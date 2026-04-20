@@ -1,0 +1,113 @@
+{
+  "original_prompt": "i should be able to assign specific Team members to specific van... schedule availability... triggers section",
+  "rephrased_goal": "Implement Many-to-Many Van-User assignments, user schedule availability, filter appointments by availability/van, and add a Triggers configuration engine.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: User Schedule Logic",
+      "subtasks_required": ["Add schedule fields to users collection", "UI in view.users.js to set days and hours"],
+      "owner": "Caveman",
+      "analogy_reference": "Paint hours on user wall",
+      "status": "pending",
+      "testing_criteria": "Can save and load weekly schedule per user."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: User Schedule Check",
+      "subtasks_required": ["Verify view.users.js saves schedule correctly to DB"],
+      "owner": "Caveman",
+      "analogy_reference": "Poke user API to check shape",
+      "status": "pending",
+      "testing_criteria": "Schedule logic works without errors."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Van Assignment Logic",
+      "subtasks_required": ["Add 'assigned_users' array to vans", "UI in view.vans.js to map technicians to van"],
+      "owner": "Caveman",
+      "analogy_reference": "Tie technicians to van cart",
+      "status": "pending",
+      "testing_criteria": "Can assign multiple technicians to a Van."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Van Assignment Check",
+      "subtasks_required": ["Verify view.vans.js saves assigned users", "Ensure data loads cleanly"],
+      "owner": "Caveman",
+      "analogy_reference": "Shake van, see who falls out",
+      "status": "pending",
+      "testing_criteria": "Save and load shows correct list."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Appointments Filtering",
+      "subtasks_required": ["Add Van selection to Add Appointment form", "Filter Tech options based on Van assignment and Day/Time availability"],
+      "owner": "Caveman",
+      "analogy_reference": "Only let right hunt member join specific hunt",
+      "status": "pending",
+      "testing_criteria": "Tech list only shows active, assigned, and available users for given van & time."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Appointment Filtering Check",
+      "subtasks_required": ["Check logic on user filtering inside appointment modal"],
+      "owner": "Caveman",
+      "analogy_reference": "Try to assign wrong man to van",
+      "status": "pending",
+      "testing_criteria": "App runs cleanly, options respond perfectly."
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Triggers Setup",
+      "subtasks_required": ["Create view.triggers.js with provided template", "Add headers JSON editing to UI", "Add to sidebar"],
+      "owner": "Caveman",
+      "analogy_reference": "Make trap for API trigger",
+      "status": "pending",
+      "testing_criteria": "View displays and can save Trigger config."
+    },
+    {
+      "id": 8,
+      "description": "Check-Pebble: Triggers Setup Check",
+      "subtasks_required": ["Verify Trigger view binds correctly"],
+      "owner": "Caveman",
+      "analogy_reference": "Look at trap",
+      "status": "pending",
+      "testing_criteria": "No frontend console errors on save/delete trigger."
+    },
+    {
+      "id": 9,
+      "description": "Do-Pebble: Triggers Engine",
+      "subtasks_required": ["Wrap firebase setDoc/updateDoc in lib/firebase.js", "Evaluate triggers logic", "Fire API fetch via trigger definition"],
+      "owner": "Caveman",
+      "analogy_reference": "When mammoth step on tripwire, rock fall",
+      "status": "pending",
+      "testing_criteria": "Updating an appointment triggers dummy fetch logic if enabled."
+    },
+    {
+      "id": 10,
+      "description": "Check-Pebble: Triggers Engine Check",
+      "subtasks_required": ["Run through update scenario", "Check logs for trigger engine fires"],
+      "owner": "Caveman",
+      "analogy_reference": "Step on tripwire, check rock",
+      "status": "pending",
+      "testing_criteria": "Engine correctly evaluates previous vs new state."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles", "Check syntax and functionality", "Ensure no uncaught type errors"],
+      "owner": "Caveman",
+      "analogy_reference": "Walk trail",
+      "status": "pending",
+      "testing_criteria": "Whole app stable."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

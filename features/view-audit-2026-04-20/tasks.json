@@ -1,0 +1,41 @@
+{
+  "original_prompt": "Audit all 14 listed views for RTDB compatibility, correct event emission, and zero remaining Firestore usage.",
+  "rephrased_goal": "Systematic audit of 14 view files to ensure correct RTDB 'subscribe' implementation and loading state management.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Audit all views for 'subscribe' and event emission.",
+      "subtasks_required": [
+        "Audit 14 files for firebase.db.subscribe",
+        "Audit 14 files for view.emit('loading:start/end')"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "All files pass visual inspection."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Spot-check critical views (Dashboard, Appointments, Vans)",
+      "subtasks_required": ["Inspect loading state triggers in critical views"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Loading triggers exist."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: Lint and Final Audit",
+      "subtasks_required": ["Run lint_applet", "Final visual inspection"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Lint passes, views confirmed."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

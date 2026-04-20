@@ -1,0 +1,2 @@
+{"ts":"2026-04-20T21:47:00Z","id":"1","action":"implemented product selection in appointments, dynamic duration calculation","artifact":"src/views/view.appointments.js","status":"PASS","resume_ctx":"products integrated fully, durations calculated, sync to calendar taking duration into account"}
+{"ts":"2026-04-20T21:52:00Z","id":"2","action":"implemented gantt chart sizing, global loaders, items download template, calendar tech names","artifact":"multiple files","status":"PASS","resume_ctx":"everything seems done based on tasks.json sweep next"}

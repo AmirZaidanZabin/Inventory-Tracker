@@ -1,0 +1,10 @@
+{
+  "projectId": "coe-datastore",
+  "appId": "1:46806042427:web:642d36d611589c6eb6191e",
+  "apiKey": "AIzaSyDQqWvJg048Y_9OUSAFWW00pusvnlJXYBw",
+  "authDomain": "coe-datastore.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-fe3d95ba-346a-48df-8c5b-76da738f53c5",
+  "storageBucket": "coe-datastore.appspot.com",
+  "messagingSenderId": "46806042427",
+  "measurementId": ""
+}

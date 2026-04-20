@@ -1,0 +1,65 @@
+{
+  "original_prompt": "Admin cannot see key icon despite being admin.",
+  "rephrased_goal": "Ensure the 'Key' icon (password override) is visible to admins in the Users module by fixing the timing and logic of authority application.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Update UsersView to expose a 'refresh' event that main.js can use",
+      "subtasks_required": ["1.1 In view.users.js, trigger a 'rendered' event after the snapshot loop finishes"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Event triggered in code."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify view.users.js event triggering",
+      "subtasks_required": ["2.1 Read view.users.js"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "view.message('rendered') present after snap loop."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Update main.js to listen for 'rendered' event in UsersView and re-apply authorities",
+      "subtasks_required": [
+        "3.1 Capture the view instance in main.js navigate",
+        "3.2 attach view.on('rendered', applyAuthorities)"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "navigate loop updated."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify main.js authority re-application",
+      "subtasks_required": ["4.1 Read main.js"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "applyAuthorities called on rendered event."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Simplify UserView button class logic just in case",
+      "subtasks_required": ["5.1 Calculate isAdmin inside UsersView and use it for initial visibility"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Button visibility logic updated."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles", "Check if key icon shows", "Run lint"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Key icon visible."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

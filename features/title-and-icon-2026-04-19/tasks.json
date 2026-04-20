@@ -1,0 +1,53 @@
+{
+  "original_prompt": "make this the icon of the application , and the title 'Inventory Tracker'",
+  "rephrased_goal": "Update app title to 'Inventory Tracker' and replace generic icons with image tags for a custom logo.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Change title and text in index.html and replace icons with logo.png img tags",
+      "subtasks_required": [
+        "Change <title>",
+        "Change login header text",
+        "Change sidebar header text",
+        "Change mobile header text",
+        "Replace login bi-box-seam with img tag",
+        "Replace sidebar bi-box-seam with img tag"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "index.html uses 'Inventory Tracker' and /logo.png."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify index.html changes",
+      "subtasks_required": ["Read index.html lines"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "No Pico Tracker text exists."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Update metadata.json to reflect new name",
+      "subtasks_required": ["Read metadata.json", "Edit metadata.json name attribute"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "metadata.json updated."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Compile applet"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Build pass."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

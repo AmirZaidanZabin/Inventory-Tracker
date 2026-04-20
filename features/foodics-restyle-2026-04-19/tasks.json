@@ -1,0 +1,56 @@
+{
+  "original_prompt": "use the skill provided to copy the styling provided in the screenshot but without changing any entity names or adding none functional buttons, or assuming the styling of things not provided",
+  "rephrased_goal": "Apply the Foodics-like aesthetic from the screenshot to the existing app structure by updating index.html styles. This includes a light sidebar, purple brand colors, specific table styling, and card styling, without altering app functionality or entity names.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Update index.html CSS variables and sidebar themes",
+      "subtasks_required": [
+        "Change --primary-color to the brand purple",
+        "Add --sidebar-bg, --sidebar-text variables",
+        "Update sidebar background and text colors to match the light theme",
+        "Update nav-link active state to have left-border and light purple background"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "CSS variables and .nav-link active classes updated in index.html."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify index.html sidebar changes",
+      "subtasks_required": ["Check if styling is correct"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "index.html reads with new CSS."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Update table and button styling in index.html to match screenshot",
+      "subtasks_required": [
+        "Update .modern-table to flat borders, less bold headers, no italic, title case instead of uppercase based on screenshot",
+        "Update table hover effect",
+        "Update the body background to match screenshot's main area white/light-grey",
+        "Update .card shadow to be more flat if necessary"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Table and card CSS classes updated."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles", "Check visual constraints", "Run lint"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "No broken CSS, matching the Foodics design system."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

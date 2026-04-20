@@ -1,0 +1,68 @@
+{
+  "original_prompt": "Continue implementing loading indicators and Gantt refinements/availability fix.",
+  "rephrased_goal": "Ensure all views have proper loading indicators and refine the appointment availability/Gantt chart according to user requests.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Verify loading logic in view.appointments.js",
+      "subtasks_required": ["Read view.appointments.js init", "Ensure loading:end is in finally or snapshot end"],
+      "owner": "Caveman",
+      "analogy_reference": "Check water hole for leaks",
+      "status": "done",
+      "testing_criteria": "loading:end is correctly placed."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Test appointments loader",
+      "subtasks_required": ["Verify view.appointments.js code"],
+      "owner": "Caveman",
+      "analogy_reference": "Poke water hole with stick",
+      "status": "done",
+      "testing_criteria": "Code has loading:start and loading:end."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Refine Appointment Modal Availability Grid",
+      "subtasks_required": ["Change Tech-specific slots to 'Available Slots' aggregate or anonymized"],
+      "owner": "Caveman",
+      "analogy_reference": "Hide hunters until deer caught",
+      "status": "done",
+      "testing_criteria": "Grid shows availability regardless of technician names."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify shift in logic for availability",
+      "subtasks_required": ["Read modified view.appointments.js"],
+      "owner": "Caveman",
+      "analogy_reference": "Check hidey spot",
+      "status": "done",
+      "testing_criteria": "Availability grid logic updated."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Final audit of all views for loader consistency",
+      "subtasks_required": ["Check Stock, Triggers, Reporting, Forms, ProductTypes"],
+      "owner": "Caveman",
+      "analogy_reference": "Count all berries in basket",
+      "status": "done",
+      "testing_criteria": "All views confirmed to have emit('loading:...')."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles", "Check for missing logic", "Verify everything works"],
+      "owner": "Caveman",
+      "analogy_reference": "Walk whole trail before sleep",
+      "status": "done",
+      "testing_criteria": "Project cave clean."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

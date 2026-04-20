@@ -1,0 +1,83 @@
+{
+  "original_prompt": "Fix innerHTML undefined error during polling updates.",
+  "rephrased_goal": "Resolve 'Cannot set properties of undefined (setting innerHTML)' by fixing missing onboards and implementing proper view lifecycle cleanup.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Fix AppointmentDetailView missing onboards",
+      "subtasks_required": [
+        "Read src/views/view.appointment_detail.js",
+        "Add available-hardware, hardware-pairs, hardware-list-display, and add-pair-btn to onboard call"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "sharpen spear tips",
+      "status": "pending",
+      "testing_criteria": "View loads without immediate crash on data fetch."
+    },
+    {
+       "id": 2,
+       "description": "Check-Pebble: Verify AppointmentDetailView stability",
+       "subtasks_required": [
+         "Run app",
+         "Navigate to an appointment detail"
+       ],
+       "owner": "Caveman",
+       "analogy_reference": "poke spear at target",
+       "status": "pending",
+       "testing_criteria": "No innerHTML error on detail page."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Enhance controller.js with cleanup support",
+      "subtasks_required": [
+        "Modify src/lib/controller.js to track unsubscriptions",
+        "Add view.unsub(fn) method",
+        "Ensure destroy() calls all unsubs"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "clean cave before guests",
+      "status": "pending",
+      "testing_criteria": "Unsubs are executed when controller.destroy() is called."
+    },
+    {
+      "id": 4,
+      "description": "Do-Pebble: Fix main.js navigation lifecycle",
+      "subtasks_required": [
+        "In src/main.js, keep track of currentView",
+        "Call currentView.destroy() before switching to new view"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "close old cave door",
+      "status": "pending",
+      "testing_criteria": "Listeners from old views are stopped when navigating."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Use unsubs in all views",
+      "subtasks_required": [
+        "Update all views to pass onSnapshot unsub results to view.unsub()"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "stop echo in cave",
+      "status": "pending",
+      "testing_criteria": "No cross-contamination of polling between views."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Check all innerHTML usages for guards", "Ensure all views are robust"],
+      "owner": "Caveman",
+      "analogy_reference": "walk trail one last time",
+      "status": "pending",
+      "testing_criteria": "App is error-free."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

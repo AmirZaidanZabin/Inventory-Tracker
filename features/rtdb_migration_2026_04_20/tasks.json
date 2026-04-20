@@ -1,0 +1,119 @@
+{
+  "original_prompt": "migrate the database to an FB RTDB - make sure that all the data entities are normalized - transactions like [user history/ audit history] are in their on tablas in the db - joins will happen on the server based on if the: /entity/$id: Contains only the essentials and forign ids, things that dont change often /entity_history/$uid: Contains the transactional data.",
+  "rephrased_goal": "Migrate from Firestore to Realtime Database with a dual-path normalization strategy, using server-side logic to join essential data and transactional history.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Initialize RTDB in server.js and update health check",
+      "subtasks_required": [
+        "Import getDatabase from firebase-admin/database",
+        "Add databaseURL to initializeApp",
+        "Update /api/health to check rtdb connectivity"
+      ],
+      "owner": "Caveman",
+      "status": "completed",
+      "testing_criteria": "/api/health returns rtdbAccessible: true"
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify RTDB connectivity",
+      "subtasks_required": [
+        "Hit /api/health endpoint",
+        "Inspect server logs for successful DB connection"
+      ],
+      "owner": "Caveman",
+      "status": "completed",
+      "testing_criteria": "Server starts and health check passes."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Implement Normalization Schemas and Helpers",
+      "subtasks_required": [
+        "Define SCHEMAS with essential fields for users, vans, items, appointments, product_types, roles, forms",
+        "Implement getNormalized(col, id) for server-side join",
+        "Implement saveNormalized(col, id, data) for dual-path storage"
+      ],
+      "owner": "Caveman",
+      "status": "completed",
+      "testing_criteria": "Helpers handle essentials and history paths correctly."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Test Normalized Helpers",
+      "subtasks_required": [
+        "Verify timestamp conversion to ISO in getNormalized",
+        "Verify server value timestamp injection in saveNormalized"
+      ],
+      "owner": "Caveman",
+      "status": "completed",
+      "testing_criteria": "Data structure matches expectations in RTDB."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Migrate Generic CRUD Routes to RTDB",
+      "subtasks_required": [
+        "Update app.get(/api/:col) to fetch and combine normalized docs",
+        "Update app.get(/api/:col/:id) to use getNormalized",
+        "Update app.post(/api/:col) to use saveNormalized",
+        "Update app.put(/api/:col/:id) to use saveNormalized",
+        "Update app.delete(/api/:col/:id) to remove from essentials path"
+      ],
+      "owner": "Caveman",
+      "status": "completed",
+      "testing_criteria": "All CRUD endpoints operational with RTDB."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify CRUD Operations",
+      "subtasks_required": [
+        "Perform test POST and verify split into /col and /col_history",
+        "Perform test GET and verify joined result"
+      ],
+      "owner": "Caveman",
+      "status": "completed",
+      "testing_criteria": "Data is correctly stored and retrieved."
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Update Trigger Engine for RTDB",
+      "subtasks_required": [
+        "Modify runTriggers to fetch definitions from RTDB 'triggers' path",
+        "Update trigger evaluation to use RTDB objects"
+      ],
+      "owner": "Caveman",
+      "status": "completed",
+      "testing_criteria": "Triggers fire based on RTDB data changes."
+    },
+    {
+      "id": 8,
+      "description": "Check-Pebble: Verify Triggers",
+      "subtasks_required": [
+        "Run an update that should match a trigger",
+        "Observe action execution in logs"
+      ],
+      "owner": "Caveman",
+      "status": "completed",
+      "testing_criteria": "Trigger logic is sound with RTDB."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS SWEEP",
+      "subtasks_required": [
+        "Grep for any remaining 'db.' or 'collection(' calls in server.js",
+        "Verify all collections in `collections` array are included",
+        "Update wiki.json with new architecture"
+      ],
+      "owner": "Caveman",
+      "status": "completed",
+      "testing_criteria": "Project fully migrated to RTDB."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

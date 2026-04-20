@@ -1,0 +1,40 @@
+{
+  "original_prompt": "Fix the following errors: Uncaught ReferenceError: activeTechSelect is not defined",
+  "rephrased_goal": "Remove lingering activeTechSelect references that were not completely erased during the auto-assignment refactor, causing runtime cell-click errors in the grid.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Remove activeTechSelect from grid cell click logic.",
+      "subtasks_required": [
+        "Replace activeTechSelect condition with just selectedTechId assignment in updateDailyGrid"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "activeTechSelect does not exist in code."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify removal",
+      "subtasks_required": ["Execute grep to ensure no occurrences"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Grep returns no results."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: Build and Lint",
+      "subtasks_required": ["Compile and lint application"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Succeeds."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

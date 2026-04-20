@@ -1,0 +1,153 @@
+{
+  "entities": {
+    "Van": {
+      "title": "Van",
+      "description": "Inventory storage location",
+      "type": "object",
+      "properties": {
+        "van_id": { "type": "string" },
+        "location_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "is_deleted": { "type": "boolean" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["van_id", "location_id"]
+    },
+    "Item": {
+      "title": "Item",
+      "description": "Inventory item (Sim Card or Pico Device)",
+      "type": "object",
+      "properties": {
+        "item_type": { "type": "string", "enum": ["Sim Card", "Pico Device"] },
+        "item_id": { "type": "string" },
+        "item_name": { "type": "string" },
+        "provider": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "is_available": { "type": "boolean" },
+        "is_deleted": { "type": "boolean" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["item_type", "item_id"]
+    },
+    "Role": {
+      "title": "Role",
+      "description": "User role and authorities",
+      "type": "object",
+      "properties": {
+        "role_id": { "type": "string" },
+        "role_name": { "type": "string" },
+        "authorities": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "is_deleted": { "type": "boolean" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["role_id", "role_name"]
+    },
+    "User": {
+      "title": "User",
+      "description": "System user",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "role_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "is_deleted": { "type": "boolean" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["user_id", "user_name", "role_id"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Technician appointment",
+      "type": "object",
+      "properties": {
+        "appointment_id": { "type": "string" },
+        "appointment_name": { "type": "string" },
+        "schedule_date": { "type": "string" },
+        "appointment_time": { "type": "string" },
+        "location_name": { "type": "string" },
+        "tech_id": { "type": "string" },
+        "van_id": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed"] },
+        "is_deleted": { "type": "boolean" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["appointment_id", "appointment_name", "schedule_date", "tech_id"]
+    },
+    "ProductType": {
+      "title": "Product Type",
+      "description": "Definition of installable products with installation duration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "duration_minutes": { "type": "number" },
+        "custom_fields": { "type": "array" }
+      },
+      "required": ["id", "name", "duration_minutes"]
+    },
+    "StockTake": {
+      "title": "Stock Take",
+      "description": "Daily stock report log",
+      "type": "object",
+      "properties": {
+        "log_id": { "type": "string" },
+        "type": { "type": "string", "enum": ["morning_load", "evening_reconcile"] },
+        "user_email": { "type": "string" },
+        "count": { "type": "number" },
+        "scanned_items": { "type": "array", "items": { "type": "string" } },
+        "missing": { "type": "array", "items": { "type": "string" } },
+        "extra": { "type": "array", "items": { "type": "string" } },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["log_id", "type", "user_email", "count", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/vans/{vanId}": {
+      "schema": { "$ref": "Van" },
+      "description": "Van fleet collection"
+    },
+    "/items/{itemId}": {
+      "schema": { "$ref": "Item" },
+      "description": "Inventory items collection"
+    },
+    "/roles/{roleId}": {
+      "schema": { "$ref": "Role" },
+      "description": "User roles collection"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "Users collection"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "Appointment" },
+      "description": "Appointments collection"
+    },
+    "/stock_takes/{logId}": {
+      "schema": { "$ref": "StockTake" },
+      "description": "Stock take history"
+    },
+    "/saved_reports/{reportId}": {
+      "schema": { "type": "object", "properties": { "name": { "type": "string" }, "query": { "type": "string" } } },
+      "description": "Saved SQL reports"
+    },
+    "/forms/{formId}": {
+      "schema": { "type": "object" },
+      "description": "Custom form configurations"
+    },
+    "/triggers/{triggerId}": {
+      "schema": { "type": "object" },
+      "description": "Automation triggers"
+    },
+    "/product_types/{typeId}": {
+      "schema": { "$ref": "ProductType" },
+      "description": "Product type configurations"
+    }
+  }
+}

@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role_id == 'admin') ||
+              (request.auth.token.email.lower() == "amir.zaidan.zabin@gmail.com" ||
+               request.auth.token.email.lower() == "amirzaidanzabin@gmail.com"));
+    }
+
+    // Users: Anyone authenticated can read, only admins or self can write
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow update: if isAdmin() || (request.auth.uid == userId && request.resource.data.role_id == resource.data.role_id);
+      allow delete: if isAdmin();
+    }
+
+    // Vans, Items, Appointments: Auth users can read, admins can write
+    match /vans/{vanId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    match /items/{itemId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    match /appointments/{aptId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_deleted']) && request.resource.data.is_deleted == true)
+      );
+      allow delete: if isAdmin();
+    }
+    
+    match /roles/{roleId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+
+    match /forms/{formId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /triggers/{triggerId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /saved_reports/{reportId} {
+      allow read, write, delete: if isAuthenticated();
+    }
+  }
+}

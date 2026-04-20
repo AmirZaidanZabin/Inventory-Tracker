@@ -1,0 +1,34 @@
+{
+  "original_prompt": "make this on the next line not wrapped around the logo",
+  "rephrased_goal": "Modify the sidebar header HTML so the application name drops to a new line below the logo image instead of rendering inline alongside it.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Change layout of logo and text inside the h5 in the sidebar",
+      "subtasks_required": [
+        "Replace 'me-2' class with 'd-block mb-2' on the logo img tag",
+        "Adjust logo size to 32px since it is now on its own row",
+        "Adjust font-size of text so it pairs well below the logo"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Logo has display:block forcing span to next line."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: Build test",
+      "subtasks_required": ["Execute compile and lint"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Build successful"
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

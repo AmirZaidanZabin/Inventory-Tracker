@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <style>
+        :root {
+            --sidebar-width: 240px;
+            --sidebar-min-width: 80px;
+            --primary-color: #532870;
+            --accent-color: #532870;
+            --bg-main: #f4f5f7;
+            --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --radius: 8px;
+            --sidebar-bg: #f9fafb;
+            --sidebar-text: #4b5563;
+        }
+        body {
+            background-color: var(--bg-main);
+            font-family: 'Inter', -apple-system, sans-serif;
+            color: #1f2937;
+        }
+        h1, h2, h3, h4, h5, h6, .fw-bold {
+            font-family: 'Outfit', sans-serif;
+        }
+        #sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            background: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            border-right: 1px solid #e5e7eb;
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #sidebar.minimized {
+            width: var(--sidebar-min-width);
+        }
+        #sidebar.minimized .sidebar-text,
+        #sidebar.minimized .user-details {
+            display: none;
+        }
+        #sidebar.minimized .nav-link {
+            justify-content: center;
+            padding: 0.8rem 0;
+        }
+        #sidebar.minimized .nav-link i {
+            margin-right: 0 !important;
+            font-size: 1.2rem;
+        }
+        #sidebar.minimized .p-4.border-bottom h5 {
+            display: none;
+        }
+        #sidebar.minimized .p-4.border-bottom {
+            text-align: center;
+        }
+        #main-content {
+            margin-left: var(--sidebar-width);
+            padding: 2rem;
+            min-height: 100vh;
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #sidebar.minimized + #main-content {
+            margin-left: var(--sidebar-min-width);
+        }
+        
+        /* Mobile Header */
+        #mobile-header {
+            display: none;
+            background: #fff;
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            position: sticky;
+            top: 0;
+            z-index: 900;
+        }
+
+        @media (max-width: 992px) {
+            #sidebar {
+                left: -100%;
+            }
+            #sidebar.show {
+                left: 0;
+                width: var(--sidebar-width) !important;
+            }
+            #sidebar.show .sidebar-text,
+            #sidebar.show .user-details {
+                display: inline !important;
+            }
+            #main-content {
+                margin-left: 0 !important;
+                padding: 1rem;
+            }
+            #mobile-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
+            }
+            .sidebar-overlay.show {
+                display: block;
+            }
+        }
+        #sidebar .nav-link {
+            color: #4b5563;
+            padding: 0.8rem 1.5rem;
+            border-radius: 4px;
+            margin: 0.2rem 1.2rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+        #sidebar .nav-link:hover {
+            background-color: #f3f4f6;
+            color: #111827;
+        }
+        #sidebar .nav-link.active {
+            background-color: #f3e8ff;
+            color: var(--primary-color);
+            border-left: 4px solid var(--primary-color);
+            border-radius: 0 4px 4px 0;
+        }
+        .sidebar-category {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #9ca3af;
+            margin: 1.5rem 1.7rem 0.5rem;
+            font-weight: 700;
+        }
+        #sidebar.minimized .sidebar-category {
+            display: none;
+        }
+        .card {
+            border: 1px solid #e5e7eb;
+            box-shadow: var(--card-shadow);
+            border-radius: var(--radius);
+            background: #fff;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        
+        /* Global Loader Wrapper */
+        #global-loader {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.8);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(2px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        
+        #global-loader.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        /* SVG Spinner */
+        .loader-spinner {
+            width: 50px;
+            height: 50px;
+            animation: rotate 2s linear infinite;
+        }
+        
+        .loader-spinner circle {
+            stroke: var(--primary-color);
+            stroke-width: 4;
+            stroke-dasharray: 1, 200;
+            stroke-dashoffset: 0;
+            animation: dash 1.5s ease-in-out infinite;
+            stroke-linecap: round;
+        }
+        
+        @keyframes rotate {
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes dash {
+            0% { stroke-dasharray: 1, 200; stroke-dashoffset: 0; }
+            50% { stroke-dasharray: 90, 200; stroke-dashoffset: -35px; }
+            100% { stroke-dasharray: 90, 200; stroke-dashoffset: -124px; }
+        }
+        .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        .login-card { transition: all 0.3s ease; }
+        .card-header {
+            background: #fff !important;
+            border-bottom: 1px solid #f3f4f6;
+            padding: 1.25rem;
+            font-weight: 600;
+        }
+        .btn-dark {
+            background: var(--primary-color);
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .btn-dark:hover {
+            background: #333;
+        }
+        .form-control, .form-select {
+            border: 1px solid #e5e7eb;
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+        }
+        .form-control:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        #auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: #fff;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .badge {
+            padding: 0.5em 0.8em;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            letter-spacing: 0.02em;
+        }
+        /* Pale Status Colors */
+        .badge-pale-primary { background-color: #eff6ff; color: #1d4ed8; }
+        .badge-pale-success { background-color: #f0fdf4; color: #15803d; }
+        .badge-pale-warning { background-color: #fffbeb; color: #a16207; }
+        .badge-pale-danger { background-color: #fef2f2; color: #b91c1c; }
+        .badge-pale-info { background-color: #f0f9ff; color: #0369a1; }
+        .badge-pale-secondary { background-color: #f9fafb; color: #4b5563; }
+
+        /* Consistent Button Themes */
+        .btn-pico {
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            border: 1px solid transparent;
+        }
+        .btn-pico-primary {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .btn-pico-primary:hover {
+            background-color: #333;
+            transform: translateY(-1px);
+        }
+        .btn-pico-outline {
+            background-color: #fff;
+            border-color: #e5e7eb;
+            color: #374151;
+        }
+        .btn-pico-outline:hover {
+            background-color: #f9fafb;
+            border-color: #d1d5db;
+        }
+        .btn-pico-danger-outline {
+            background-color: #fff;
+            border-color: #fee2e2;
+            color: #b91c1c;
+        }
+        .btn-pico-danger-outline:hover {
+            background-color: #fef2f2;
+            border-color: #fecaca;
+        }
+
+        /* Table Action Buttons */
+        .table-action-btn {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .table thead th {
+            background: #ffffff;
+            text-transform: none;
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: #111827;
+            border-bottom: 2px solid #f3f4f6;
+            vertical-align: middle;
+        }
+        .table tbody td {
+            vertical-align: middle;
+            font-size: 0.875rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        /* Modern Table Styles */
+        .modern-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            border: 1px solid #f3f4f6;
+        }
+        .modern-table thead th {
+            background: #ffffff;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 700;
+            text-transform: none;
+            color: #111827;
+            padding: 16px;
+            border-bottom: 2px solid #f3f4f6;
+            text-align: left;
+        }
+        .modern-table tbody tr {
+            transition: background 0.2s ease;
+            cursor: pointer;
+        }
+        .modern-table tbody tr:hover {
+            background: #f9fafb;
+        }
+        .modern-table tbody td {
+            padding: 16px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.875rem;
+            vertical-align: middle;
+        }
+        .modern-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .data-mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #4b5563;
+        }
+
+        /* Modal Animations */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content-custom {
+            background: #fff;
+            width: 100%;
+            max-width: 500px;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            padding: 2rem;
+        }
+        .modal-overlay.show .modal-content-custom {
+            transform: translateY(0);
+        }
+        .modal-fade-out {
+            opacity: 0 !important;
+            transform: translateY(20px) !important;
+        }
+
+        .hidden { display: none !important; }
+        
+        /* Clean Tabs */
+        .nav-tabs {
+            border-bottom: 2px solid #f3f4f6;
+            margin-bottom: 1rem;
+        }
+        .nav-tabs .nav-link {
+            border: none;
+            color: #6b7280;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            margin: 0;
+            background: transparent;
+            border-bottom: 2px solid transparent;
+            border-radius: 0;
+            margin-bottom: -2px;
+        }
+        .nav-tabs .nav-link:hover {
+            color: #111827;
+            background: transparent;
+        }
+        .nav-tabs .nav-link.active {
+            color: var(--primary-color);
+            background: transparent;
+            border-bottom: 2px solid var(--primary-color);
+        }
+        
+        /* Fade Transitions */
+        #view-container {
+            transition: opacity 0.3s ease-in-out;
+            opacity: 1;
+        }
+        #view-container.fade-out {
+            opacity: 0;
+        }
+
+        /* SQL Highlighting */
+        .sql-editor-container {
+            position: relative;
+            min-height: 120px;
+        }
+        .sql-backdrop {
+            position: absolute;
+            inset: 0;
+            padding: 0.6rem 1rem;
+            border: 1px solid transparent;
+            pointer-events: none;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow: hidden;
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            color: transparent;
+        }
+        .sql-textarea {
+            position: relative;
+            background: transparent !important;
+            color: transparent !important;
+            caret-color: #1f2937;
+            z-index: 1;
+        }
+        .sql-highlighted {
+            position: absolute;
+            inset: 0;
+            padding: 0.6rem 1rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow: hidden;
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            pointer-events: none;
+        }
+        .sidebar-category {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+        .sidebar-category:hover {
+            color: #4b5563;
+        }
+        .sidebar-category .chevron {
+            transition: transform 0.2s;
+            font-size: 0.8rem;
+        }
+        .sidebar-category.collapsed .chevron {
+            transform: rotate(-90deg);
+        }
+    </style>
+</head>
+<body>
+    <!-- Global Loader -->
+    <div id="global-loader">
+        <svg class="loader-spinner" viewBox="0 0 50 50">
+            <circle cx="25" cy="25" r="20" fill="none"></circle>
+        </svg>
+    </div>
+
+    <div id="auth-overlay">
+        <div class="text-center login-card" style="width: 100%; max-width: 400px; padding: 2rem;">
+            <img src="/logo.png" alt="Inventory Tracker" style="max-height: 48px; object-fit: contain; width: auto;" class="mb-4">
+            <h1 class="h3 mb-4 font-weight-normal">Inventory Tracker</h1>
+            
+            <div id="login-forms-container">
+                <!-- Main Login Form -->
+                <div id="login-main-form">
+                    <div class="mb-3 text-start">
+                        <label class="form-label small fw-bold">Email Address</label>
+                        <input type="email" id="login-email" class="form-control" placeholder="name@company.com">
+                    </div>
+                    <div class="mb-3 text-start">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label class="form-label small fw-bold">Password</label>
+                            <a href="#" id="show-forgot-btn" class="text-accent small text-decoration-none">Forgot?</a>
+                        </div>
+                        <div class="input-group">
+                            <input type="password" id="login-password" class="form-control" placeholder="••••••••">
+                            <button class="btn btn-outline-secondary" type="button" id="toggle-password">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="login-error" class="alert alert-danger small py-2 hidden mb-3"></div>
+                    <button id="email-login-btn" class="btn btn-dark w-100 py-2 mb-3">Sign In</button>
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <hr class="flex-grow-1">
+                        <span class="px-3 text-muted small">OR</span>
+                        <hr class="flex-grow-1">
+                    </div>
+                    
+                    <button id="login-btn" class="btn btn-outline-dark w-100 py-2 mb-3">
+                        <i class="bi bi-google me-2"></i> Sign in with Google
+                    </button>
+                </div>
+
+                <!-- Forgot Password Form -->
+                <div id="forgot-password-form" class="hidden">
+                    <h5 class="mb-3 fw-bold">Reset Password</h5>
+                    <p class="text-muted small mb-4">Enter your email and we'll send you a reset link.</p>
+                    <div class="mb-3 text-start">
+                        <label class="form-label small fw-bold">Email Address</label>
+                        <input type="email" id="reset-email" class="form-control" placeholder="name@company.com">
+                    </div>
+                    <button id="send-reset-btn" class="btn btn-dark w-100 py-2 mb-3">Send Reset Link</button>
+                    <button id="back-to-login-btn" class="btn btn-link text-decoration-none text-muted small w-100">Back to Login</button>
+                </div>
+            </div>
+
+            <button id="guest-btn" class="btn btn-link text-decoration-none text-muted btn-sm mt-3">
+                Continue as Guest
+            </button>
+        </div>
+    </div>
+
+    <div id="app-shell" class="hidden">
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+        <aside id="sidebar">
+            <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold" style="color: var(--primary-color)">
+                    <img src="/logo.png" alt="Logo" style="height: 32px; object-fit: contain; width: auto;" class="d-block mb-1">
+                    <span class="sidebar-text" style="font-size: 1.1rem; letter-spacing: -0.02em;">Inventory Tracker</span>
+                </h5>
+                <button id="sidebar-toggle" class="btn btn-link text-muted p-0 d-none d-lg-block ms-3">
+                    <i class="bi bi-list fs-4"></i>
+                </button>
+            </div>
+            <nav class="nav flex-column mt-3" id="main-nav">
+                <a class="nav-link auth-dashboard hidden" href="#" data-view="dashboard"><i class="bi bi-speedometer2 me-2"></i><span class="sidebar-text">Dashboard</span></a>
+                
+                <div class="sidebar-category collapsed" data-group="views">
+                    <span>Views</span>
+                    <i class="bi bi-chevron-down chevron"></i>
+                </div>
+                <div class="sidebar-group d-none" id="group-views">
+                    <a class="nav-link" href="#" data-view="calendar"><i class="bi bi-calendar-range me-2"></i><span class="sidebar-text">Calendar</span></a>
+                    <a class="nav-link" href="#" data-view="gantt"><i class="bi bi-bar-chart-steps me-2"></i><span class="sidebar-text">Gantt Chart</span></a>
+                    <a class="nav-link auth-appointments hidden" href="#" data-view="appointments"><i class="bi bi-calendar-event me-2"></i><span class="sidebar-text">Appointments</span></a>
+                </div>
+                
+                <div class="sidebar-category collapsed auth-reporting:view hidden" data-group="reporting">
+                    <span>Reporting</span>
+                    <i class="bi bi-chevron-down chevron"></i>
+                </div>
+                <div class="sidebar-group d-none" id="group-reporting">
+                    <a class="nav-link auth-reporting:view hidden" href="#" data-view="reporting"><i class="bi bi-graph-up me-2"></i><span class="sidebar-text">Insights</span></a>
+                </div>
+                
+                <div class="sidebar-category collapsed auth-inventory:view hidden" data-group="inventory">
+                    <span>Inventory</span>
+                    <i class="bi bi-chevron-down chevron"></i>
+                </div>
+                <div class="sidebar-group d-none" id="group-inventory">
+                    <a class="nav-link auth-stock:view hidden" href="#" data-view="stock"><i class="bi bi-clipboard2-check me-2"></i><span class="sidebar-text">Stock Takes</span></a>
+                    <a class="nav-link auth-items:view hidden" href="#" data-view="items"><i class="bi bi-phone me-2"></i><span class="sidebar-text">Hardware</span></a>
+                    <a class="nav-link auth-vans:view hidden" href="#" data-view="vans"><i class="bi bi-truck me-2"></i><span class="sidebar-text">Van Fleet</span></a>
+                </div>
+                
+                <div class="sidebar-category collapsed auth-settings:view hidden" data-group="settings">
+                    <span>Settings</span>
+                    <i class="bi bi-chevron-down chevron"></i>
+                </div>
+                <div class="sidebar-group d-none" id="group-settings">
+                    <a class="nav-link auth-users:view hidden" href="#" data-view="users"><i class="bi bi-people me-2"></i><span class="sidebar-text">Users</span></a>
+                    <a class="nav-link auth-roles:view hidden" href="#" data-view="roles"><i class="bi bi-shield-lock me-2"></i><span class="sidebar-text">Roles</span></a>
+                    <a class="nav-link auth-triggers:view hidden" href="#" data-view="triggers"><i class="bi bi-lightning-charge me-2"></i><span class="sidebar-text">Triggers</span></a>
+                    <a class="nav-link auth-forms:view hidden" href="#" data-view="forms"><i class="bi bi-ui-checks me-2"></i><span class="sidebar-text">Custom Forms</span></a>
+                    <a class="nav-link auth-admin hidden" href="#" data-view="product_types"><i class="bi bi-box-seam me-2"></i><span class="sidebar-text">Product Types</span></a>
+                </div>
+                
+                <a class="nav-link auth-admin hidden" href="#" id="run-app-tests" style="margin-top: 1rem;"><i class="bi bi-check2-circle me-2"></i><span class="sidebar-text">Run Tests</span></a>
+            </nav>
+            <div class="position-absolute bottom-0 w-100 p-3 border-top" style="border-top: 1px solid #e5e7eb !important; background: #fff;">
+                <div class="d-flex align-items-center mb-3 px-2">
+                    <img id="user-avatar" src="" class="rounded-circle me-2" width="32" height="32" style="border: 2px solid #e5e7eb;">
+                    <div class="overflow-hidden user-details">
+                        <div id="user-name" class="small fw-bold text-truncate text-dark"></div>
+                        <div id="user-role" class="text-muted" style="font-size: 0.7rem;"></div>
+                    </div>
+                </div>
+                <button id="logout-btn" class="btn btn-outline-secondary btn-sm w-100">
+                    <i class="bi bi-box-arrow-right me-2"></i><span class="sidebar-text">Sign Out</span>
+                </button>
+            </div>
+        </aside>
+
+        <main id="main-content">
+            <header id="mobile-header">
+                <button id="mobile-toggle" class="btn btn-link text-dark p-0">
+                    <i class="bi bi-list fs-3"></i>
+                </button>
+                <h5 class="mb-0 fw-bold">Inventory Tracker</h5>
+                <div style="width: 32px;"></div> <!-- Spacer -->
+            </header>
+            <header class="mb-4 d-flex justify-content-between align-items-center d-none d-lg-flex">
+                <h2 id="view-title" class="fw-bold">Dashboard</h2>
+                <div id="view-actions"></div>
+            </header>
+            <div id="view-container"></div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>

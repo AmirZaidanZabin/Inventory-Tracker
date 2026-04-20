@@ -1,0 +1,20 @@
+{
+  "general_facts": [
+    "App uses Firebase Realtime Database with dual-path normalization (essentials vs history).",
+    "Essentials: Static data and foreign keys at /entity/$id.",
+    "History: Transactional logs and frequent changes at /entity_history/$id.",
+    "Loading indicators are managed via view.emit('loading:start') and view.emit('loading:end') in main.js.",
+    "Global loader element is #global-loader in index.html.",
+    "Product Types are stored in the normalized RTDB structure.",
+    "Frontend controller needs to support emit() for event handling."
+  ],
+  "tech_stack": {
+    "frontend": "React-like controller library (custom), Bootstrap 5, D3.js (Dashboard), Leaflet.js (Vans/Appointments)",
+    "backend": "Firebase Realtime Database (Normalized Admin logic)"
+  },
+  "FAQ": {
+    "Events": [
+      {"Q": "Why is view.emit not a function?", "A": "The custom controller library missing event emitter capability."}
+    ]
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "original_prompt": "deletion is not working for any entities",
+  "rephrased_goal": "Fix deletion logic across all modules by resolving dynamic element listener binding issues, improving polling frequency for reactive UI updates, and ensuring async operations provide feedback.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Improve polling frequency in firebase.js",
+      "subtasks_required": [
+        "Change setInterval in onSnapshot from 10000ms to 2000ms"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "UI updates faster after changes."
+    },
+    {
+      "id": 2,
+      "description": "Do-Pebble: Fix view.forms.js deletion/edit listeners",
+      "subtasks_required": [
+        "Replace view.$(...) with container.querySelector(...) inside renderFormsList"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Forms can be deleted."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Fix view.triggers.js deletion/edit listeners",
+      "subtasks_required": [
+        "Replace view.$(...) with list.querySelector(...) inside renderTriggersList",
+        "Add await to deleteDoc and provide console feedack"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Triggers can be deleted."
+    },
+    {
+      "id": 4,
+      "description": "Do-Pebble: Audit view.vans.js, view.items.js, view.users.js",
+      "subtasks_required": [
+        "Ensure delete listeners use await and handle success/error feedback"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Hard deletions work and are responsive."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": [
+        "Lint all modified views",
+        "Verify all 'delete' buttons across app use correct selectors"
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Application builds and functions."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

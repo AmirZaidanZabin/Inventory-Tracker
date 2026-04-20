@@ -1,0 +1,70 @@
+{
+  "original_prompt": "Better visual feedback for login errors and working admin password change.",
+  "rephrased_goal": "Improve login error UI with animations and status messages; ensure admin password override works correctly in UsersView.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Add error message placeholder and shake animation CSS to index.html",
+      "subtasks_required": ["1.1 Update CSS in index.html for .login-error and @keyframes shake", "1.2 Add <div id='login-error'> to login card"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "HTML/CSS exists in file."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify index.html changes",
+      "subtasks_required": ["2.1 Read index.html"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "CSS and Div present."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Update main.js login logic to show error message and shake card",
+      "subtasks_required": ["3.1 Modify email-login-btn trigger", "3.2 Use login-error div instead of alert"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Code uses login-error div."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify main.js changes",
+      "subtasks_required": ["4.1 Read main.js"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "No alert for common errors."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Fix User ID logic in view.users.js for password reset",
+      "subtasks_required": ["5.1 Ensure user.user_id is used for password reset API call", "5.2 Add loading state to password reset button"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Button has loading state, uses correct ID."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify view.users.js changes",
+      "subtasks_required": ["6.1 Read view.users.js"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Logic updated."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all auth flows", "Check server.js for any missing permissions", "Run lint"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Project solid."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

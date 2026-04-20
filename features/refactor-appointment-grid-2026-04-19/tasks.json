@@ -1,0 +1,46 @@
+{
+  "original_prompt": "technicians shouldnt show up here, it should be the availablity regardless",
+  "rephrased_goal": "Replace the technician-specific columns in the daily schedule view with a single 'Availability' column that aggregates available slots based on dynamic technician capability, and colors accordingly.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Refactor updateDailyGrid",
+      "subtasks_required": [
+        "Change grid template columns to Time + 1 Availability column.",
+        "Change header to just 'Availability'.",
+        "Map over hours and for each hour, filter currentValidTechs to find unbooked, scheduled techs.",
+        "Render the cell showing available slot count with color coded opacity, or 'Fully Booked'."
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Grid renders a single availability column instead of tech columns."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify click binding works",
+      "subtasks_required": [
+        "Ensure data-tech uses the first available tech so that selectedTechId is valid.",
+        "Ensure select-slot-btn works properly."
+      ],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Clicking an available cell sets selectedTechId and highlights cell."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: Lint and Check",
+      "subtasks_required": ["Check for any syntax errors or regressions"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Code runs without errors."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}
