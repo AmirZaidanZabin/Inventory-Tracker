@@ -205,6 +205,7 @@ export function VansView() {
             view.delete('vans-list');
             const list = view.$('vans-list');
             view.emit('loading:end');
+            view.emit('rendered');
             if (!list) return;
 
             if (snap && snap.forEach) {

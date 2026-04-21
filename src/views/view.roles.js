@@ -98,6 +98,7 @@ export function RolesView() {
             view.delete('roles-list');
             const list = view.$('roles-list');
             view.emit('loading:end');
+            view.emit('rendered');
             if (!list) return;
 
             snap.forEach(doc => {

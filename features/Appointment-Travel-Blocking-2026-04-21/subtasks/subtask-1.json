@@ -1,0 +1,6 @@
+{
+  "id": 1,
+  "description": "Enforce Location and Products before rendering time slots correctly",
+  "expected_output": "Daily grid listens to product changes and explicitly warns if location missing",
+  "status": "pending"
+}

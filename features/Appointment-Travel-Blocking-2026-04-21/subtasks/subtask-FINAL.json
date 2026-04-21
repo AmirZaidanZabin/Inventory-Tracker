@@ -1,0 +1,6 @@
+{
+  "id": "FINAL",
+  "description": "Sweep-Pebble: BIG BOSS CHECK",
+  "expected_output": "The location is required, product durations update grid, and travel distances block slots correctly",
+  "status": "pending"
+}

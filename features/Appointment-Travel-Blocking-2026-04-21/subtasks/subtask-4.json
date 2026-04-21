@@ -1,0 +1,6 @@
+{
+  "id": 4,
+  "description": "Check-Pebble: Inspect task 3",
+  "expected_output": "Grid correctly maps out unbookable slots due to travel constraints",
+  "status": "pending"
+}

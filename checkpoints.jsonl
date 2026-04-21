@@ -2,4 +2,7 @@
 {"ts":"2026-04-18T18:25:35Z","id":"FINAL","action":"BIG BOSS CHECK","artifact":"multiple","status":"PASS","resume_ctx":"Done with user grunt"}
 {"ts":"2026-04-18T18:31:00Z","id":"FINAL_FIX","action":"Fixed grid filtering and schedule blocking out","artifact":"src/views/view.appointments.js","status":"PASS","resume_ctx":"Done"}
 {"ts":"2026-04-18T18:36:00Z","id":"1","action":"Created view.forms.js and linked it to the UI","artifact":"view.forms.js, index.html, main.js, server.js","status":"PASS","resume_ctx":"Done"}
-{"ts":"2026-04-18T18:38:35Z","id":"FINAL_FORMS","action":"Completed Big Boss Sweeps - Forms module hooked in to entities","artifact":"multiple","status":"PASS","resume_ctx":"Done"}
+
+{"ts":"2026-04-21T01:45:00Z","id":"BUS-1","action":"Added missing createModal import to view.triggers.js and view.forms.js","artifact":"src/views/view.triggers.js, src/views/view.forms.js","status":"PASS","resume_ctx":"Both views used createModal but had no import"}
+{"ts":"2026-04-21T01:46:00Z","id":"BUS-2","action":"Added view.emit('rendered') to all 14 views so main.js applyAuthorities fires on every data load","artifact":"all src/views/*.js","status":"PASS","resume_ctx":"Replaced all document.dispatchEvent(apply-auth) with view.emit('rendered')"}
+{"ts":"2026-04-21T01:47:00Z","id":"BUS-FINAL","action":"BIG BOSS SWEEP: All views now emit loading:start/end + rendered through system bus","artifact":"all src/views/*.js","status":"PASS","resume_ctx":"System bus pattern consistent across all 14 views"}

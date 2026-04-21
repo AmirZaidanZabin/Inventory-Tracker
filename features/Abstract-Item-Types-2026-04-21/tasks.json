@@ -1,0 +1,59 @@
+{
+  "original_prompt": "abstract the hardware item type to be configurable, as an item types entity on it own",
+  "rephrased_goal": "Create a new Item Types entity/view to configure hardware types dynamically, update the sidebar to navigate to it, and refactor items and product_types views to fetch these configured types from the database.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Create view.item_types.js",
+      "subtasks_required": ["Create a view with a table for listing item_types", "Add a modal form for creating/editing item_types (fields: id, name)", "Implement delete logic"],
+      "owner": "Caveman",
+      "analogy_reference": "build a new storage room for molds",
+      "status": "pending",
+      "testing_criteria": "view.item_types.js exports ItemTypesView that manages the 'item_types' collection."
+    },
+    {
+      "id": 2,
+      "description": "Do-Pebble: Register view in main.js and index.html",
+      "subtasks_required": ["Import ItemTypesView in main.js and map it to #/item_types", "Add a link to #/item_types in index.html sidebar"],
+      "owner": "Caveman",
+      "analogy_reference": "paint path to the new storage room",
+      "status": "pending",
+      "testing_criteria": "Navigation to /#/item_types loads the new view."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Refactor view.items.js to use item_types",
+      "subtasks_required": ["Fetch item_types in open-add-item", "Populate the typeSelect dropdown with fetched types instead of hardcoded Pico/SIM"],
+      "owner": "Caveman",
+      "analogy_reference": "use molds from the storage room",
+      "status": "pending",
+      "testing_criteria": "Registering hardware shows dynamic types from the database."
+    },
+    {
+      "id": 4,
+      "description": "Do-Pebble: Refactor view.product_types.js to use item_types",
+      "subtasks_required": ["Fetch item_types instead of extracting unique types from items", "Render checkboxes based on the formal item_types collection"],
+      "owner": "Caveman",
+      "analogy_reference": "check molds instead of rocks",
+      "status": "pending",
+      "testing_criteria": "Product Type creation dynamically pulls defined item types."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: Ensure no hardcoded references remain",
+      "subtasks_required": ["Review all pebbles", "Check for any other Pico/SIM hardcoded lists in form creation"],
+      "owner": "Caveman",
+      "analogy_reference": "sweep the cave",
+      "status": "pending",
+      "testing_criteria": "Item types are fully abstracted."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": false,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

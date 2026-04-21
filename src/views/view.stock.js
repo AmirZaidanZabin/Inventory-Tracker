@@ -296,6 +296,7 @@ T-002,S-002,Pico Terminal Auth,Mobily`;
         view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'stock_takes'), (snap) => {
             const histList = view.$('history-list');
             view.emit('loading:end');
+            view.emit('rendered');
             if (histList) histList.innerHTML = '';
             const docs = snap.docs.map(t => t.data()).sort((a,b) => {
                 if(!a.timestamp || !b.timestamp) return 0;
@@ -319,8 +320,6 @@ T-002,S-002,Pico Terminal Auth,Mobily`;
                     list.appendChild(tr);
                 }
             });
-            
-            document.dispatchEvent(new CustomEvent('apply-auth'));
         }));
     });
 

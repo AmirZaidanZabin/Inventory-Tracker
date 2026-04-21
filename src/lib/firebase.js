@@ -98,6 +98,7 @@ export const firebase = {
             });
 
             const poll = async () => {
+                if (document.hidden) return; // Pause polling when tab is inactive
                 const user = auth.currentUser;
                 if (!user) return; // Silently skip if auth not ready
                 
@@ -130,8 +131,15 @@ export const firebase = {
             };
             
             poll();
-            interval = setInterval(poll, 2000); // Poll every 2s
-            return () => clearInterval(interval);
+            interval = setInterval(poll, 10000); // Poll every 10s (reduced from 2s to prevent flooding)
+            
+            const forcePoll = () => poll();
+            window.addEventListener('firebase-poll-now', forcePoll);
+
+            return () => {
+                clearInterval(interval);
+                window.removeEventListener('firebase-poll-now', forcePoll);
+            };
         },
 
         getDoc: async (ref) => {
@@ -149,8 +157,12 @@ export const firebase = {
             };
         },
 
-        getDocs: async (ref) => {
-            const data = await apiFetch(`/api/${ref.path}`);
+        getDocs: async (ref, options = {}) => {
+            let path = ref.path;
+            if (options.limit) {
+                path += (path.includes('?') ? '&' : '?') + 'limit=' + options.limit;
+            }
+            const data = await apiFetch(`/api/${path}`);
             const parseData = (d) => ({ 
                 ...d, 
                 created_at: d.created_at ? { toDate: () => new Date(d.created_at) } : null, 
@@ -170,30 +182,38 @@ export const firebase = {
         },
 
         setDoc: async (ref, data) => {
-            return apiFetch(`/api/${ref.col}`, {
+            const res = await apiFetch(`/api/${ref.col}`, {
                 method: 'POST',
                 body: JSON.stringify({ ...data, id: ref.id, created_at: '__server_timestamp__', updated_at: '__server_timestamp__' })
             });
+            window.dispatchEvent(new Event('firebase-poll-now'));
+            return res;
         },
 
         addDoc: async (ref, data) => {
-            return apiFetch(`/api/${ref.path}`, {
+            const res = await apiFetch(`/api/${ref.path}`, {
                 method: 'POST',
                 body: JSON.stringify({ ...data, created_at: '__server_timestamp__', updated_at: '__server_timestamp__' })
             });
+            window.dispatchEvent(new Event('firebase-poll-now'));
+            return res;
         },
 
         updateDoc: async (ref, data) => {
-            return apiFetch(`/api/${ref.col}/${ref.id}`, {
+            const res = await apiFetch(`/api/${ref.col}/${ref.id}`, {
                 method: 'PUT',
                 body: JSON.stringify({ ...data, updated_at: '__server_timestamp__' })
             });
+            window.dispatchEvent(new Event('firebase-poll-now'));
+            return res;
         },
 
         deleteDoc: async (ref) => {
-            return apiFetch(`/api/${ref.col}/${ref.id}`, {
+            const res = await apiFetch(`/api/${ref.col}/${ref.id}`, {
                 method: 'DELETE'
             });
+            window.dispatchEvent(new Event('firebase-poll-now'));
+            return res;
         },
         
         serverTimestamp: () => '__server_timestamp__',

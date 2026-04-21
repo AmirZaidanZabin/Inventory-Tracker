@@ -99,6 +99,7 @@ async function startServer() {
     items: { essentials: ['item_id', 'item_type', 'provider', 'created_at'] },
     appointments: { essentials: ['appointment_id', 'id', 'appointment_name', 'schedule_date', 'lat', 'lng', 'created_at'] },
     product_types: { essentials: ['id', 'name', 'duration_minutes', 'created_at'] },
+    item_types: { essentials: ['id', 'name', 'created_at'] },
     roles: { essentials: ['role_id', 'role_name', 'created_at'] },
     forms: { essentials: ['id', 'name', 'created_at'] }
   };
@@ -256,7 +257,7 @@ async function startServer() {
   }
 
   // Generic CRUD implementation
-  const collections = ["vans", "items", "appointments", "roles", "users", "audit_logs", "stock_takes", "test_collection", "triggers", "forms", "saved_reports", "product_types"];
+  const collections = ["vans", "items", "appointments", "roles", "users", "audit_logs", "stock_takes", "test_collection", "triggers", "forms", "saved_reports", "product_types", "item_types"];
 
   // Admin: Change User Password
   app.post("/api/admin/users/:uid/password", authenticate, async (req, res) => {
@@ -289,7 +290,11 @@ async function startServer() {
     // List
     app.get(`/api/${colName}`, authenticate, async (req, res) => {
       console.log(`Backend: Fetching ${colName} (RTDB)...`);
-      const [snap, error] = await _tc(async () => await rtdb.ref(colName).once('value'));
+      let queryRef = rtdb.ref(colName);
+      if (req.query.limit) {
+          queryRef = queryRef.limitToFirst(parseInt(req.query.limit));
+      }
+      const [snap, error] = await _tc(async () => await queryRef.once('value'));
       
       if (error) {
         console.error(`Backend Error: Error fetching ${colName}:`, error);

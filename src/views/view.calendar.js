@@ -384,6 +384,7 @@ export function CalendarView() {
             }
             const container = view.$('calendar-body');
             if (container) renderGrid();
+            view.emit('rendered');
         }));
 
         try {

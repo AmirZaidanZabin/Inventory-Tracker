@@ -24,6 +24,7 @@ export function ProductTypesView() {
                                     <th>ID</th>
                                     <th>Name</th>
                                     <th>Duration (min)</th>
+                                    <th>Hardware Req</th>
                                     <th>Custom Fields</th>
                                     <th width="100">Actions</th>
                                 </tr>
@@ -77,7 +78,7 @@ export function ProductTypesView() {
         return { show: () => bsModal.show(), hide: () => bsModal.hide(), element: mEl };
     };
 
-    const getFormHTML = (pt = null) => {
+    const getFormHTML = (pt = null, itemTypes = []) => {
         return `
             <form id="pt-form">
                 <div class="row g-3">
@@ -92,6 +93,23 @@ export function ProductTypesView() {
                     <div class="col-md-3">
                         <label class="form-label small fw-bold">Duration (min)</label>
                         <input type="number" class="form-control" name="duration_minutes" value="${pt ? pt.duration_minutes : '30'}" required min="1">
+                    </div>
+                </div>
+                <div class="row g-3 mt-2">
+                    <div class="col-12">
+                        <label class="form-label small fw-bold mb-2">Required Hardware Types</label>
+                        <div class="d-flex flex-wrap gap-3 p-2 border rounded bg-light">
+                            ${itemTypes.map(t => {
+                                const isChecked = pt && pt.hardware_requirements && pt.hardware_requirements.includes(t) ? 'checked' : '';
+                                return `
+                                    <div class="form-check">
+                                        <input class="form-check-input hw-req-checkbox" type="checkbox" value="${t}" id="hw-req-${t.replace(/\s+/g, '-')}" ${isChecked}>
+                                        <label class="form-check-label small" for="hw-req-${t.replace(/\s+/g, '-')}">${t}</label>
+                                    </div>
+                                `;
+                            }).join('') || '<span class="text-muted small">No hardware types found in inventory.</span>'}
+                        </div>
+                        <div class="small text-muted mt-1">Select the hardware types that must be assigned when booking this product.</div>
                     </div>
                 </div>
                 
@@ -152,10 +170,16 @@ export function ProductTypesView() {
         form.onsubmit = async (e) => {
             e.preventDefault();
             const fd = new FormData(form);
+            const hwReqs = [];
+            form.querySelectorAll('.hw-req-checkbox:checked').forEach(chk => {
+                hwReqs.push(chk.value);
+            });
+
             const data = {
                 id: fd.get('id'),
                 name: fd.get('name'),
                 duration_minutes: parseInt(fd.get('duration_minutes') || '0', 10),
+                hardware_requirements: hwReqs,
                 custom_fields: cfs.map(c => ({...c, key: c.label.toLowerCase().replace(/[^a-z0-9]/g, '_')}))
             };
 
@@ -186,10 +210,30 @@ export function ProductTypesView() {
         };
     };
 
-    view.trigger('click', 'btn-add-product-type', () => {
-        const modal = createModal('New Product Type', getFormHTML());
-        modal.show();
-        initFormJS(modal.element, null);
+    view.trigger('click', 'btn-add-product-type', async () => {
+        const btn = document.getElementById('btn-add-product-type');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
+        
+        try {
+            const itemTypesSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_types'));
+            const typesSet = new Set();
+            itemTypesSnap.forEach(doc => {
+                const it = doc.data().name;
+                if(it) typesSet.add(it);
+            });
+            const itemTypes = Array.from(typesSet).sort();
+
+            const modal = createModal('New Product Type', getFormHTML(null, itemTypes));
+            modal.show();
+            initFormJS(modal.element, null);
+        } catch(e) {
+            alert('Error loading form: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
     });
 
     view.on('init', () => {
@@ -198,6 +242,7 @@ export function ProductTypesView() {
         view.unsub(firebase.db.subscribe(q, (snap) => {
             const list = view.$('product-types-list');
             view.emit('loading:end');
+            view.emit('rendered');
             if(!list) return;
             
             if(snap.empty) {
@@ -211,12 +256,14 @@ export function ProductTypesView() {
                 const tr = document.createElement('tr');
                 tr.className = 'product-type-row';
                 
+                const hwBadges = (pt.hardware_requirements || []).map(hw => `<span class="badge bg-secondary me-1">${hw}</span>`).join('');
                 const cfBadges = (pt.custom_fields || []).map(cf => `<span class="badge bg-light text-dark border me-1">${cf.label}</span>`).join('');
                 
                 tr.innerHTML = `
                     <td><code class="data-mono">${pt.id}</code></td>
                     <td class="fw-bold">${pt.name}</td>
                     <td>${pt.duration_minutes}</td>
+                    <td>${hwBadges || '-'}</td>
                     <td>${cfBadges || '-'}</td>
                     <td>
                         <button class="btn-pico btn-pico-outline table-action-btn edit-pt me-1"><i class="bi bi-pencil"></i></button>
@@ -224,10 +271,30 @@ export function ProductTypesView() {
                     </td>
                 `;
 
-                tr.querySelector('.edit-pt').onclick = () => {
-                    const modal = createModal('Edit Product Type', getFormHTML(pt));
-                    modal.show();
-                    initFormJS(modal.element, pt);
+                tr.querySelector('.edit-pt').onclick = async function() {
+                    const btn = this;
+                    const origHtml = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                    
+                    try {
+                        const itemTypesSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_types'));
+                        const typesSet = new Set();
+                        itemTypesSnap.forEach(doc => {
+                            const it = doc.data().name;
+                            if(it) typesSet.add(it);
+                        });
+                        const itemTypes = Array.from(typesSet).sort();
+
+                        const modal = createModal('Edit Product Type', getFormHTML(pt, itemTypes));
+                        modal.show();
+                        initFormJS(modal.element, pt);
+                    } catch (e) {
+                        alert('Error loading form: ' + e.message);
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }
                 };
 
                 tr.querySelector('.delete-pt').onclick = async () => {

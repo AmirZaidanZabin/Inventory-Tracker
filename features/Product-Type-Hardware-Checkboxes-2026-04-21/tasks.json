@@ -1,0 +1,50 @@
+{
+  "original_prompt": "the required hardware types need to be selectable as a drop down or checkboxes, for the product types",
+  "rephrased_goal": "Refactor the hardware_requirements input in the Product Types modal to use dynamically generated checkboxes based on existing hardware item_types in the inventory.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Fetch unique item_types when opening Product Type modal",
+      "subtasks_required": ["Update btn-add-product-type click handler to fetch items and extract unique item_types", "Update edit-pt click handler to fetch items and extract unique item_types"],
+      "owner": "Caveman",
+      "analogy_reference": "gather all stone shapes",
+      "status": "pending",
+      "testing_criteria": "Array of unique item types is successfully generated and passed to getFormHTML."
+    },
+    {
+      "id": 2,
+      "description": "Do-Pebble: Refactor getFormHTML to render checkboxes",
+      "subtasks_required": ["Change the text input for hardware_requirements to a loop generating checkboxes", "Pre-check checkboxes if the product type already requires them"],
+      "owner": "Caveman",
+      "analogy_reference": "carve molds for each stone shape",
+      "status": "pending",
+      "testing_criteria": "Modal displays checkboxes for all available item types."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Update initFormJS to parse checkboxes",
+      "subtasks_required": ["Iterate over checked checkboxes to build the hwReqs array instead of reading a text input"],
+      "owner": "Caveman",
+      "analogy_reference": "collect chosen molds",
+      "status": "pending",
+      "testing_criteria": "Saving a product type correctly saves an array of the selected hardware requirement strings."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: Review and verify",
+      "subtasks_required": ["Check edit and create flow", "Ensure old comma-separated data is supported and pre-checked properly"],
+      "owner": "Caveman",
+      "analogy_reference": "sweep the cave",
+      "status": "pending",
+      "testing_criteria": "No regressions in product type saving."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": false,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

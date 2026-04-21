@@ -1,0 +1,59 @@
+{
+  "original_prompt": "the user must first select the location that they want the appointment to be in in the modal. the system should calculate based on the previous or upcoming appointments if there are any scheduled ahead of time, that the travel distance duration is taken into account, the travel from appointment a to appointment b should have the slot/duration blocked on the appointment slot selection",
+  "rephrased_goal": "Enforce location selection before showing time slots, and calculate travel times between consecutive appointments to block unreachable slots.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Update UI to enforce Location selection first",
+      "subtasks_required": ["Hide/disable daily schedule grid until lat/lng are set", "Make product duration changes trigger grid update"],
+      "owner": "Caveman",
+      "analogy_reference": "lock door until key found",
+      "status": "pending",
+      "testing_criteria": "Grid shows 'Select location first' when map not clicked."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Inspect task 1",
+      "subtasks_required": ["Check if grid updates on map click", "Check if grid updates on product duration change"],
+      "owner": "Caveman",
+      "analogy_reference": "turn knob",
+      "status": "pending",
+      "testing_criteria": "Grid accurately reflects location and duration presence."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Implement Travel Block Logic in updateDailyGrid",
+      "subtasks_required": ["Calculate end time of previous appt + travel time", "Calculate travel time + end time to next appt", "Block slot if overlap"],
+      "owner": "Caveman",
+      "analogy_reference": "measure distance between campfires before walk",
+      "status": "pending",
+      "testing_criteria": "Slots impossible to reach are greyed out."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Inspect task 3",
+      "subtasks_required": ["Test tech with previous appt far away", "Test tech with next appt far away"],
+      "owner": "Caveman",
+      "analogy_reference": "walk the trail",
+      "status": "pending",
+      "testing_criteria": "Grid explicitly blocks unreachable slots."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles", "Find missing steps in project", "Fix broken logic across cave"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail before sleep",
+      "status": "pending",
+      "testing_criteria": "Does whole project work together? No missing rocks?"
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

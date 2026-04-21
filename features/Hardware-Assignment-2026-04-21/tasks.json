@@ -1,0 +1,68 @@
+{
+  "original_prompt": "pick the products -> the system will calculate the duration... i should be able to select 2x of specific product... deducted from the overall available inventory stock... try to use the same flow of assignment as in the appoinment editing section",
+  "rephrased_goal": "Add quantity selectors to products, calculate dynamic duration based on quantity, and integrate drag-and-drop hardware assignment directly into the appointment scheduling modal.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Change product checkboxes to quantity inputs",
+      "subtasks_required": ["Update HTML for product types in modal", "Update duration calculation to multiply by quantity", "Trigger grid update on quantity change"],
+      "owner": "Caveman",
+      "analogy_reference": "count many rocks",
+      "status": "pending",
+      "testing_criteria": "Grid duration logic multiplies properly with quantities."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify task 1",
+      "subtasks_required": ["Check if duration changes visually on grid"],
+      "owner": "Caveman",
+      "analogy_reference": "see if rocks fit",
+      "status": "pending",
+      "testing_criteria": "Selecting 2x 60min product blocks 120min."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Integrate Hardware Drag-and-Drop to modal",
+      "subtasks_required": ["Add available hardware list to modal", "Add pair slots based on total product quantity", "Bind drag and drop logic"],
+      "owner": "Caveman",
+      "analogy_reference": "put small stones in holes",
+      "status": "pending",
+      "testing_criteria": "Hardware list renders, drag and drop works."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify task 3",
+      "subtasks_required": ["Verify pair slots auto-generate based on product quantity"],
+      "owner": "Caveman",
+      "analogy_reference": "check holes",
+      "status": "pending",
+      "testing_criteria": "Pair slots match total quantity."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Update submission logic to save and assign hardware",
+      "subtasks_required": ["Extract assigned pairs on submit", "Update items collection to status='assigned'", "Save hardware array to appointment metadata"],
+      "owner": "Caveman",
+      "analogy_reference": "bury the stones",
+      "status": "pending",
+      "testing_criteria": "Items are marked assigned in DB upon booking."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles", "Find missing steps"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail",
+      "status": "pending",
+      "testing_criteria": "Modal fully supports quantity and hardware assignment."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

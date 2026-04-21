@@ -17,6 +17,7 @@ import { AppointmentsGanttView } from './views/view.gantt.js';
 import { TriggersView } from './views/view.triggers.js';
 import { FormsView } from './views/view.forms.js';
 import { ProductTypesView } from './views/view.product_types.js';
+import { ItemTypesView } from './views/view.item_types.js';
 
 const App = (() => {
     let state = {
@@ -124,10 +125,13 @@ const App = (() => {
             return;
         }
 
-        const link = e.target.closest('.nav-link');
-        if (link) {
+        const link = e.target.closest('.nav-link[data-view]');
+        if (link && link.dataset.view) {
             e.preventDefault();
-            window.location.hash = link.dataset.view;
+            const targetView = link.dataset.view;
+            // Always navigate directly (hashchange won't fire if hash is unchanged)
+            window.location.hash = targetView;
+            App.navigate(targetView);
             
             // Close mobile sidebar on nav
             shell.$('sidebar').classList.remove('show');
@@ -316,7 +320,11 @@ const App = (() => {
 
             // Guest/Viewer restriction: Only Calendar and Gantt
             const isGuest = state.user.isAnonymous;
-            const isViewer = state.roleId === 'viewer';
+            const currentUserEmail = state.user.email?.toLowerCase();
+            const adminEmails = ['amir.zaidan.zabin@gmail.com', 'amirzaidanzabin@gmail.com'];
+            const isAdminEmail = adminEmails.includes(currentUserEmail);
+            const isAdmin = isAdminEmail || state.roleId === 'admin' || state.authorities.includes('admin') || state.authorities.includes('manage_users');
+            const isViewer = !isAdmin && state.roleId === 'viewer';
             const publicViews = ['calendar', 'gantt'];
             
             if ((isGuest || isViewer) && !publicViews.includes(viewId)) {
@@ -345,7 +353,7 @@ const App = (() => {
                     }
                 }
             });
-            shell.$('view-title').textContent = viewId.charAt(0).toUpperCase() + viewId.slice(1);
+            shell.$('view-title').textContent = viewId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             
             // Apply fade out
             const container = shell.$('view-container');
@@ -377,6 +385,7 @@ const App = (() => {
                     case 'triggers': view = TriggersView(); break;
                     case 'forms': view = FormsView(); break;
                     case 'product_types': view = ProductTypesView(); break;
+                    case 'item_types': view = ItemTypesView(); break;
                 }
 
                 if (view) {

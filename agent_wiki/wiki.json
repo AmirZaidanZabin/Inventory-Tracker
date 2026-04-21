@@ -6,7 +6,10 @@
     "Loading indicators are managed via view.emit('loading:start') and view.emit('loading:end') in main.js.",
     "Global loader element is #global-loader in index.html.",
     "Product Types are stored in the normalized RTDB structure.",
-    "Frontend controller needs to support emit() for event handling."
+    "Frontend controller needs to support emit() for event handling.",
+    "All views MUST emit view.emit('rendered') after data loads. This triggers applyAuthorities() in main.js via view.on('rendered', applyAuthorities).",
+    "NEVER use document.dispatchEvent(new CustomEvent('apply-auth')) in views — always use view.emit('rendered') instead.",
+    "Both view.triggers.js and view.forms.js require import { createModal } from '../lib/modal.js' — they use it for delete confirm dialogs."
   ],
   "tech_stack": {
     "frontend": "React-like controller library (custom), Bootstrap 5, D3.js (Dashboard), Leaflet.js (Vans/Appointments)",
@@ -14,7 +17,8 @@
   },
   "FAQ": {
     "Events": [
-      {"Q": "Why is view.emit not a function?", "A": "The custom controller library missing event emitter capability."}
+      {"Q": "Why is view.emit not a function?", "A": "The custom controller library missing event emitter capability."},
+      {"Q": "How does auth get re-applied after a view loads?", "A": "View emits 'rendered' after data arrives. main.js listens with view.on('rendered', applyAuthorities). Never use document.dispatchEvent directly."}
     ]
   }
 }

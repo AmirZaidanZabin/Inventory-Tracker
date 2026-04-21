@@ -91,6 +91,17 @@
       },
       "required": ["id", "name", "duration_minutes"]
     },
+    "ItemType": {
+      "title": "Hardware Type",
+      "description": "Definition of hardware equipment categories",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
+    },
     "StockTake": {
       "title": "Stock Take",
       "description": "Daily stock report log",
@@ -148,6 +159,10 @@
     "/product_types/{typeId}": {
       "schema": { "$ref": "ProductType" },
       "description": "Product type configurations"
+    },
+    "/item_types/{typeId}": {
+      "schema": { "$ref": "ItemType" },
+      "description": "Hardware item types configurations"
     }
   }
 }

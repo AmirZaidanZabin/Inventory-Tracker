@@ -6,13 +6,13 @@ export function ReportingView() {
     const view = controller({
         stringComponent: `
             <div class="reporting-view">
-                <div class="container-fluid">
-                    <div class="row">
+                <div class="container-fluid py-4">
+                    <div class="row g-4">
                         <div class="col-md-9">
-                        <div class="card mb-4">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">SQL Query Engine</h5>
-                                <span id="db-status" class="badge badge-pale-secondary">Initializing...</span>
+                        <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+                            <div class="card-header bg-white border-bottom-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-terminal me-2 text-primary"></i>SQL Query Engine</h5>
+                                <span id="db-status" class="badge rounded-pill bg-light text-secondary border">Initializing...</span>
                             </div>
                             <div class="card-body">
                                 <div class="mb-3">
@@ -44,10 +44,10 @@ export function ReportingView() {
                         <div id="query-error" class="alert alert-danger hidden"></div>
                         <div id="save-status" class="alert hidden mt-2"></div>
 
-                        <div class="card">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0">Results</h6>
-                                <button id="export-csv" class="btn-pico btn-pico-outline btn-sm hidden">
+                        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                            <div class="card-header bg-white border-bottom-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0 fw-bold"><i class="bi bi-table me-2 text-primary"></i>Results</h6>
+                                <button id="export-csv" class="btn btn-sm btn-outline-primary rounded-pill hidden">
                                     <i class="bi bi-download me-1"></i>Export CSV
                                 </button>
                             </div>
@@ -60,13 +60,30 @@ export function ReportingView() {
                                 </table>
                             </div>
                         </div>
+
+                        <!-- Database Schemas -->
+                        <div class="card border-0 shadow-sm rounded-4 mt-4 overflow-hidden">
+                            <div class="card-header bg-white border-bottom-0 py-3 px-4 fw-bold" data-bs-toggle="collapse" data-bs-target="#schema-container" style="cursor: pointer;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span><i class="bi bi-diagram-3 me-2 text-primary"></i>Database Schemas</span>
+                                    <i class="bi bi-chevron-expand text-muted"></i>
+                                </div>
+                            </div>
+                            <div id="schema-container" class="collapse">
+                                <div class="card-body bg-light p-3">
+                                    <div class="row g-3" id="schema-list">
+                                        <div class="col-12 text-center text-muted">Loading schemas...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Reporting Folder (Saved Reports) -->
                     <div class="col-md-3">
-                        <div class="card h-100">
-                            <div class="card-header bg-light fw-bold">
-                                <i class="bi bi-folder2-open me-2"></i>Reporting Folder
+                        <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
+                            <div class="card-header bg-white border-bottom-0 pt-4 px-4 fw-bold">
+                                <i class="bi bi-folder2-open me-2 text-primary"></i>Reporting Folder
                             </div>
                             <div class="card-body p-0">
                                 <div class="d-flex justify-content-between align-items-center mb-2 px-3 pt-2">
@@ -118,6 +135,7 @@ export function ReportingView() {
         .onboard({ id: 'query-error' })
         .onboard({ id: 'results-head' })
         .onboard({ id: 'results-body' })
+        .onboard({ id: 'schema-list' })
         .onboard({ id: 'report-utilization' })
         .onboard({ id: 'report-stock' })
         .onboard({ id: 'save-report' })
@@ -138,7 +156,19 @@ export function ReportingView() {
         if (!highlighted) return;
         highlighted.textContent = query + (query.endsWith('\n') ? ' ' : '');
         if (window.Prism) Prism.highlightElement(highlighted);
+        syncScroll();
     };
+
+    const syncScroll = () => {
+        const textarea = view.$('sql-query');
+        const highlighted = view.$('sql-highlighted');
+        if (!textarea || !highlighted) return;
+        highlighted.scrollTop = textarea.scrollTop;
+        highlighted.scrollLeft = textarea.scrollLeft;
+    };
+
+    const SYSTEM_TABLES = ["vans", "items", "appointments", "roles", "users", "audit_logs", "stock_takes", "triggers", "forms", "saved_reports", "product_types", "item_types"];
+    let tableSchemas = {};
 
     const initDb = async () => {
         try {
@@ -147,83 +177,41 @@ export function ReportingView() {
             });
             db = new SQL.Database();
             
-            // Create tables
-            db.run("CREATE TABLE appointments (id TEXT, name TEXT, date TEXT, status TEXT, tech_id TEXT);");
-            db.run("CREATE TABLE vans (id TEXT, location TEXT);");
-            db.run("CREATE TABLE items (id TEXT, type TEXT, provider TEXT, available BOOLEAN);");
-            db.run("CREATE TABLE users (id TEXT, name TEXT, role TEXT);");
-            db.run("CREATE TABLE stock_takes (log_id TEXT, type TEXT, user_email TEXT, count INTEGER, timestamp TEXT);");
-            db.run("CREATE TABLE audit_logs (log_id TEXT, details TEXT, user_id TEXT, user_name TEXT, timestamp TEXT);");
-
-            // Fetch data
-            const [aptSnap, vanSnap, itemSnap, userSnap, stockSnap,logSnap] = await Promise.all([
-                firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'appointments')),
-                firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'vans')),
-                firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'items')),
-                firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'users')),
-                firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'stock_takes')),
-                firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'audit_logs'))
-            ]);
-     
+            view.$('db-status').textContent = "Loading schemas...";
             
-            // Insert data
-            aptSnap.forEach(doc => {
-                const d = doc.data();
-                db.run("INSERT INTO appointments VALUES (?, ?, ?, ?, ?)", [
-                    d.appointment_id || doc.id, 
-                    d.appointment_name ?? null, 
-                    d.schedule_date ?? null, 
-                    d.status ?? null, 
-                    d.tech_id ?? null
-                ]);
-            });
-            vanSnap.forEach(doc => {
-                const d = doc.data();
-                db.run("INSERT INTO vans VALUES (?, ?)", [
-                    d.van_id || doc.id, 
-                    d.location_id ?? null
-                ]);
-            });
-            itemSnap.forEach(doc => {
-                const d = doc.data();
-                db.run("INSERT INTO items VALUES (?, ?, ?, ?)", [
-                    d.item_id || doc.id, 
-                    d.item_type ?? null, 
-                    d.provider ?? null, 
-                    d.is_available ? 1 : 0
-                ]);
-            });
-            userSnap.forEach(doc => {
-                const d = doc.data();
-                db.run("INSERT INTO users VALUES (?, ?, ?)", [
-                    d.user_id || doc.id, 
-                    d.user_name ?? null, 
-                    d.role_id ?? null
-                ]);
-            });
-            stockSnap.forEach(doc => {
-                const d = doc.data();
-                const ts = d.timestamp?.toDate?.()?.toISOString() || d.timestamp || '';
-                db.run("INSERT INTO stock_takes VALUES (?, ?, ?, ?, ?)", [
-                    d.log_id || doc.id, 
-                    d.type ?? null, 
-                    d.user_email ?? null, 
-                    d.count ?? 0, 
-                    ts
-                ]);
+            // Fetch limit=1 for all tables to get schema
+            const snaps = await Promise.all(SYSTEM_TABLES.map(t => 
+                firebase.db.getDocs(firebase.db.collection(firebase.db.db, t), { limit: 1 })
+            ));
+            
+            snaps.forEach((snap, idx) => {
+                const tableName = SYSTEM_TABLES[idx];
+                let cols = ['id', 'created_at', 'updated_at'];
+                if (snap && snap.docs && snap.docs.length > 0) {
+                    const data = snap.docs[0].data();
+                    cols = Object.keys(data).filter(k => k !== 'timestamp');
+                    if(!cols.includes('id')) cols.unshift('id');
+                }
+                tableSchemas[tableName] = cols;
+                
+                // Create empty table
+                db.run(`CREATE TABLE ${tableName} (${cols.map(c => `"${c}" TEXT`).join(', ')});`);
             });
 
-            logSnap.forEach(doc => {
-                const d = doc.data();
-                const ts = d.timestamp?.toDate?.()?.toISOString() || d.timestamp || '';
-                db.run("INSERT INTO audit_logs VALUES (?, ?, ?, ?, ?)", [
-                    d.action || doc.id, 
-                    d.details ?? null, 
-                    d.user_id ?? null, 
-                    d.user_name ?? null, 
-                    ts
-                ]);
-            });
+            // Render Schema Dropdown UI
+            const schemaList = view.$('schema-list');
+            if (schemaList) {
+                schemaList.innerHTML = Object.entries(tableSchemas).map(([t, cols]) => `
+                    <div class="col-md-3 col-sm-4 col-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white py-1 fw-bold small text-primary border-bottom-0">${t}</div>
+                            <div class="card-body p-2 pt-0" style="font-size: 0.75rem; font-family: monospace; max-height: 120px; overflow-y: auto;">
+                                ${cols.map(c => `<div class="text-truncate text-secondary" title="${c}">- ${c}</div>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
             
             view.$('db-status').textContent = "Ready";
             view.$('db-status').className = "badge badge-pale-success";
@@ -236,18 +224,61 @@ export function ReportingView() {
             view.$('db-status').className = "badge badge-pale-danger";
         }
     };
-
-    // I need to add getDocs to firebase.js
-    // For now I'll use a more robust data loading in the 'init' message
     
-    const runQuery = () => {
+    const runQuery = async () => {
         const query = view.$('sql-query').value;
         view.$('query-error')?.classList.add('hidden');
         view.$('export-csv')?.classList.add('hidden');
         lastResults = null;
         
+        const btn = view.$('run-query');
+        const origBtnHtml = btn.innerHTML;
+        btn.disabled = true;
+
         try {
+            // Identify used tables
+            const queryLower = query.toLowerCase();
+            const usedTables = SYSTEM_TABLES.filter(t => new RegExp(`\\b${t}\\b`, 'i').test(queryLower));
+            
+            if (usedTables.length > 0) {
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Fetching...`;
+                
+                // Fetch all data for used tables
+                const snaps = await Promise.all(usedTables.map(t => 
+                    firebase.db.getDocs(firebase.db.collection(firebase.db.db, t))
+                ));
+                
+                // Clear existing data and insert new data
+                snaps.forEach((snap, idx) => {
+                    const t = usedTables[idx];
+                    db.run(`DELETE FROM ${t};`);
+                    
+                    const cols = tableSchemas[t];
+                    if(snap && snap.docs && snap.docs.length > 0) {
+                        const placeholders = cols.map(() => '?').join(', ');
+                        const stmt = db.prepare(`INSERT INTO ${t} (${cols.map(c=>`"${c}"`).join(', ')}) VALUES (${placeholders})`);
+                        
+                        snap.docs.forEach(doc => {
+                            const d = doc.data();
+                            d.id = d.id || doc.id;
+                            const vals = cols.map(c => {
+                                let val = d[c];
+                                if (val !== null && val !== undefined && typeof val === 'object') {
+                                    if(val.toDate) val = val.toDate().toISOString();
+                                    else val = JSON.stringify(val);
+                                }
+                                return val === undefined ? null : String(val);
+                            });
+                            stmt.run(vals);
+                        });
+                        stmt.free();
+                    }
+                });
+            }
+
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Executing...`;
             const res = db.exec(query);
+            
             if (res.length === 0) {
                 view.$('results-head').innerHTML = '';
                 view.$('results-body').innerHTML = '<tr><td class="text-center py-4 text-muted">0 rows returned</td></tr>';
@@ -269,18 +300,14 @@ export function ReportingView() {
         } catch (err) {
             view.$('query-error').textContent = err.message;
             view.$('query-error')?.classList.remove('hidden');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origBtnHtml;
         }
     };
 
     view.trigger('input', 'sql-query', updateHighlighting);
-    view.trigger('scroll', 'sql-query', () => {
-        const queryEl = view.$('sql-query');
-        const highEl = view.$('sql-highlighted');
-        if (queryEl && highEl) {
-            highEl.scrollTop = queryEl.scrollTop;
-            highEl.scrollLeft = queryEl.scrollLeft;
-        }
-    });
+    view.trigger('scroll', 'sql-query', syncScroll);
 
     view.trigger('click', 'run-query', runQuery);
 
@@ -519,6 +546,7 @@ ORDER BY Day DESC;`;
         view.emit('loading:start');
         initDb().then(() => {
             view.emit('loading:end');
+            view.emit('rendered');
         });
         loadSavedReports();
     });

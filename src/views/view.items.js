@@ -107,9 +107,10 @@ export function ItemsView() {
 
     view.trigger('click', 'open-add-item', async () => {
         // Fetch Vans for selection
-        const [vansSnap, formsSnap] = await Promise.all([
+        const [vansSnap, formsSnap, itemTypesSnap] = await Promise.all([
             firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'vans')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms'))
+            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms')),
+            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_types'))
         ]);
         const vans = [];
         vansSnap.forEach(doc => vans.push(doc.data()));
@@ -176,11 +177,20 @@ export function ItemsView() {
 
         modal.show();
 
+        const dynamicItemTypes = [];
+        if (itemTypesSnap) {
+            itemTypesSnap.forEach(doc => {
+                const it = doc.data();
+                dynamicItemTypes.push({ label: it.name, value: it.name });
+            });
+        }
+        if (dynamicItemTypes.length === 0) {
+            dynamicItemTypes.push({ label: 'Pico Device', value: 'Pico Device' });
+            dynamicItemTypes.push({ label: 'Sim Card', value: 'Sim Card' });
+        }
+
         const typeSelect = CustomSelect({
-            options: [
-                { label: 'Pico Device', value: 'Pico Device' },
-                { label: 'Sim Card', value: 'Sim Card' }
-            ],
+            options: dynamicItemTypes,
             placeholder: 'Select Type...',
             id: 'item-type-select'
         });
@@ -244,6 +254,7 @@ export function ItemsView() {
             view.delete('items-list');
             const list = view.$('items-list');
             view.emit('loading:end');
+            view.emit('rendered');
             if (!list) return;
 
             if (snap && snap.forEach) {

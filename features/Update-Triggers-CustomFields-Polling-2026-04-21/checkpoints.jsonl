@@ -1,0 +1,5 @@
+{"ts":"2026-04-21T03:36:10Z","id":"1","action":"update blueprint","artifact":"firebase-blueprint.json","status":"PASS","resume_ctx":"item types and product types added"}
+{"ts":"2026-04-21T03:36:20Z","id":"2","action":"update view.forms.js","artifact":"src/views/view.forms.js","status":"PASS","resume_ctx":"product and item types exposed to custom fields"}
+{"ts":"2026-04-21T03:36:58Z","id":"3","action":"update polling","artifact":"src/lib/firebase.js","status":"PASS","resume_ctx":"polling optimized and manual invalidation added"}
+{"ts":"2026-04-21T03:39:00Z","id":"1","action":"move sidebar links","artifact":"index.html","status":"PASS","resume_ctx":"Moved Product Types and Hardware Types to Inventory sidebar category"}
+{"ts":"2026-04-21T03:42:00Z","id":"FINAL","action":"optimize reporting SQL engine","artifact":"src/views/view.reporting.js","status":"PASS","resume_ctx":"completed SQL lazy fetching, schema mapping, and table loading"}

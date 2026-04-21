@@ -296,6 +296,7 @@ export function AppointmentsGanttView() {
         view.emit('loading:start');
         fetchGanttData().finally(() => {
             view.emit('loading:end');
+            view.emit('rendered');
         });
     });
 

@@ -99,6 +99,25 @@ export function AppointmentsView() {
                             <div class="col-12 mt-2" id="products-selection-container"></div>
                             <div class="col-12 mt-2" id="custom-fields-container"></div>
                             
+                            <!-- Hardware Pairing Section (similar to detail view) -->
+                            <div class="col-12 mt-3" id="hardware-deployment-container" style="display: none;">
+                                <label class="form-label small fw-bold">Deploy Hardware (Drag to Pair Slots)</label>
+                                <div class="row g-2">
+                                    <div class="col-md-5">
+                                        <div class="p-2 border rounded bg-light" style="height: 200px; overflow-y: auto;">
+                                            <div class="small fw-bold mb-2">Available Hardware</div>
+                                            <div id="available-hardware" class="d-flex flex-column gap-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-7">
+                                        <div class="small fw-bold mb-2">Assigned Pairs</div>
+                                        <div id="hardware-pairs" class="d-flex flex-column gap-2" style="max-height: 200px; overflow-y: auto;">
+                                            <!-- Dynamic pair slots go here based on quantity -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div class="col-12 mt-4">
                                 <button type="submit" class="btn-pico btn-pico-primary w-100">Book Appointment</button>
                             </div>
@@ -151,15 +170,15 @@ export function AppointmentsView() {
         // Render Product Types Selection
         const productsContainer = modal.element.querySelector('#products-selection-container');
         if (productsContainer && allProductTypes.length > 0) {
-            let html = `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">Products Required</h6><div class="row g-2">`;
+            let html = `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">Products & Quantities</h6><div class="row g-2">`;
             allProductTypes.forEach(pt => {
                 html += `
                     <div class="col-md-6">
-                        <div class="form-check">
-                            <input class="form-check-input product-type-chk" type="checkbox" value="${pt.id}" id="pt-${pt.id}" data-duration="${pt.duration_minutes}">
-                            <label class="form-check-label small" for="pt-${pt.id}">
+                        <div class="d-flex align-items-center justify-content-between border rounded p-1">
+                            <label class="form-label small mb-0 ms-2" for="pt-${pt.id}">
                                 ${pt.name} <span class="text-muted">(${pt.duration_minutes} min)</span>
                             </label>
+                            <input class="form-control form-control-sm product-type-qty text-center" type="number" min="0" value="0" max="10" data-id="${pt.id}" data-duration="${pt.duration_minutes}" data-hw='${JSON.stringify(pt.hardware_requirements || [])}' id="pt-${pt.id}" style="width: 60px;">
                         </div>
                     </div>
                 `;
@@ -284,6 +303,20 @@ export function AppointmentsView() {
                 return `${hInt}:${m} ${ampm}`;
             }
 
+            // Compute target appt duration
+            let totalDurationMin = 60; // fallback if 0 products selected
+            let sumProducts = 0;
+            modal.element.querySelectorAll('.product-type-qty').forEach(input => {
+                const qty = parseInt(input.value || '0', 10);
+                sumProducts += qty * parseInt(input.dataset.duration || '0', 10);
+            });
+            if (sumProducts > 0) totalDurationMin = sumProducts;
+
+            const targetLatStr = modal.element.querySelector('[name="lat"]').value;
+            const targetLngStr = modal.element.querySelector('[name="lng"]').value;
+            const targetLat = parseFloat(targetLatStr);
+            const targetLng = parseFloat(targetLngStr);
+
             const gridHtml = `
                 <div class="calendar-grid bg-white" style="display: grid; grid-template-columns: 80px 1fr; gap: 0;">
                     <!-- Headers -->
@@ -293,6 +326,8 @@ export function AppointmentsView() {
                     <!-- Time Rows -->
                     ${hours.map(hour => {
                         const cellHourInt = parseInt(hour.split(':')[0], 10);
+                        const targetStartMin = cellHourInt * 60;
+                        const targetEndMin = targetStartMin + totalDurationMin;
                         const dDay = new Date(dateStr).getDay();
 
                         let availableTechs = [];
@@ -310,23 +345,68 @@ export function AppointmentsView() {
                             const isWorking = cellHourInt >= startHour && cellHourInt < endHour;
                             if (isWorking) {
                                 totalServiceableTechs++;
-                                const isBooked = dailyApts.some(a => a.tech_id === t.id && (a.appointment_time === hour || (!a.appointment_time && hour==='08:00')));
+                                let isBooked = false;
+
+                                // Check if appt exceeds shift
+                                if (targetEndMin > endHour * 60) {
+                                    isBooked = true;
+                                } else {
+                                    const techApts = dailyApts.filter(a => a.tech_id === t.id);
+                                    for (const a of techApts) {
+                                        const aTime = a.appointment_time || '08:00';
+                                        const aStartMin = parseInt(aTime.split(':')[0], 10) * 60 + parseInt(aTime.split(':')[1], 10);
+                                        const aDur = a.metadata?.duration_minutes || 60;
+                                        const aEndMin = aStartMin + aDur;
+
+                                        // 1. Check strict time overlap
+                                        if (Math.max(targetStartMin, aStartMin) < Math.min(targetEndMin, aEndMin)) {
+                                            isBooked = true;
+                                            break;
+                                        }
+
+                                        // 2. Check travel time
+                                        let travelMins = 15; // default prep time
+                                        if (targetLatStr && targetLngStr && a.metadata?.location?.lat && a.metadata?.location?.lng) {
+                                            const aLat = parseFloat(a.metadata.location.lat);
+                                            const aLng = parseFloat(a.metadata.location.lng);
+                                            const dist = calculateDistance(targetLat, targetLng, aLat, aLng);
+                                            travelMins = estimateDuration(dist);
+                                        } else {
+                                            travelMins = estimateDuration(0); // applies default prep time
+                                        }
+
+                                        if (aEndMin <= targetStartMin) {
+                                            if (aEndMin + travelMins > targetStartMin) {
+                                                isBooked = true;
+                                                break;
+                                            }
+                                        }
+                                        if (targetEndMin <= aStartMin) {
+                                            if (targetEndMin + travelMins > aStartMin) {
+                                                isBooked = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
                                 if (!isBooked) {
                                     availableTechs.push(t);
                                 }
                             }
                         });
 
-                        // If no van coverage, totalServiceableTechs will be 0 implicitly.
                         const isBlocked = availableTechs.length === 0;
                         const hasNoCoverage = currentValidTechs.length === 0;
+                        const noLocation = !modal.element.querySelector('[name="lat"]').value;
 
                         // Density-based color coding
                         let availOpacity = 0.1 + (Math.min(availableTechs.length, 3) * 0.15);
                         let bgStyle = isBlocked ? 'background: rgba(0,0,0,0.03);' : `background: rgba(34, 197, 94, ${availOpacity});`;
 
                         let slotText = '';
-                        if (hasNoCoverage) slotText = '<span class="text-muted"><i class="bi bi-geo-alt-fill me-1"></i>Select valid location</span>';
+                        if (noLocation) slotText = '<span class="text-muted"><i class="bi bi-geo-alt-fill me-1"></i>Select location first</span>';
+                        else if (hasNoCoverage) slotText = '<span class="text-muted"><i class="bi bi-geo-alt-fill me-1"></i>Select valid location</span>';
                         else if (totalServiceableTechs === 0) slotText = '<span class="text-muted"><i class="bi bi-moon-stars me-1"></i>Off Hours</span>';
                         else if (isBlocked) slotText = '<span class="text-muted"><i class="bi bi-x-circle me-1"></i>Fully Booked</span>';
                         else slotText = `<span class="text-success fw-bold"><i class="bi bi-check-circle me-1"></i>Available</span>`;
@@ -390,6 +470,129 @@ export function AppointmentsView() {
         if (dateInput) {
             updateDailyGrid(dateInput.value);
         }
+
+        let hardwarePairsAssigned = [];
+        
+        const renderHardwarePairs = () => {
+            const container = modal.element.querySelector('#hardware-deployment-container');
+            if (!container) return;
+            
+            let newGroups = [];
+            let gId = 1;
+            modal.element.querySelectorAll('.product-type-qty').forEach(input => {
+                const qty = parseInt(input.value || '0', 10);
+                const reqsStr = input.getAttribute('data-hw');
+                let hwReqs = [];
+                try { hwReqs = JSON.parse(reqsStr || '[]'); } catch(e){}
+                
+                if (hwReqs.length > 0) {
+                    for(let i=0; i<qty; i++) {
+                        newGroups.push({
+                            id: gId++,
+                            sourceProductId: input.dataset.id,
+                            requirements: hwReqs,
+                            assigned_items: {}
+                        });
+                    }
+                }
+            });
+
+            if (newGroups.length === 0) {
+                container.style.display = 'none';
+                hardwarePairsAssigned = [];
+                return;
+            } else {
+                container.style.display = 'block';
+            }
+
+            // Re-map existing assigned_items if the sourceProductId matches
+            newGroups.forEach((ng, i) => {
+                const existing = hardwarePairsAssigned[i];
+                if (existing && existing.sourceProductId === ng.sourceProductId) {
+                    ng.assigned_items = existing.assigned_items || {};
+                }
+            });
+            hardwarePairsAssigned = newGroups;
+
+            const pairsContainer = modal.element.querySelector('#hardware-pairs');
+            pairsContainer.innerHTML = '';
+            
+            hardwarePairsAssigned.forEach(group => {
+                const slotHtml = document.createElement('div');
+                slotHtml.className = 'border rounded p-2 bg-white d-flex flex-column gap-2 mb-2';
+                
+                let dropZones = group.requirements.map(reqType => {
+                    const assignedId = group.assigned_items[reqType];
+                    return `
+                        <div class="drop-slot border-dashed p-2 text-center small rounded flex-grow-1" data-group="${group.id}" data-type="${reqType}" style="border: 1px dashed #ccc; min-width: 100px;">
+                            ${assignedId ? `<span class="badge bg-primary">${assignedId}</span>` : `Drop ${reqType}`}
+                        </div>
+                    `;
+                }).join('');
+
+                slotHtml.innerHTML = `
+                    <div class="fw-bold small text-muted">Slot ${group.id} (${group.sourceProductId})</div>
+                    <div class="d-flex flex-wrap gap-2 w-100">
+                        ${dropZones}
+                    </div>
+                `;
+                pairsContainer.appendChild(slotHtml);
+
+                // Bind drag over and drop
+                group.requirements.forEach(reqType => {
+                    const dropEl = slotHtml.querySelector(`.drop-slot[data-group="${group.id}"][data-type="${reqType}"]`);
+                    dropEl.ondragover = (e) => e.preventDefault();
+                    dropEl.ondrop = (e) => {
+                        e.preventDefault();
+                        const draggedId = e.dataTransfer.getData('id');
+                        const draggedType = e.dataTransfer.getData('type');
+
+                        if (draggedType === reqType) {
+                            group.assigned_items[reqType] = draggedId;
+                            renderHardwarePairs();
+                        } else {
+                            alert(`Invalid slot for ${draggedType}. Please drop in the ${reqType} slot.`);
+                        }
+                    };
+                });
+            });
+        };
+
+        const renderAvailableHardwareList = () => {
+            const listEl = modal.element.querySelector('#available-hardware');
+            if(!listEl) return;
+            listEl.innerHTML = '';
+            items.docs.forEach(doc => {
+                const item = doc.data();
+                const isAvail = item.status === 'available' || (!item.status && item.is_available);
+                if (!isAvail) return;
+
+                const el = document.createElement('div');
+                el.className = 'p-2 bg-white border rounded small cursor-move mb-1';
+                el.draggable = true;
+                const displayType = item.item_type || 'Unknown';
+                el.textContent = `${displayType}: ${item.item_id}`;
+                el.dataset.id = item.item_id;
+                el.dataset.type = displayType;
+
+                el.ondragstart = (e) => {
+                    e.dataTransfer.setData('id', el.dataset.id);
+                    e.dataTransfer.setData('type', el.dataset.type);
+                };
+                listEl.appendChild(el);
+            });
+        };
+        
+        renderAvailableHardwareList();
+
+        // Listen for product changes
+        modal.element.querySelectorAll('.product-type-qty').forEach(input => {
+            input.addEventListener('change', () => {
+                const dt = modal.element.querySelector('[name="schedule_date"]').value;
+                if (dt) updateDailyGrid(dt);
+                renderHardwarePairs();
+            });
+        });
 
         // Map
         const map = L.map('apt-map').setView([24.7136, 46.6753], 10);
@@ -496,12 +699,38 @@ export function AppointmentsView() {
             // Extract Products
             const selectedProducts = [];
             let totalDurationMin = 0;
-            modal.element.querySelectorAll('.product-type-chk:checked').forEach(chk => {
-                selectedProducts.push(chk.value);
-                totalDurationMin += parseInt(chk.dataset.duration || '0', 10);
+            modal.element.querySelectorAll('.product-type-qty').forEach(input => {
+                const qty = parseInt(input.value || '0', 10);
+                if (qty > 0) {
+                    selectedProducts.push({ id: input.dataset.id, quantity: qty });
+                    totalDurationMin += qty * parseInt(input.dataset.duration || '0', 10);
+                }
             });
+
+            const validPairs = hardwarePairsAssigned.filter(g => {
+                return g.requirements.every(req => g.assigned_items[req]);
+            });
+
+            if (validPairs.length < hardwarePairsAssigned.length && hardwarePairsAssigned.length > 0) {
+                if(!confirm("You haven't fully assigned hardware to all requested product slots. Proceed anyway?")) {
+                    return;
+                }
+            }
             
             try {
+                // Batch update items as assigned
+                const itemUpdates = [];
+                validPairs.forEach(group => {
+                    for (const reqType of group.requirements) {
+                        const itemId = group.assigned_items[reqType];
+                        itemUpdates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', itemId), { is_available: false, status: 'assigned', location_name: data.location_name }));
+                    }
+                });
+                if(itemUpdates.length > 0) {
+                    await Promise.all(itemUpdates);
+                }
+                const hwPayload = validPairs.map(g => g.assigned_items);
+
                 await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'appointments', id), {
                     appointment_id: id,
                     ...data,
@@ -510,7 +739,7 @@ export function AppointmentsView() {
                     status: 'pending',
                     created_at: firebase.db.serverTimestamp(),
                     metadata: { 
-                        hardware: [], // Initialized as an empty array for completion
+                        hardware: hwPayload,
                         location: { lat: data.lat, lng: data.lng },
                         custom_data: customData,
                         products: selectedProducts,
@@ -654,8 +883,7 @@ export function AppointmentsView() {
                         if (list) list.appendChild(row);
                     });
             }
-            
-            document.dispatchEvent(new CustomEvent('apply-auth'));
+            view.emit('rendered');
         }));
     });
 

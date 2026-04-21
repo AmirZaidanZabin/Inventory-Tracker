@@ -1,5 +1,6 @@
 import { controller } from '../lib/controller.js';
 import { firebase } from '../lib/firebase.js';
+import { createModal } from '../lib/modal.js';
 
 let blueprintData = null;
 let FIELDS = ['status', 'id']; // Default fallback
@@ -360,6 +361,7 @@ export function TriggersView() {
 
         view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'triggers'), (snap) => {
             view.emit('loading:end');
+            view.emit('rendered');
             const arr = [];
             if(snap && snap.forEach) {
                 snap.forEach(doc => {
