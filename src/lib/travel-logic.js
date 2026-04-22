@@ -1,70 +1,87 @@
 /**
- * Distance and Travel Logic Helper
+ * Distance and Travel Logic Helper (Geospatial & Proximity Aware)
  */
 
-// Average urban speed in km/h
-const DEFAULT_AVG_SPEED = 40; 
+const TRAVEL_CACHE = new Map();
 const DEFAULT_PREP_TIME = 15; // 15 mins buffer/prep
 
 /**
- * Haversine formula for distance in KM
+ * Fetch routing data from OSRM
+ */
+async function fetchOSRMRoute(lat1, lon1, lat2, lon2) {
+    const key = `${lat1},${lon1};${lat2},${lon2}`;
+    if (TRAVEL_CACHE.has(key)) return TRAVEL_CACHE.get(key);
+
+    try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=false`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("OSRM API error");
+        const data = await res.json();
+        
+        if (data.routes && data.routes.length > 0) {
+            const route = {
+                distanceKm: data.routes[0].distance / 1000,
+                durationMin: Math.ceil(data.routes[0].duration / 60)
+            };
+            TRAVEL_CACHE.set(key, route);
+            return route;
+        }
+    } catch (e) {
+        console.warn("OSRM fetch failed, falling back to Haversine:", e.message);
+    }
+    return null;
+}
+
+/**
+ * Haversine fallback
  */
 export function calculateDistance(lat1, lon1, lat2, lon2) {
     if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
-    const R = 6371; // Radius of the earth in km
-    const dLat = deg2rad(lat2 - lat1);
-    const dLon = deg2rad(lon2 - lon1);
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
 
-function deg2rad(deg) {
-    return deg * (Math.PI / 180);
+/**
+ * Enhanced Duration Estimator (Async OSRM)
+ */
+export async function estimateDuration(lat1, lon1, lat2, lon2) {
+    const route = await fetchOSRMRoute(lat1, lon1, lat2, lon2);
+    if (route) {
+        return route.durationMin + DEFAULT_PREP_TIME;
+    }
+    // Fallback to Haversine (40km/h avg)
+    const dist = calculateDistance(lat1, lon1, lat2, lon2);
+    return Math.round((dist / 40) * 60 + DEFAULT_PREP_TIME);
 }
 
 /**
- * Returns estimated travel time in minutes
- * @param {number} distanceKm 
- * @param {number} [speed] - Overrides default speed
- * @param {number} [prepTime] - Overrides default prep time
+ * Finds the nearest existing locations for buffering
  */
-export function estimateDuration(distanceKm, speed = DEFAULT_AVG_SPEED, prepTime = DEFAULT_PREP_TIME) {
-    const travelMinutes = (distanceKm / speed) * 60;
-    return Math.round(travelMinutes + prepTime);
-}
-
-/**
- * Finds the origin (previous location) for a specific van at a given time
- */
-export function findPrecedingLocation(vanId, dateStr, timeStr, allAppointments, vanData) {
-    // 1. Filter appts for this van on this date
+export function findAdjacentAppointments(techId, dateStr, timeStr, allAppointments, userBase) {
     const dailyAppts = allAppointments
-        .filter(a => a.van_id === vanId && a.schedule_date === dateStr && !a.is_deleted)
+        .filter(a => a.tech_id === techId && a.schedule_date === dateStr && !a.is_deleted)
         .sort((a, b) => (a.appointment_time || '00:00').localeCompare(b.appointment_time || '00:00'));
 
-    // 2. Find the last appt before timeStr
     const preceding = [...dailyAppts].reverse().find(a => (a.appointment_time || '00:00') < timeStr);
+    const following = dailyAppts.find(a => (a.appointment_time || '00:00') > timeStr);
 
-    if (preceding && preceding.metadata?.location?.lat) {
-        return {
-            lat: parseFloat(preceding.metadata.location.lat),
-            lng: parseFloat(preceding.metadata.location.lng),
-            source: `Job ${preceding.appointment_id}`
-        };
-    }
+    const formatLoc = (apt, label) => apt?.metadata?.location?.lat ? {
+        lat: parseFloat(apt.metadata.location.lat),
+        lng: parseFloat(apt.metadata.location.lng),
+        source: `${label}: ${apt.appointment_id}`
+    } : null;
 
-    // 3. Fallback to van default location
-    if (vanData && vanData.default_lat && vanData.default_lng) {
-        return {
-            lat: parseFloat(vanData.default_lat),
-            lng: parseFloat(vanData.default_lng),
-            source: 'Van Base'
-        };
-    }
+    // Fallback to base coordinates if first/last of day
+    const base = userBase?.lat ? { lat: parseFloat(userBase.lat), lng: parseFloat(userBase.lng), source: 'Tech Base' } : null;
 
-    return null;
+    return {
+        prev: formatLoc(preceding, 'Job') || base,
+        next: formatLoc(following, 'Job') || base
+    };
 }

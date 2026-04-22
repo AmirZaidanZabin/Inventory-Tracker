@@ -35,7 +35,16 @@ async function apiFetch(url, options = {}) {
         const text = await response.text();
         throw new Error(text || response.statusText);
     }
-    return response.json();
+    
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+        return response.json();
+    } else {
+        const text = await response.text();
+        console.error("Expected JSON but got:", contentType, "from", url);
+        console.error("Sample:", text.slice(0, 200));
+        throw new Error(`Expected JSON from ${url} but received ${contentType || 'unknown content'}`);
+    }
 }
 
 export const firebase = {
@@ -48,8 +57,8 @@ export const firebase = {
             }
             return result;
         } catch (error) {
-            if (error.code === 'auth/popup-closed-by-user') {
-                console.log('User closed popup.');
+            if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+                console.log('User closed or cancelled popup.');
                 return null;
             }
             throw error;
@@ -90,6 +99,8 @@ export const firebase = {
         
         subscribe: (ref, cb, errCb) => {
             let interval;
+            let lastDataHash = null;
+
             const parseData = (d) => ({ 
                 ...d, 
                 created_at: d.created_at ? { toDate: () => new Date(d.created_at) } : null, 
@@ -98,15 +109,20 @@ export const firebase = {
             });
 
             const poll = async () => {
-                if (document.hidden) return; // Pause polling when tab is inactive
                 const user = auth.currentUser;
-                if (!user) return; // Silently skip if auth not ready
+                if (!user) return;
                 
                 try {
                     const data = await (ref.type === 'collection' 
                         ? apiFetch(`/api/${ref.path}`) 
                         : apiFetch(`/api/${ref.col}/${ref.id}`));
                     
+                    const currentHash = JSON.stringify(data);
+                    if (currentHash === lastDataHash) {
+                        return; // No change, skip callback to prevent flicker
+                    }
+                    lastDataHash = currentHash;
+
                     // Mock Snapshot
                     const snap = ref.type === 'collection' 
                         ? { 
@@ -131,15 +147,8 @@ export const firebase = {
             };
             
             poll();
-            interval = setInterval(poll, 10000); // Poll every 10s (reduced from 2s to prevent flooding)
-            
-            const forcePoll = () => poll();
-            window.addEventListener('firebase-poll-now', forcePoll);
-
-            return () => {
-                clearInterval(interval);
-                window.removeEventListener('firebase-poll-now', forcePoll);
-            };
+            interval = setInterval(poll, 2000); // Polling remains as fallback, but suppressed if no change
+            return () => clearInterval(interval);
         },
 
         getDoc: async (ref) => {
@@ -157,12 +166,8 @@ export const firebase = {
             };
         },
 
-        getDocs: async (ref, options = {}) => {
-            let path = ref.path;
-            if (options.limit) {
-                path += (path.includes('?') ? '&' : '?') + 'limit=' + options.limit;
-            }
-            const data = await apiFetch(`/api/${path}`);
+        getDocs: async (ref) => {
+            const data = await apiFetch(`/api/${ref.path}`);
             const parseData = (d) => ({ 
                 ...d, 
                 created_at: d.created_at ? { toDate: () => new Date(d.created_at) } : null, 
@@ -182,38 +187,30 @@ export const firebase = {
         },
 
         setDoc: async (ref, data) => {
-            const res = await apiFetch(`/api/${ref.col}`, {
+            return apiFetch(`/api/${ref.col}`, {
                 method: 'POST',
                 body: JSON.stringify({ ...data, id: ref.id, created_at: '__server_timestamp__', updated_at: '__server_timestamp__' })
             });
-            window.dispatchEvent(new Event('firebase-poll-now'));
-            return res;
         },
 
         addDoc: async (ref, data) => {
-            const res = await apiFetch(`/api/${ref.path}`, {
+            return apiFetch(`/api/${ref.path}`, {
                 method: 'POST',
                 body: JSON.stringify({ ...data, created_at: '__server_timestamp__', updated_at: '__server_timestamp__' })
             });
-            window.dispatchEvent(new Event('firebase-poll-now'));
-            return res;
         },
 
         updateDoc: async (ref, data) => {
-            const res = await apiFetch(`/api/${ref.col}/${ref.id}`, {
+            return apiFetch(`/api/${ref.col}/${ref.id}`, {
                 method: 'PUT',
                 body: JSON.stringify({ ...data, updated_at: '__server_timestamp__' })
             });
-            window.dispatchEvent(new Event('firebase-poll-now'));
-            return res;
         },
 
         deleteDoc: async (ref) => {
-            const res = await apiFetch(`/api/${ref.col}/${ref.id}`, {
+            return apiFetch(`/api/${ref.col}/${ref.id}`, {
                 method: 'DELETE'
             });
-            window.dispatchEvent(new Event('firebase-poll-now'));
-            return res;
         },
         
         serverTimestamp: () => '__server_timestamp__',

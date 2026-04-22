@@ -31,6 +31,9 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      outDir: 'dist',
+    },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
     },

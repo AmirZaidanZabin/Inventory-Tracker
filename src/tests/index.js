@@ -1,6 +1,8 @@
 import { tester } from '../lib/tester.js';
 import { firebase } from '../lib/firebase.js';
 import { runViewTests } from './views.test.js';
+import { runSystemTests } from './system.test.js';
+import { runAuthTests } from './auth.test.js';
 
 export async function runTests() {
     const t = tester();
@@ -8,6 +10,12 @@ export async function runTests() {
 
     // View Tests
     await runViewTests(t);
+
+    // System Integration & Audit Tests
+    await runSystemTests(t);
+
+    // Auth & Logic Tests
+    await runAuthTests(t);
 
     // CRUD Tests (using a test collection)
     await t.test('Firestore: Create and Delete Test Doc', async () => {

@@ -1,6 +1,5 @@
 import { controller } from '../lib/controller.js';
 import { firebase } from '../lib/firebase.js';
-import { createModal } from '../lib/modal.js';
 
 const FIELD_TYPES = [
     { value: 'text',     label: 'Short Text' },
@@ -19,9 +18,7 @@ const ENTITIES = [
     { id: 'appointments', name: 'Appointments' },
     { id: 'users',        name: 'Users' },
     { id: 'vans',         name: 'Vans' },
-    { id: 'items',        name: 'Hardware Items' },
-    { id: 'product_types',name: 'Product Types' },
-    { id: 'item_types',   name: 'Hardware Types' }
+    { id: 'items',        name: 'Hardware Items' }
 ];
 
 export function FormsView() {
@@ -350,7 +347,6 @@ export function FormsView() {
             }
             state.forms = arr;
             view.emit('loading:end');
-            view.emit('rendered');
             renderFormsList();
         }));
     });

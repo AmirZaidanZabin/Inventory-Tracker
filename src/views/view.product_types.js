@@ -78,7 +78,7 @@ export function ProductTypesView() {
         return { show: () => bsModal.show(), hide: () => bsModal.hide(), element: mEl };
     };
 
-    const getFormHTML = (pt = null, itemTypes = []) => {
+    const getFormHTML = (pt = null, catalogs = []) => {
         return `
             <form id="pt-form">
                 <div class="row g-3">
@@ -91,25 +91,27 @@ export function ProductTypesView() {
                         <input type="text" class="form-control" name="name" value="${pt ? pt.name : ''}" required>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label small fw-bold">Duration (min)</label>
-                        <input type="number" class="form-control" name="duration_minutes" value="${pt ? pt.duration_minutes : '30'}" required min="1">
+                        <label class="form-label small fw-bold">Parent Hardware (Duration Source)</label>
+                        <select class="form-select" name="catalog_id" required>
+                            <option value="">Select Hardware...</option>
+                            ${catalogs.map(c => `<option value="${c.catalog_id}" ${pt && pt.catalog_id === c.catalog_id ? 'selected' : ''}>${c.item_name} (${c.duration_minutes}m)</option>`).join('')}
+                        </select>
                     </div>
                 </div>
                 <div class="row g-3 mt-2">
                     <div class="col-12">
-                        <label class="form-label small fw-bold mb-2">Required Hardware Types</label>
+                        <label class="form-label small fw-bold mb-2">Required Additional Hardware Types</label>
                         <div class="d-flex flex-wrap gap-3 p-2 border rounded bg-light">
-                            ${itemTypes.map(t => {
-                                const isChecked = pt && pt.hardware_requirements && pt.hardware_requirements.includes(t) ? 'checked' : '';
+                            ${catalogs.map(t => {
+                                const isChecked = pt && pt.hardware_requirements && pt.hardware_requirements.includes(t.catalog_id) ? 'checked' : '';
                                 return `
                                     <div class="form-check">
-                                        <input class="form-check-input hw-req-checkbox" type="checkbox" value="${t}" id="hw-req-${t.replace(/\s+/g, '-')}" ${isChecked}>
-                                        <label class="form-check-label small" for="hw-req-${t.replace(/\s+/g, '-')}">${t}</label>
+                                        <input class="form-check-input hw-req-checkbox" type="checkbox" value="${t.catalog_id}" id="hw-req-${t.catalog_id}" ${isChecked}>
+                                        <label class="form-check-label small" for="hw-req-${t.catalog_id}">${t.item_name}</label>
                                     </div>
                                 `;
                             }).join('') || '<span class="text-muted small">No hardware types found in inventory.</span>'}
                         </div>
-                        <div class="small text-muted mt-1">Select the hardware types that must be assigned when booking this product.</div>
                     </div>
                 </div>
                 
@@ -178,10 +180,17 @@ export function ProductTypesView() {
             const data = {
                 id: fd.get('id'),
                 name: fd.get('name'),
-                duration_minutes: parseInt(fd.get('duration_minutes') || '0', 10),
+                catalog_id: fd.get('catalog_id'),
                 hardware_requirements: hwReqs,
                 custom_fields: cfs.map(c => ({...c, key: c.label.toLowerCase().replace(/[^a-z0-9]/g, '_')}))
             };
+
+            if (!data.catalog_id) {
+                alert("Data Integrity Error: A Product Type MUST be linked to a primary Hardware Type.");
+                btn.disabled = false;
+                btn.innerHTML = 'Save Product Type';
+                return;
+            }
 
             const btn = form.querySelector('button[type="submit"]');
             btn.disabled = true;
@@ -217,15 +226,11 @@ export function ProductTypesView() {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
         
         try {
-            const itemTypesSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_types'));
-            const typesSet = new Set();
-            itemTypesSnap.forEach(doc => {
-                const it = doc.data().name;
-                if(it) typesSet.add(it);
-            });
-            const itemTypes = Array.from(typesSet).sort();
+            const itemTypesSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'));
+            const catalogs = [];
+            itemTypesSnap.forEach(doc => catalogs.push(doc.data()));
 
-            const modal = createModal('New Product Type', getFormHTML(null, itemTypes));
+            const modal = createModal('New Product Type', getFormHTML(null, catalogs));
             modal.show();
             initFormJS(modal.element, null);
         } catch(e) {
@@ -278,15 +283,11 @@ export function ProductTypesView() {
                     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
                     
                     try {
-                        const itemTypesSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_types'));
-                        const typesSet = new Set();
-                        itemTypesSnap.forEach(doc => {
-                            const it = doc.data().name;
-                            if(it) typesSet.add(it);
-                        });
-                        const itemTypes = Array.from(typesSet).sort();
+                        const itemTypesSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'));
+                        const catalogs = [];
+                        itemTypesSnap.forEach(doc => catalogs.push(doc.data()));
 
-                        const modal = createModal('Edit Product Type', getFormHTML(pt, itemTypes));
+                        const modal = createModal('Edit Product Type', getFormHTML(pt, catalogs));
                         modal.show();
                         initFormJS(modal.element, pt);
                     } catch (e) {

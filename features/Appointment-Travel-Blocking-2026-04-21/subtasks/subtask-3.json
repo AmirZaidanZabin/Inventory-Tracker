@@ -1,6 +1,0 @@
-{
-  "id": 3,
-  "description": "Do-Pebble: Implement Travel Block Logic in updateDailyGrid",
-  "expected_output": "Grid checks overlap and travel duration before allowing slot",
-  "status": "pending"
-}

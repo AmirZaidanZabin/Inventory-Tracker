@@ -1,3 +1,0 @@
-{"ts":"2026-04-21T03:24:30Z","id":"1","action":"create item types view","artifact":"src/views/view.item_types.js","status":"PASS","resume_ctx":"item types view created and wired up"}
-{"ts":"2026-04-21T03:24:35Z","id":"2","action":"register view","artifact":"src/main.js","status":"PASS","resume_ctx":"item types added to sidebar"}
-{"ts":"2026-04-21T03:25:20Z","id":"FINAL","action":"sweep item types abstraction","artifact":"src/views/view.product_types.js","status":"PASS","resume_ctx":"completed abstracting hardware item types to their own entity"}

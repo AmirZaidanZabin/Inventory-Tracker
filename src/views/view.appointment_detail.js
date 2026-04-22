@@ -18,6 +18,7 @@ export function AppointmentDetailView(appointmentId) {
                                 <div class="mb-2"><i class="bi bi-geo-alt me-2"></i><span id="det-location"></span></div>
                                 <div class="mb-2"><i class="bi bi-person me-2"></i><span id="det-tech"></span></div>
                                 <div class="mb-2"><i class="bi bi-box-seam me-2"></i><span id="det-products"></span></div>
+                                <div id="det-products-list" class="mt-2 mb-2 p-2 bg-light rounded" style="max-height: 150px; overflow-y: auto;"></div>
                                 <div id="det-status" class="badge bg-warning text-dark mt-2"></div>
                                 <button id="delete-apt-btn" class="btn btn-outline-danger btn-sm w-100 mt-3 auth-admin hidden">
                                     <i class="bi bi-trash me-2"></i>Delete Appointment
@@ -31,31 +32,35 @@ export function AppointmentDetailView(appointmentId) {
                             </div>
                         </div>
                         <div class="card">
-                            <div class="card-header">Hardware Assigned</div>
+                            <div class="card-header">Required Hardware (Frozen from Booking)</div>
                             <div class="card-body">
+                                <div id="required-hardware-snapshot" class="mb-3"></div>
+                                <hr>
+                                <div class="small fw-bold mb-1">Status:</div>
                                 <div id="hardware-list-display" class="small text-muted">Awaiting completion...</div>
                             </div>
                         </div>
                     </div>
                     <div class="col-lg-8">
                         <div class="card mb-4">
-                            <div class="card-header">Job Execution</div>
+                            <div class="card-header">Job Execution & Hardware Pairing</div>
                             <div class="card-body">
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">Deploy Hardware (Drag to Pair Slots)</label>
+                                    <label class="form-label fw-bold">Scan & Pair Hardware (Must match requirements)</label>
                                     <div class="row g-2">
-                                        <div class="col-md-5">
-                                            <div class="p-2 border rounded bg-light" style="height: 250px; overflow-y: auto;">
-                                                <div class="small fw-bold mb-2">Available DB Hardware</div>
+                                        <div class="col-md-4">
+                                            <div class="p-2 border rounded bg-light" style="height: 350px; overflow-y: auto;">
+                                                <div class="small fw-bold mb-2">Technician Van Stock</div>
                                                 <div id="available-hardware" class="d-flex flex-column gap-1"></div>
                                             </div>
                                         </div>
-                                        <div class="col-md-7">
+                                        <div class="col-md-8">
                                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <div class="small fw-bold">Required Hardware Slots</div>
+                                                <div class="small fw-bold">Installation Audit Slots</div>
+                                                <div class="text-xs text-muted">Drag stock into specific slots</div>
                                             </div>
-                                            <div id="hardware-pairs" class="d-flex flex-column gap-2" style="max-height: 250px; overflow-y: auto;">
-                                                <!-- Dynamic pair slots go here -->
+                                            <div id="hardware-slots-container" class="d-flex flex-column gap-2" style="max-height: 350px; overflow-y: auto;">
+                                                <!-- Dynamic requirement slots go here -->
                                             </div>
                                         </div>
                                     </div>
@@ -100,6 +105,7 @@ export function AppointmentDetailView(appointmentId) {
         .onboard({ id: 'delete-apt-btn' })
         .onboard({ id: 'available-hardware' })
         .onboard({ id: 'hardware-pairs' })
+        .onboard({ id: 'add-pair-btn' })
         .onboard({ id: 'hardware-list-display' });
 
     let photos = [];
@@ -118,52 +124,51 @@ export function AppointmentDetailView(appointmentId) {
         if (urlInput) urlInput.value = '';
     });
 
-    let hardwarePairsAssigned = [];
+    let hardwareSlots = []; // { id, catalog_id, item_name, assigned_id, assigned_type }
 
-    const renderHardwarePairs = () => {
-        const container = view.$('hardware-pairs');
+    const renderHardwareSlots = () => {
+        const container = view.$('hardware-slots-container');
         if(!container) return;
         container.innerHTML = '';
-        hardwarePairsAssigned.forEach(group => {
-            const slotHtml = document.createElement('div');
-            slotHtml.className = 'border rounded p-2 bg-white d-flex flex-column gap-2 mb-2';
-            
-            let dropZones = group.requirements.map(reqType => {
-                const assignedId = group.assigned_items[reqType];
-                return `
-                    <div class="drop-slot border-dashed p-2 text-center small rounded flex-grow-1" data-group="${group.id}" data-type="${reqType}" style="border: 1px dashed #ccc; min-width: 100px;">
-                        ${assignedId ? `<span class="badge bg-primary">${assignedId}</span>` : `Drop ${reqType}`}
-                    </div>
-                `;
-            }).join('');
-
-            slotHtml.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <div class="fw-bold small text-muted">Slot ${group.id}</div>
+        
+        hardwareSlots.forEach((slot, index) => {
+            const div = document.createElement('div');
+            div.className = 'border rounded p-2 bg-white d-flex align-items-center gap-2';
+            div.innerHTML = `
+                <div class="flex-grow-1">
+                    <div class="text-xs fw-bold text-accent">${slot.item_name}</div>
+                    <div class="text-xxs text-muted">ID: ${slot.catalog_id}</div>
                 </div>
-                <div class="d-flex flex-wrap gap-2 w-100">
-                    ${dropZones}
+                <div class="drop-slot border-dashed p-2 text-center small rounded flex-grow-1" 
+                     id="slot-${index}" 
+                     style="border: 2px dashed ${slot.assigned_id ? '#22c55e' : '#cbd5e1'}; min-width: 150px; background: ${slot.assigned_id ? '#f0fdf4' : ''}">
+                    ${slot.assigned_id ? `<span class="badge bg-success">${slot.assigned_id}</span>` : `<span class="text-muted text-xs">Drop ${slot.item_name} here</span>`}
                 </div>
+                ${slot.assigned_id ? `<button class="btn btn-sm text-danger clear-slot-btn" data-index="${index}"><i class="bi bi-x-circle"></i></button>` : ''}
             `;
-            container.appendChild(slotHtml);
+            container.appendChild(div);
 
-            // Bind drag over and drop
-            group.requirements.forEach(reqType => {
-                const dropEl = slotHtml.querySelector(`.drop-slot[data-group="${group.id}"][data-type="${reqType}"]`);
-                dropEl.ondragover = (e) => e.preventDefault();
-                dropEl.ondrop = (e) => {
-                    e.preventDefault();
-                    const draggedId = e.dataTransfer.getData('id');
-                    const draggedType = e.dataTransfer.getData('type');
+            const dropEl = div.querySelector(`#slot-${index}`);
+            dropEl.ondragover = (e) => e.preventDefault();
+            dropEl.ondrop = (e) => {
+                e.preventDefault();
+                const draggedId = e.dataTransfer.getData('id');
+                const draggedCatalogId = e.dataTransfer.getData('catalog_id');
 
-                    if (draggedType === reqType) {
-                        group.assigned_items[reqType] = draggedId;
-                        renderHardwarePairs();
-                    } else {
-                        alert(`Invalid slot for ${draggedType}. Please drop in the ${reqType} slot.`);
-                    }
+                if (draggedCatalogId === slot.catalog_id) {
+                    slot.assigned_id = draggedId;
+                    renderHardwareSlots();
+                } else {
+                    alert(`Invalid Hardware. Slot requires [${slot.catalog_id}], but you attempted to deploy [${draggedCatalogId}].`);
+                }
+            };
+
+            if (slot.assigned_id) {
+                div.querySelector('.clear-slot-btn').onclick = () => {
+                    slot.assigned_id = null;
+                    renderHardwareSlots();
                 };
-            });
+            }
         });
     };
 
@@ -193,16 +198,23 @@ export function AppointmentDetailView(appointmentId) {
                     // Let's release ALL tracked hardware in this appointment array.
                     if (apt.status !== 'completed' && apt.metadata && Array.isArray(apt.metadata.hardware)) {
                         const updates = [];
-                        apt.metadata.hardware.forEach(hwObj => {
-                            Object.values(hwObj).forEach(itemId => {
-                                if (itemId) {
-                                    updates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', itemId), {
-                                        status: 'available',
-                                        is_available: true,
-                                        location_name: ''
-                                    }));
-                                }
-                            });
+                        apt.metadata.hardware.forEach(pair => {
+                            if (pair.pico_id) {
+                                updates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', pair.pico_id), {
+                                    status: 'available',
+                                    is_available: true,
+                                    current_location_type: 'WAREHOUSE',
+                                    current_location_id: ''
+                                }));
+                            }
+                            if (pair.sim_id) {
+                                updates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', pair.sim_id), {
+                                    status: 'available',
+                                    is_available: true,
+                                    current_location_type: 'WAREHOUSE',
+                                    current_location_id: ''
+                                }));
+                            }
                         });
                         
                         if (updates.length > 0) {
@@ -223,17 +235,19 @@ export function AppointmentDetailView(appointmentId) {
     
     view.trigger('click', 'complete-job', async () => {
         const completionDesc = view.$('completion-desc').value;
-        const validPairs = hardwarePairsAssigned.filter(g => g.requirements.every(req => g.assigned_items[req]));
-        const isIncomplete = validPairs.length !== hardwarePairsAssigned.length || hardwarePairsAssigned.length === 0;
+        const incomplete = hardwareSlots.some(s => !s.assigned_id);
+
+        if (incomplete) {
+            return alert("Job Integrity Error: You must assign all required hardware types as per the booking snapshot before completing.");
+        }
 
         const modal = createModal({
-            title: isIncomplete ? 'Warning: Incomplete Hardware' : 'Confirm Job Completion',
+            title: 'Confirm Job Completion',
             body: `
-                ${isIncomplete ? '<p class="text-danger fw-bold"><i class="bi bi-exclamation-triangle me-2"></i>Some hardware pairs are incomplete or missing.</p>' : ''}
-                <p>Are you sure you want to complete this job ${isIncomplete ? 'without fully deploying hardware' : ''}?</p>
+                <p>Are you sure you want to complete this job? Correct inventory associations will be saved.</p>
                 <div class="d-flex justify-content-end gap-2 mt-4">
                     <button type="button" class="btn-pico btn-pico-outline cancel-btn">Cancel</button>
-                    <button type="button" class="btn-pico ${isIncomplete ? 'btn-pico-warning' : 'btn-pico-primary'} confirm-btn">Complete Anyway</button>
+                    <button type="button" class="btn-pico btn-pico-primary confirm-btn">Complete & Save</button>
                 </div>
             `
         });
@@ -244,27 +258,32 @@ export function AppointmentDetailView(appointmentId) {
             try {
                 // Batch update items as assigned
                 const itemUpdates = [];
-                validPairs.forEach(group => {
-                    group.requirements.forEach(reqType => {
-                        const itemId = group.assigned_items[reqType];
-                        itemUpdates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', itemId), { is_available: false, status: 'assigned', location_name: view.$('det-location').textContent }));
-                    });
+                const location_string = view.$('det-id').textContent;
+                
+                hardwareSlots.forEach(slot => {
+                    itemUpdates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', slot.assigned_id), { 
+                        is_available: false, 
+                        status: 'assigned', 
+                        current_location_type: 'APPOINTMENT', 
+                        current_location_id: location_string 
+                    }));
                 });
                 
                 if(itemUpdates.length > 0) {
                     await Promise.all(itemUpdates);
                 }
 
-                const hwPayload = validPairs.map(g => g.assigned_items);
+                // Prepare hardware results (legacy support for pair format if needed, but going generic)
+                const deployedHw = hardwareSlots.map(s => ({ catalog_id: s.catalog_id, item_id: s.assigned_id }));
 
                 await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), {
                     status: 'completed',
-                    'metadata.hardware': hwPayload,
+                    'metadata.hardware': deployedHw,
                     'metadata.photos': photos,
                     'metadata.completion_description': completionDesc,
                     'metadata.completed_at': firebase.db.serverTimestamp()
                 });
-                firebase.logAction("Job Completed", `Appointment ${appointmentId} closed: ${completionDesc}`);
+                firebase.logAction("Job Completed", `Appointment ${appointmentId} closed with ${deployedHw.length} items.`);
                 window.location.hash = '#appointments';
             } catch (err) {
                 console.error('Completion failed:', err.message);
@@ -278,11 +297,18 @@ export function AppointmentDetailView(appointmentId) {
         let map;
         view.emit('loading:start');
         
-        // Fetch and render available hardware to the list
         const renderAvailableHardwareList = async () => {
             const listEl = view.$('available-hardware');
             if(!listEl) return;
             listEl.innerHTML = '';
+
+            const catalogSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'));
+            const catalogMap = {};
+            catalogSnap.forEach(doc => {
+                const c = doc.data();
+                catalogMap[c.catalog_id || c.id] = c.item_type;
+            });
+
             const itemsRes = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'items'));
             itemsRes.docs.forEach(doc => {
                 const item = doc.data();
@@ -292,34 +318,51 @@ export function AppointmentDetailView(appointmentId) {
                 const el = document.createElement('div');
                 el.className = 'p-2 bg-white border rounded small cursor-move mb-1';
                 el.draggable = true;
-                const displayType = item.item_type || 'Unknown';
+                const displayType = catalogMap[item.catalog_id] || 'Unknown';
                 el.textContent = `${displayType}: ${item.item_id}`;
                 el.dataset.id = item.item_id;
                 el.dataset.type = displayType;
+                el.dataset.catalogId = item.catalog_id; // PASS CATALOG ID FOR VALIDATION
 
                 el.ondragstart = (e) => {
                     e.dataTransfer.setData('id', el.dataset.id);
                     e.dataTransfer.setData('type', el.dataset.type);
+                    e.dataTransfer.setData('catalog_id', el.dataset.catalogId);
                 };
                 listEl.appendChild(el);
             });
         };
+
+        let initialLoadDone = false;
+
         view.unsub(firebase.db.subscribe(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), (snap) => {
             if (!snap.exists()) return;
             const apt = snap.data();
             
-            // Initialize hardwarePairsAssigned from appointment metadata
-            if (hardwarePairsAssigned.length === 0 && apt.metadata && Array.isArray(apt.metadata.hardware)) {
-                hardwarePairsAssigned = apt.metadata.hardware.map((hw, index) => {
-                    return {
-                        id: index + 1,
-                        requirements: Object.keys(hw),
-                        assigned_items: { ...hw }
-                    };
-                });
-            }
             renderAvailableHardwareList();
-            renderHardwarePairs();
+
+            // Render Required Snapshot (Instruction 4)
+            const snapshotEl = view.$('required-hardware-snapshot');
+            if (snapshotEl && apt.metadata?.required_hardware) {
+                const reqs = apt.metadata.required_hardware;
+                snapshotEl.innerHTML = reqs.map(r => `
+                    <div class="d-flex justify-content-between align-items-center mb-1 text-xs">
+                        <span><i class="bi bi-tag-fill me-1"></i>${r.item_name}</span>
+                        <span class="badge bg-pale-secondary text-dark">${r.count} required</span>
+                    </div>
+                `).join('') || '<div class="text-muted small">No hardware requirements frozen for this booking.</div>';
+
+                // Initialize Slots ONLY once
+                if (!initialLoadDone && apt.status !== 'completed' && hardwareSlots.length === 0) {
+                    reqs.forEach(r => {
+                        for(let i=0; i<r.count; i++) {
+                            hardwareSlots.push({ catalog_id: r.catalog_id, item_name: r.item_name, assigned_id: null });
+                        }
+                    });
+                    renderHardwareSlots();
+                    initialLoadDone = true;
+                }
+            }
 
             const nameEl = view.$('det-name');
             const idEl = view.$('det-id');
@@ -341,30 +384,42 @@ export function AppointmentDetailView(appointmentId) {
                 if(!p || p.length === 0) {
                     prodEl.textContent = "No Products Selected";
                 } else {
-                    // Ideally we fetch product_types but storing count or ID is fine for now
-                    prodEl.textContent = p.length + " Product(s) Selected";
+                    prodEl.textContent = `${p.length} Product(s) [Total Effort: ${apt.metadata?.duration_minutes || 0} min]`;
                 }
             }
             if(statusEl) statusEl.textContent = apt.status;
+
+            // Render Product Breakdown (Instruction 4)
+            const productsBreakdown = view.$('det-products-list');
+            if (productsBreakdown && apt.metadata?.products) {
+                const pIds = apt.metadata.products;
+                firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'product_types')).then(snap => {
+                    const products = snap.docs.map(d => ({id: d.id, ...d.data()})).filter(pt => pIds.includes(pt.id));
+                    productsBreakdown.innerHTML = products.map(pt => `
+                        <div class="small d-flex justify-content-between border-bottom py-1">
+                            <span>${pt.name}</span>
+                            <span class="text-muted">${pt.duration_minutes} min</span>
+                        </div>
+                    `).join('') || '<div class="small text-muted">No specific product data found.</div>';
+                });
+            }
             
             // Render array of hardware
             const hwArray = apt.metadata?.hardware || [];
             const hwDisplay = view.$('hardware-list-display');
             if (hwDisplay) {
                 if (apt.status === 'completed' && Array.isArray(hwArray) && hwArray.length > 0) {
-                    hwDisplay.innerHTML = hwArray.map((hw, i) => {
-                        const keysStr = Object.keys(hw).map(k => `${k}: <span class="badge bg-primary">${hw[k] || 'N/A'}</span>`).join('<br>');
-                        return `
-                            <div class="mb-2 p-2 border rounded">
-                                <strong>Slot ${i+1}:</strong><br>
-                                ${keysStr}
-                            </div>
-                        `;
-                    }).join('');
+                    hwDisplay.innerHTML = hwArray.map((hw, i) => `
+                        <div class="mb-2 p-2 border rounded">
+                            <strong>Item ${i+1}:</strong><br>
+                            Type: <span class="badge bg-secondary">${hw.catalog_id || 'N/A'}</span><br>
+                            Serial: <span class="badge bg-primary">${hw.item_id || 'N/A'}</span>
+                        </div>
+                    `).join('');
                 } else if (apt.status === 'completed') {
                     hwDisplay.innerHTML = 'No hardware assigned.';
                 } else {
-                    hwDisplay.innerHTML = 'Awaiting completion...';
+                    hwDisplay.innerHTML = '<span class="text-warning">Awaiting deployment...</span>';
                 }
             }
             
@@ -391,13 +446,15 @@ export function AppointmentDetailView(appointmentId) {
                     descEl.value = apt.metadata?.completion_description || '';
                     descEl.disabled = true;
                 }
-                const hwPairs = view.$('hardware-pairs');
-                    if(hwPairs) hwPairs.style.display = 'none';
+                const addPairBtn = view.$('add-pair-btn');
+                    if(addPairBtn) addPairBtn.style.display = 'none';
+                const hwSlots = view.$('hardware-slots-container');
+                    if(hwSlots) hwSlots.style.display = 'none';
                 const availHw = view.$('available-hardware');
                     if(availHw && availHw.parentElement) availHw.parentElement.style.display = 'none';
             }
             
-            view.emit('rendered');
+            document.dispatchEvent(new CustomEvent('apply-auth'));
             view.emit('loading:end');
         }));
     });

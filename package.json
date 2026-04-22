@@ -1,37 +1,19 @@
 {
   "name": "pico-inventory-vanilla",
-  "version": "1.0.0",
   "private": true,
-  "description": "<div align=\"center\"> <img width=\"1200\" height=\"475\" alt=\"GHBanner\" src=\"https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6\" /> </div>",
-  "homepage": "https://github.com/AmirZaidanZabin/Inventory-Tracker#readme",
-  "bugs": {
-    "url": "https://github.com/AmirZaidanZabin/Inventory-Tracker/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/AmirZaidanZabin/Inventory-Tracker.git"
-  },
-  "license": "ISC",
-  "author": "",
+  "version": "1.0.0",
   "type": "module",
-  "main": "check-default-db.js",
-  "directories": {
-    "lib": "lib"
-  },
   "scripts": {
     "dev": "node server.js",
     "build": "vite build",
-    "start": "serve -s dist -l $PORT",
-    "lint": "echo 'Skipping lint'",
-    "deploy": "gcloud run deploy inventory-tracker --project foodics-coe --source . --region europe-west1 --allow-unauthenticated --min-instances 1"
+    "start": "node server.js",
+    "lint": "echo 'Skipping lint'"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",
-    "ci": "^2.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
-    "env": "^0.0.2",
     "express": "^4.21.2",
     "firebase": "^12.12.0",
     "firebase-admin": "^13.8.0",
@@ -39,7 +21,6 @@
     "next-themes": "^0.4.6",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "serve": "^14.2.6",
     "sonner": "^2.0.7",
     "sql.js": "^1.14.1",
     "tailwind-merge": "^3.5.0",

@@ -1,2 +1,0 @@
-{"ts":"2026-04-21T03:15:20Z","id":"1","action":"update product types UI","artifact":"src/views/view.product_types.js","status":"PASS","resume_ctx":"hardware_requirements added to product types"}
-{"ts":"2026-04-21T03:17:40Z","id":"FINAL","action":"sweep abstract hardware","artifact":"src/views/view.appointment_detail.js","status":"PASS","resume_ctx":"completed abstract hardware assignment using product type requirements"}

@@ -14,22 +14,37 @@
       },
       "required": ["van_id", "location_id"]
     },
-    "Item": {
-      "title": "Item",
-      "description": "Inventory item (Sim Card or Pico Device)",
+    "InventoryHardwareType": {
+      "title": "Inventory - Hardware Type",
+      "description": "Inventory hardware definitions (formerly Item Catalog)",
       "type": "object",
       "properties": {
+        "catalog_id": { "type": "string" },
         "item_type": { "type": "string", "enum": ["Sim Card", "Pico Device"] },
-        "item_id": { "type": "string" },
         "item_name": { "type": "string" },
         "provider": { "type": "string" },
+        "duration_minutes": { "type": "number", "description": "Estimated installation duration in minutes" },
         "created_at": { "type": "string", "format": "date-time" },
         "updated_at": { "type": "string", "format": "date-time" },
-        "is_available": { "type": "boolean" },
-        "is_deleted": { "type": "boolean" },
         "metadata": { "type": "object" }
       },
-      "required": ["item_type", "item_id"]
+      "required": ["catalog_id", "item_type"]
+    },
+    "Item": {
+      "title": "Item Instance",
+      "description": "Serialized inventory unit",
+      "type": "object",
+      "properties": {
+        "item_id": { "type": "string" },
+        "catalog_id": { "type": "string" },
+        "current_location_type": { "type": "string", "enum": ["VAN", "WAREHOUSE", "INSTALLED"] },
+        "current_location_id": { "type": "string" },
+        "is_available": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["item_id", "catalog_id", "current_location_type"]
     },
     "Role": {
       "title": "Role",
@@ -41,7 +56,6 @@
         "authorities": { "type": "array", "items": { "type": "string" } },
         "created_at": { "type": "string", "format": "date-time" },
         "updated_at": { "type": "string", "format": "date-time" },
-        "is_deleted": { "type": "boolean" },
         "metadata": { "type": "object" }
       },
       "required": ["role_id", "role_name"]
@@ -52,14 +66,14 @@
       "type": "object",
       "properties": {
         "user_id": { "type": "string" },
-        "user_name": { "type": "string" },
         "role_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "email": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" },
         "updated_at": { "type": "string", "format": "date-time" },
-        "is_deleted": { "type": "boolean" },
         "metadata": { "type": "object" }
       },
-      "required": ["user_id", "user_name", "role_id"]
+      "required": ["user_id", "role_id"]
     },
     "Appointment": {
       "title": "Appointment",
@@ -67,56 +81,47 @@
       "type": "object",
       "properties": {
         "appointment_id": { "type": "string" },
-        "appointment_name": { "type": "string" },
-        "schedule_date": { "type": "string" },
-        "appointment_time": { "type": "string" },
-        "location_name": { "type": "string" },
         "tech_id": { "type": "string" },
         "van_id": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "completed"] },
-        "is_deleted": { "type": "boolean" },
+        "product_type_id": { "type": "string" },
+        "status": { "type": "string", "enum": ["scheduled", "in_progress", "completed", "cancelled"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
         "metadata": { "type": "object" }
       },
-      "required": ["appointment_id", "appointment_name", "schedule_date", "tech_id"]
+      "required": ["appointment_id", "tech_id"]
     },
-    "ProductType": {
-      "title": "Product Type",
-      "description": "Definition of installable products with installation duration",
+    "InventoryProductType": {
+      "title": "Inventory - Product Type",
+      "description": "Definition of installable products linked to hardware",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
+        "type_id": { "type": "string" },
         "name": { "type": "string" },
-        "duration_minutes": { "type": "number" },
-        "custom_fields": { "type": "array" }
+        "catalog_id": { "type": "string", "description": "Reference to InventoryHardwareType" },
+        "duration_minutes": { "type": "number", "description": "Override or inherited duration from hardware" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
       },
-      "required": ["id", "name", "duration_minutes"]
+      "required": ["type_id", "name", "catalog_id"]
     },
-    "ItemType": {
-      "title": "Hardware Type",
-      "description": "Definition of hardware equipment categories",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "name"]
-    },
-    "StockTake": {
-      "title": "Stock Take",
-      "description": "Daily stock report log",
+    "StockTakeLog": {
+      "title": "Stock Take Log",
+      "description": "Inventory audit trails",
       "type": "object",
       "properties": {
         "log_id": { "type": "string" },
-        "type": { "type": "string", "enum": ["morning_load", "evening_reconcile"] },
-        "user_email": { "type": "string" },
-        "count": { "type": "number" },
+        "user_id": { "type": "string" },
+        "van_id": { "type": "string" },
+        "log_type": { "type": "string", "enum": ["morning_load", "evening_reconcile"] },
         "scanned_items": { "type": "array", "items": { "type": "string" } },
-        "missing": { "type": "array", "items": { "type": "string" } },
-        "extra": { "type": "array", "items": { "type": "string" } },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "discrepancies": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
       },
-      "required": ["log_id", "type", "user_email", "count", "timestamp"]
+      "required": ["log_id", "user_id", "van_id", "log_type"]
     }
   },
   "firestore": {
@@ -124,9 +129,13 @@
       "schema": { "$ref": "Van" },
       "description": "Van fleet collection"
     },
+    "/item_catalog/{catalogId}": {
+      "schema": { "$ref": "InventoryHardwareType" },
+      "description": "Inventory hardware types"
+    },
     "/items/{itemId}": {
       "schema": { "$ref": "Item" },
-      "description": "Inventory items collection"
+      "description": "Inventory items instances"
     },
     "/roles/{roleId}": {
       "schema": { "$ref": "Role" },
@@ -140,8 +149,8 @@
       "schema": { "$ref": "Appointment" },
       "description": "Appointments collection"
     },
-    "/stock_takes/{logId}": {
-      "schema": { "$ref": "StockTake" },
+    "/stock_take_logs/{logId}": {
+      "schema": { "$ref": "StockTakeLog" },
       "description": "Stock take history"
     },
     "/saved_reports/{reportId}": {
@@ -157,12 +166,8 @@
       "description": "Automation triggers"
     },
     "/product_types/{typeId}": {
-      "schema": { "$ref": "ProductType" },
-      "description": "Product type configurations"
-    },
-    "/item_types/{typeId}": {
-      "schema": { "$ref": "ItemType" },
-      "description": "Hardware item types configurations"
+      "schema": { "$ref": "InventoryProductType" },
+      "description": "Inventory product types"
     }
   }
 }

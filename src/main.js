@@ -125,13 +125,10 @@ const App = (() => {
             return;
         }
 
-        const link = e.target.closest('.nav-link[data-view]');
-        if (link && link.dataset.view) {
+        const link = e.target.closest('.nav-link');
+        if (link) {
             e.preventDefault();
-            const targetView = link.dataset.view;
-            // Always navigate directly (hashchange won't fire if hash is unchanged)
-            window.location.hash = targetView;
-            App.navigate(targetView);
+            window.location.hash = link.dataset.view;
             
             // Close mobile sidebar on nav
             shell.$('sidebar').classList.remove('show');
@@ -192,7 +189,7 @@ const App = (() => {
             setTimeout(() => card?.classList.remove('shake'), 400);
 
             let msg = "Login failed: " + e.message;
-            if (e.code === 'auth/wrong-password') {
+            if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
                 msg = "Incorrect password. Try again or reset via email.";
             } else if (e.code === 'auth/user-not-found') {
                 msg = "Account not found. Use Google or check email.";
@@ -320,11 +317,7 @@ const App = (() => {
 
             // Guest/Viewer restriction: Only Calendar and Gantt
             const isGuest = state.user.isAnonymous;
-            const currentUserEmail = state.user.email?.toLowerCase();
-            const adminEmails = ['amir.zaidan.zabin@gmail.com', 'amirzaidanzabin@gmail.com'];
-            const isAdminEmail = adminEmails.includes(currentUserEmail);
-            const isAdmin = isAdminEmail || state.roleId === 'admin' || state.authorities.includes('admin') || state.authorities.includes('manage_users');
-            const isViewer = !isAdmin && state.roleId === 'viewer';
+            const isViewer = state.roleId === 'viewer';
             const publicViews = ['calendar', 'gantt'];
             
             if ((isGuest || isViewer) && !publicViews.includes(viewId)) {
@@ -353,7 +346,7 @@ const App = (() => {
                     }
                 }
             });
-            shell.$('view-title').textContent = viewId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            shell.$('view-title').textContent = viewId.charAt(0).toUpperCase() + viewId.slice(1);
             
             // Apply fade out
             const container = shell.$('view-container');

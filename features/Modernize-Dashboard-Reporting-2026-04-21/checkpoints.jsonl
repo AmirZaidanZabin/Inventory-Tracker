@@ -1,6 +1,0 @@
-{"ts":"2026-04-21T03:47:40Z","id":"1","action":"modernize reporting","artifact":"src/views/view.reporting.js","status":"PASS","resume_ctx":"modernized styling and card layouts"}
-{"ts":"2026-04-21T03:47:45Z","id":"2","action":"modernize dashboard and add weekly view","artifact":"src/views/view.dashboard.js","status":"PASS","resume_ctx":"upgraded KPI cards and added tech-vs-day weekly schedule"}
-{"ts":"2026-04-21T03:51:20Z","id":"spacing-fix","action":"fix reporting layout and dashboard clickability","artifact":"src/views/view.reporting.js","status":"PASS","resume_ctx":"fixed div hierarchy in reporting and added clickable dashboard cards"}
-{"ts":"2026-04-21T03:53:00Z","id":"sql-fix","action":"fix SQL editor alignment","artifact":"index.html","status":"PASS","resume_ctx":"unified textarea and pre styling for perfect character alignment"}
-{"ts":"2026-04-21T03:55:10Z","id":"sql-fix-v2","action":"ultra-strict SQL alignment","artifact":"index.html","status":"PASS","resume_ctx":"forced identical line-height and font-metrics across all highlighter children"}
-{"ts":"2026-04-21T03:57:30Z","id":"auth-update","action":"update role authorities","artifact":"src/constants.js","status":"PASS","resume_ctx":"added product_types and item_types to PREDEFINED_AUTHORITIES"}

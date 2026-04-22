@@ -1,115 +1,154 @@
 import { controller } from '../lib/controller.js';
 import { firebase } from '../lib/firebase.js';
 
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+function toYMD(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatTime(timeStr) {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':');
+    let hours = parseInt(h, 10);
+    const suffix = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${hours}:${m} ${suffix}`;
+}
+
+function buildMonthWeeks(date) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    const weeks = [];
+    let currentWeek = [];
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+        const currentDay = new Date(year, month, d);
+        currentWeek.push(currentDay);
+        
+        if (currentDay.getDay() === 6 || d === daysInMonth) {
+            weeks.push([...currentWeek]);
+            currentWeek = [];
+        }
+    }
+    return weeks;
+}
+
 export function DashboardView() {
     const view = controller({
         stringComponent: `
-            <div class="dashboard-view">
+            <div class="dashboard-view animate__animated animate__fadeIn">
+                <style>
+                    .calendar-grid { display: grid; gap: 1px; background: #e2e8f0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+                    .calendar-day-header { background: #f8fafc; padding: 10px; text-align: center; font-weight: 600; font-size: 0.75rem; color: #64748b; }
+                    .calendar-day { background: #fff; padding: 10px; min-height: 200px; transition: background 0.2s; }
+                    .cal-task-pill { background: #ffffff; border: 1px solid #cbd5e1; border-left: 4px solid #6366f1; border-radius: 4px; padding: 4px 8px; font-size: 0.7rem; margin-bottom: 6px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+                    .cal-task-pill:hover { background: #f8fafc; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                    .cal-task-pill.status-completed { border-left-color: #10b981; }
+                    .cal-task-pill.status-pending { border-left-color: #f59e0b; }
+                </style>
+                <!-- Header Stats -->
                 <div class="row g-4 mb-4">
                     <div class="col-md-3">
-                        <a href="#vans" class="text-decoration-none h-100 d-block card-clickable">
-                            <div class="card border-0 shadow-sm rounded-4 p-4 border-start border-primary border-4 h-100">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-uppercase small fw-bold text-muted mb-2">Active VANs</h6>
-                                        <h2 id="count-vans" class="mb-0 fw-bold">0</h2>
-                                    </div>
-                                    <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-primary">
-                                        <i class="bi bi-truck fs-3"></i>
-                                    </div>
+                        <div class="card border-0 shadow-sm rounded-4 h-100 card-clickable overflow-hidden" data-view="vans">
+                            <div class="card-body p-4 border-start border-primary border-5">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-uppercase small fw-bold text-muted mb-0">Active VANs</h6>
+                                    <div class="stats-icon bg-pale-primary"><i class="bi bi-truck text-primary"></i></div>
                                 </div>
+                                <h2 id="count-vans" class="mb-0 fw-bold">0</h2>
+                                <div class="small text-muted mt-2">Active fleet units</div>
                             </div>
-                        </a>
+                        </div>
                     </div>
                     <div class="col-md-3">
-                        <a href="#items" class="text-decoration-none h-100 d-block card-clickable">
-                            <div class="card border-0 shadow-sm rounded-4 p-4 border-start border-success border-4 h-100">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-uppercase small fw-bold text-muted mb-2">Available Pico</h6>
-                                        <h2 id="count-pico" class="mb-0 fw-bold">0</h2>
-                                    </div>
-                                    <div class="bg-success bg-opacity-10 p-3 rounded-circle text-success">
-                                        <i class="bi bi-cpu fs-3"></i>
-                                    </div>
+                        <div class="card border-0 shadow-sm rounded-4 h-100 card-clickable overflow-hidden" data-view="items">
+                            <div class="card-body p-4 border-start border-success border-5">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-uppercase small fw-bold text-muted mb-0">Picos Available</h6>
+                                    <div class="stats-icon bg-pale-success"><i class="bi bi-cpu text-success"></i></div>
                                 </div>
+                                <h2 id="count-pico" class="mb-0 fw-bold">0</h2>
+                                <div class="small text-muted mt-2">Inventory ready</div>
                             </div>
-                        </a>
+                        </div>
                     </div>
                     <div class="col-md-3">
-                        <a href="#items" class="text-decoration-none h-100 d-block card-clickable">
-                            <div class="card border-0 shadow-sm rounded-4 p-4 border-start border-info border-4 h-100">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-uppercase small fw-bold text-muted mb-2">SIM Cards</h6>
-                                        <h2 id="count-sim" class="mb-0 fw-bold">0</h2>
-                                    </div>
-                                    <div class="bg-info bg-opacity-10 p-3 rounded-circle text-info">
-                                        <i class="bi bi-sim fs-3"></i>
-                                    </div>
+                        <div class="card border-0 shadow-sm rounded-4 h-100 card-clickable overflow-hidden" data-view="items">
+                            <div class="card-body p-4 border-start border-info border-5">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-uppercase small fw-bold text-muted mb-0">SIM Cards</h6>
+                                    <div class="stats-icon bg-pale-info"><i class="bi bi-sim text-info"></i></div>
                                 </div>
+                                <h2 id="count-sim" class="mb-0 fw-bold">0</h2>
+                                <div class="small text-muted mt-2">Network modules</div>
                             </div>
-                        </a>
+                        </div>
                     </div>
                     <div class="col-md-3">
-                        <a href="#appointments" class="text-decoration-none h-100 d-block card-clickable">
-                            <div class="card border-0 shadow-sm rounded-4 p-4 border-start border-warning border-4 h-100">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-uppercase small fw-bold text-muted mb-2">Pending Jobs</h6>
-                                        <h2 id="count-jobs" class="mb-0 fw-bold">0</h2>
-                                    </div>
-                                    <div class="bg-warning bg-opacity-10 p-3 rounded-circle text-warning">
-                                        <i class="bi bi-calendar-check fs-3"></i>
-                                    </div>
+                        <div class="card border-0 shadow-sm rounded-4 h-100 card-clickable overflow-hidden" data-view="appointments">
+                            <div class="card-body p-4 border-start border-warning border-5">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-uppercase small fw-bold text-muted mb-0">Pending Jobs</h6>
+                                    <div class="stats-icon bg-pale-warning"><i class="bi bi-clock-history text-warning"></i></div>
                                 </div>
+                                <h2 id="count-jobs" class="mb-0 fw-bold">0</h2>
+                                <div class="small text-muted mt-2">Scheduling queue</div>
                             </div>
-                        </a>
+                        </div>
                     </div>
                 </div>
 
-                <div class="row g-4 mb-4">
+                <!-- Main Grid -->
+                <div class="row g-4">
                     <div class="col-lg-8">
-                        <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
+                        <!-- Weekly Grid -->
+                        <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
                             <div class="card-header bg-white border-bottom-0 pt-4 px-4 d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-pie-chart me-2 text-primary"></i>Inventory Distribution</h5>
-                                <div class="badge rounded-pill bg-light text-primary border">Live Data</div>
+                                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-calendar-week me-2 text-primary"></i>Weekly Operations Overview</h5>
+                                <div class="d-flex gap-2">
+                                    <span class="badge rounded-pill bg-pale-primary text-primary px-3 py-2 small">0.7rem View</span>
+                                </div>
+                            </div>
+                            <div class="card-body p-0 overflow-auto">
+                                <div id="weekly-grid-container" class="p-4" style="min-width: 800px;">
+                                    <div class="text-center py-5 text-muted">
+                                        <div class="spinner-border spinner-border-sm me-2"></div>Building schedule grid...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Inventory Distribution -->
+                        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                            <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-bar-chart-line me-2 text-primary"></i>Inventory Distribution</h5>
                             </div>
                             <div class="card-body">
-                                <div id="inventory-chart" style="height: 300px; width: 100%;"></div>
+                                <div id="inventory-chart" style="height: 320px; width: 100%;"></div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Right Column: Recent Activity & Roles -->
                     <div class="col-lg-4">
-                        <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
-                            <div class="card-header bg-white border-bottom-0 pt-4 px-4 fw-bold text-dark">
-                                <i class="bi bi-activity me-2 text-primary"></i>Recent Activity
+                        <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden h-100">
+                            <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-lightning-charge me-2 text-primary"></i>Recent Activity</h5>
                             </div>
                             <div class="card-body p-0">
-                                <div id="recent-logs" class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
-                                    <div class="p-4 text-center text-muted small">No recent activity</div>
+                                <div id="recent-logs" class="list-group list-group-flush" style="max-height: 500px; overflow-y: auto;">
+                                    <div class="p-5 text-center text-muted">
+                                        <i class="bi bi-activity d-block fs-2 mb-2 opacity-25"></i>
+                                        No recent logs detected.
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Weekly Operations Overview -->
-                <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
-                    <div class="card-header bg-white border-bottom-0 pt-4 px-4 d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-calendar-week me-2 text-primary"></i>Weekly Operations Overview</h5>
-                        <div id="week-label" class="small text-muted fw-semibold"></div>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-bordered mb-0 border-light-subtle">
-                                <thead class="bg-light">
-                                    <tr id="weekly-head"></tr>
-                                </thead>
-                                <tbody id="weekly-body">
-                                    <tr><td colspan="8" class="text-center py-5 text-muted">Loading schedule...</td></tr>
-                                </tbody>
-                            </table>
+                            <div class="card-footer bg-light border-0 py-3 text-center">
+                                <button class="btn btn-sm btn-link text-decoration-none text-muted" id="view-all-logs">View System Audit</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -123,75 +162,91 @@ export function DashboardView() {
         .onboard({ id: 'count-jobs' })
         .onboard({ id: 'recent-logs' })
         .onboard({ id: 'inventory-chart' })
-        .onboard({ id: 'weekly-head' })
-        .onboard({ id: 'weekly-body' })
-        .onboard({ id: 'week-label' });
+        .onboard({ id: 'weekly-grid-container' })
+        .onboard({ id: 'view-all-logs' });
 
-    let chartData = { vans: 0, pico: 0, sim: 0, jobs: 0 };
-    let technicians = [];
-    let allAppointments = [];
+    let localState = {
+        vans: [],
+        items: [],
+        appointments: [],
+        users: [],
+        itemCatalog: []
+    };
 
     const renderWeeklyGrid = () => {
-        const head = view.$('weekly-head');
-        const body = view.$('weekly-body');
-        const label = view.$('week-label');
-        if (!head || !body) return;
+        const container = view.$('weekly-grid-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        const currentDate = new Date();
+        const weeks = buildMonthWeeks(currentDate);
+        const techNames = {};
+        localState.users.forEach(u => {
+            techNames[u.id] = u.user_name || 'Unassigned';
+        });
 
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        const gridHtml = `
+            <div class="calendar-grid w-100" style="grid-template-columns: repeat(${weeks.length}, 1fr); min-width: 900px;">
+                ${weeks.map((week, index) => {
+                    const start = week[0];
+                    const end = week[week.length - 1];
+                    return `
+                        <div class="calendar-day-header">
+                            Week ${index + 1}<br>
+                            <small class="text-muted fw-normal">${start.getDate()} ${MONTH_NAMES[start.getMonth()].substring(0,3)} - ${end.getDate()} ${MONTH_NAMES[end.getMonth()].substring(0,3)}</small>
+                        </div>`;
+                }).join('')}
 
-        if (label) {
-            label.textContent = `${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}`;
-        }
+                ${weeks.map((week, index) => {
+                    let weekTasks = [];
+                    week.forEach(date => {
+                        const dateStr = toYMD(date);
+                        const dayTasks = localState.appointments
+                            .filter(t => !t.is_deleted && t.schedule_date === dateStr)
+                            .map(t => ({
+                                ...t, 
+                                prettyDate: `${MONTH_NAMES[date.getMonth()].substring(0,3)} ${date.getDate()}`,
+                                sortKey: `${t.schedule_date}T${t.appointment_time || '00:00'}`
+                            }));
+                        weekTasks = weekTasks.concat(dayTasks);
+                    });
+                    weekTasks.sort((a,b) => a.sortKey.localeCompare(b.sortKey));
 
-        const days = [];
-        for (let i = 0; i < 7; i++) {
-            const d = new Date(startOfWeek);
-            d.setDate(startOfWeek.getDate() + i);
-            days.push(d);
-        }
+                    return `
+                        <div class="calendar-day" style="background: #fafafa;">
+                            ${weekTasks.length === 0 ? '<div class="text-center py-4 text-muted opacity-50 small">No tasks</div>' : ''}
+                            ${weekTasks.map(t => {
+                                const isCompleted = t.status === 'completed';
+                                const tName = techNames[t.tech_id] || 'Unassigned';
+                                return `
+                                    <div class="cal-task-pill ${isCompleted ? 'status-completed' : 'status-pending'}"
+                                         data-task-id="${t.appointment_id}">
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span class="text-muted fw-bold" style="font-size: 0.6rem;">${t.prettyDate}</span>
+                                            <span class="fw-bold text-primary" style="font-size: 0.6rem;">${t.appointment_time ? formatTime(t.appointment_time) : 'Anytime'}</span>
+                                        </div>
+                                        <div class="fw-bold mb-1" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${t.appointment_name}</div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="opacity-75" style="font-size: 0.65rem;">${tName}</span>
+                                            <i class="bi bi-chevron-right text-muted" style="font-size: 0.6rem;"></i>
+                                        </div>
+                                    </div>`;
+                            }).join('')}
+                        </div>`;
+                }).join('')}
+            </div>
+        `;
+        
+        container.innerHTML = gridHtml;
 
-        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        head.innerHTML = `<th class="bg-light fw-bold" style="width: 150px;">Technician</th>` + 
-            days.map(d => `<th class="text-center bg-light">
-                <div class="fw-bold">${dayNames[d.getDay()]}</div>
-                <div class="small text-muted fw-normal">${d.getDate()}/${d.getMonth()+1}</div>
-            </th>`).join('');
-
-        if (technicians.length === 0) {
-            body.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted small">No technicians found</td></tr>`;
-            return;
-        }
-
-        body.innerHTML = technicians.map(tech => {
-            const techId = tech.user_id || tech.id;
-            return `
-                <tr>
-                    <td class="fw-bold align-middle bg-light bg-opacity-10">${tech.user_name || 'Unknown'}</td>
-                    ${days.map(day => {
-                        const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-                        const dayApts = allAppointments.filter(a => !a.is_deleted && a.tech_id === techId && a.schedule_date === dateStr);
-                        
-                        return `
-                            <td class="p-1 align-top" style="min-height: 80px; background: #fff;">
-                                ${dayApts.map(a => `
-                                    <div class="p-1 mb-1 rounded border-start border-3 ${a.status === 'completed' ? 'border-success bg-success' : 'border-primary bg-primary'} bg-opacity-10" 
-                                         style="font-size: 0.7rem; cursor: pointer;"
-                                         onclick="window.location.hash='#appointment/${a.appointment_id}'">
-                                        <div class="fw-bold text-truncate">${a.appointment_time || 'Anytime'}</div>
-                                        <div class="text-truncate text-dark">${a.appointment_name}</div>
-                                    </div>
-                                `).join('')}
-                                ${dayApts.length === 0 ? '<div class="text-center py-3 text-light-emphasis small" style="opacity:0.3">-</div>' : ''}
-                            </td>
-                        `;
-                    }).join('')}
-                </tr>
-            `;
-        }).join('');
+        // Add redirection click handlers
+        container.querySelectorAll('.cal-task-pill').forEach(el => {
+            el.onclick = () => {
+                const taskId = el.dataset.taskId;
+                window.location.hash = `appointment/${taskId}`;
+            };
+        });
     };
 
     const renderChart = () => {
@@ -201,34 +256,65 @@ export function DashboardView() {
 
         const width = container.offsetWidth;
         const height = container.offsetHeight;
-        const margin = { top: 20, right: 20, bottom: 30, left: 40 };
+        const margin = { top: 20, right: 30, bottom: 40, left: 50 };
 
         const svg = d3.select(container)
             .append('svg')
-            .attr('width', width)
-            .attr('height', height);
+            .attr('width', '100%')
+            .attr('height', '100%')
+            .attr('viewBox', `0 0 ${width} ${height}`)
+            .attr('preserveAspectRatio', 'xMinYMin meet');
+
+        // Count Pico vs SIM using catalog mapping
+        const catalogMap = {};
+        localState.itemCatalog.forEach(c => {
+            catalogMap[c.catalog_id || c.id] = c.item_type;
+        });
+
+        let picoCount = 0;
+        let simCount = 0;
+        localState.items.forEach(i => {
+            const type = catalogMap[i.catalog_id];
+            if (type === 'Pico Device') picoCount++;
+            if (type === 'Sim Card') simCount++;
+        });
 
         const data = [
-            { label: 'VANs', value: chartData.vans, color: '#3b82f6' },
-            { label: 'Pico', value: chartData.pico, color: '#10b981' },
-            { label: 'SIM', value: chartData.sim, color: '#06b6d4' },
-            { label: 'Jobs', value: chartData.jobs, color: '#f59e0b' }
+            { label: 'VANs', value: localState.vans.length, color: '#3b82f6' },
+            { label: 'Pico', value: picoCount, color: '#10b981' },
+            { label: 'SIM', value: simCount, color: '#06b6d4' },
+            { label: 'Pending', value: localState.appointments.filter(a => a.status === 'pending').length, color: '#f59e0b' }
         ];
+
+        // Update card counters
+        if (view.$('count-vans')) view.$('count-vans').textContent = localState.vans.length;
+        if (view.$('count-pico')) view.$('count-pico').textContent = picoCount;
+        if (view.$('count-sim')) view.$('count-sim').textContent = simCount;
+        if (view.$('count-jobs')) view.$('count-jobs').textContent = localState.appointments.filter(a => a.status === 'pending').length;
 
         const x = d3.scaleBand()
             .range([margin.left, width - margin.right])
             .domain(data.map(d => d.label))
-            .padding(0.3);
+            .padding(0.4);
 
         const y = d3.scaleLinear()
             .range([height - margin.bottom, margin.top])
-            .domain([0, d3.max(data, d => d.value) || 10]);
+            .domain([0, d3.max(data, d => d.value) * 1.1 || 10]);
 
+        // Y Axis
+        svg.append('g')
+            .attr('transform', `translate(${margin.left},0)`)
+            .call(d3.axisLeft(y).ticks(5).tickSize(-width + margin.left + margin.right))
+            .call(g => g.select('.domain').remove())
+            .call(g => g.selectAll('.tick line').attr('stroke', '#f0f0f0'));
+
+        // X Axis
         svg.append('g')
             .attr('transform', `translate(0,${height - margin.bottom})`)
             .call(d3.axisBottom(x).tickSize(0).tickPadding(10))
             .call(g => g.select('.domain').remove());
 
+        // Bars
         svg.selectAll('rect')
             .data(data)
             .enter()
@@ -238,95 +324,118 @@ export function DashboardView() {
             .attr('width', x.bandwidth())
             .attr('height', d => height - margin.bottom - y(d.value))
             .attr('fill', d => d.color)
-            .attr('rx', 4);
+            .attr('rx', 6)
+            .style('cursor', 'pointer')
+            .on('mouseover', function() { d3.select(this).style('opacity', 0.85); })
+            .on('mouseout', function() { d3.select(this).style('opacity', 1); });
+            
+        // Labels
+        svg.selectAll('.label')
+            .data(data)
+            .enter()
+            .append('text')
+            .attr('x', d => x(d.label) + x.bandwidth() / 2)
+            .attr('y', d => y(d.value) - 8)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '0.75rem')
+            .attr('font-weight', 'bold')
+            .attr('fill', '#64748b')
+            .text(d => d.value);
     };
+
+    const updateRecentLogs = (snap) => {
+        const list = view.$('recent-logs');
+        if (!list) return;
+        view.delete('recent-logs');
+
+        if (snap.empty) {
+            list.innerHTML = '<div class="p-5 text-center text-muted">No recent activity</div>';
+            return;
+        }
+
+        snap.docs.slice(0, 10).forEach(doc => {
+            const log = doc.data();
+            const date = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+            
+            const item = document.createElement('div');
+            item.className = 'list-group-item border-0 px-4 py-3 hover-bg-light';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <span class="badge rounded-pill bg-pale-primary text-primary px-2" style="font-size: 0.65rem;">${log.action || 'SYSTEM'}</span>
+                    <span class="text-muted" style="font-size: 0.65rem;">${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div class="small fw-medium text-dark">${log.details || 'No details'}</div>
+                <div class="text-muted" style="font-size: 0.65rem;">${log.user_email || 'System'}</div>
+            `;
+            list.appendChild(item);
+        });
+    };
+
+    view.trigger('click', 'view-all-logs', () => {
+        window.location.hash = 'reporting';
+    });
+
+    // Handle card clicks
+    document.addEventListener('click', (e) => {
+        const card = e.target.closest('.card-clickable');
+        if (card && card.dataset.view) {
+            window.location.hash = card.dataset.view;
+        }
+    });
 
     view.on('init', () => {
         view.emit('loading:start');
-        let unsubs = 4;
-        const checkEnd = () => { unsubs--; if(unsubs<=0) view.emit('loading:end'); };
-
-        // Listen to collections
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'vans'), (snap) => {
-            chartData.vans = snap.size;
-            const el = view.$('count-vans');
-            if (el) el.textContent = snap.size;
-            renderChart();
-            checkEnd();
-            view.emit('rendered');
-        }));
-
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'items'), (snap) => {
-            let pico = 0;
-            let sim = 0;
-            snap.forEach(doc => {
-                const data = doc.data();
-                if (data.item_type === 'Pico Device') pico++;
-                if (data.item_type === 'Sim Card') sim++;
-            });
-            chartData.pico = pico;
-            chartData.sim = sim;
-            const elPico = view.$('count-pico');
-            const elSim = view.$('count-sim');
-            if (elPico) elPico.textContent = pico;
-            if (elSim) elSim.textContent = sim;
-            renderChart();
-            checkEnd();
-        }));
-
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'appointments'), (snap) => {
-            allAppointments = [];
-            if (snap && snap.docs) {
-                snap.docs.forEach(doc => allAppointments.push(doc.data()));
-            }
-            chartData.jobs = allAppointments.length;
-            const el = view.$('count-jobs');
-            if (el) el.textContent = chartData.jobs;
-            renderChart();
-            renderWeeklyGrid();
-            checkEnd();
-        }));
-
-        // Fetch technicians
-        const loadTechs = async () => {
-            try {
-                const userSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'users'));
-                technicians = [];
-                if (userSnap && userSnap.docs) {
-                    userSnap.docs.forEach(doc => technicians.push(doc.data()));
-                }
+        
+        let loaded = 0;
+        const total = 5;
+        const markLoaded = () => {
+            loaded++;
+            if (loaded >= total) {
+                view.emit('loading:end');
                 renderWeeklyGrid();
-            } catch (e) {
-                console.error("Dashboard: Error loading technicians", e);
+                renderChart();
             }
         };
-        loadTechs();
 
+        // Vans
+        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'vans'), (snap) => {
+            localState.vans = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            renderChart();
+            markLoaded();
+        }));
+
+        // Catalog
+        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'item_catalog'), (snap) => {
+            localState.itemCatalog = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            renderChart();
+            markLoaded();
+        }));
+
+        // Items
+        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'items'), (snap) => {
+            localState.items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            renderChart();
+            markLoaded();
+        }));
+
+        // Appointments
+        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'appointments'), (snap) => {
+            localState.appointments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            renderWeeklyGrid();
+            renderChart();
+            markLoaded();
+        }));
+
+        // Users
+        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'users'), (snap) => {
+            localState.users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            renderWeeklyGrid();
+            markLoaded();
+        }));
+
+        // Recent Logs
         view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'audit_logs'), (snap) => {
-            view.delete('recent-logs');
-            const list = view.$('recent-logs');
-            checkEnd();
-            if (!list) return;
-
-            if (snap.empty) {
-                list.innerHTML = '<div class="p-4 text-center text-muted small">No recent activity</div>';
-                return;
-            }
-            if (snap.docs) {
-                snap.docs.slice(0, 10).forEach(doc => {
-                    const log = doc.data();
-                    const item = document.createElement('div');
-                    item.className = 'list-group-item border-0 px-4 py-3';
-                    item.innerHTML = `
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="badge badge-pale-primary small">${log.action}</span>
-                            <span class="text-muted" style="font-size: 0.7rem;">${log.timestamp?.toDate().toLocaleTimeString() || '...'}</span>
-                        </div>
-                        <div class="text-muted small">${log.details}</div>
-                    `;
-                    list.appendChild(item);
-                });
-            }
+            updateRecentLogs(snap);
         }));
 
         window.addEventListener('resize', renderChart);

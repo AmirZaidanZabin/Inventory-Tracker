@@ -79,12 +79,27 @@ export function ItemTypesView() {
             <form id="it-form">
                 <div class="row g-3">
                     <div class="col-12">
-                        <label class="form-label small fw-bold">Type ID</label>
-                        <input type="text" class="form-control" name="id" value="${pt ? pt.id : ''}" ${pt ? 'readonly' : 'required'} placeholder="e.g. pico-device">
+                        <label class="form-label small fw-bold">Catalog ID</label>
+                        <input type="text" class="form-control" name="catalog_id" value="${pt ? (pt.catalog_id || pt.id) : ''}" ${pt ? 'readonly' : 'required'} placeholder="e.g. pico-device-v2">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">Item Type</label>
+                        <select class="form-select" name="item_type" required>
+                            <option value="Sim Card" ${pt && pt.item_type === 'Sim Card' ? 'selected' : ''}>Sim Card</option>
+                            <option value="Pico Device" ${pt && pt.item_type === 'Pico Device' ? 'selected' : ''}>Pico Device</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">Item Name</label>
+                        <input type="text" class="form-control" name="item_name" value="${pt ? (pt.item_name || pt.name || '') : ''}" placeholder="e.g. Pico Device V2" required>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">Installation Duration (min)</label>
+                        <input type="number" class="form-control" name="duration_minutes" value="${pt ? (pt.duration_minutes || 30) : 30}" required min="0">
                     </div>
                     <div class="col-12">
-                        <label class="form-label small fw-bold">Name (Displayed)</label>
-                        <input type="text" class="form-control" name="name" value="${pt ? pt.name : ''}" placeholder="e.g. Pico Device" required>
+                        <label class="form-label small fw-bold">Provider</label>
+                        <input type="text" class="form-control" name="provider" value="${pt ? (pt.provider || '') : ''}" placeholder="e.g. Verizon">
                     </div>
                 </div>
                 
@@ -103,8 +118,12 @@ export function ItemTypesView() {
             const fd = new FormData(form);
 
             const data = {
-                id: fd.get('id'),
-                name: fd.get('name')
+                id: fd.get('catalog_id'), // Need an ID for firebase doc
+                catalog_id: fd.get('catalog_id'),
+                item_type: fd.get('item_type'),
+                item_name: fd.get('item_name'),
+                duration_minutes: parseInt(fd.get('duration_minutes') || '0', 10),
+                provider: fd.get('provider')
             };
 
             const btn = form.querySelector('button[type="submit"]');
@@ -112,7 +131,7 @@ export function ItemTypesView() {
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
 
             try {
-                const docRef = firebase.db.doc(firebase.db.db, 'item_types', data.id);
+                const docRef = firebase.db.doc(firebase.db.db, 'item_catalog', data.id);
                 if(!pt) { // Creating
                     const snap = await firebase.db.getDoc(docRef);
                     if(snap.exists()) {
@@ -141,7 +160,7 @@ export function ItemTypesView() {
     });
 
     view.on('init', () => {
-        const q = firebase.db.collection(firebase.db.db, 'item_types');
+        const q = firebase.db.collection(firebase.db.db, 'item_catalog');
         view.emit('loading:start');
         view.unsub(firebase.db.subscribe(q, (snap) => {
             const list = view.$('item-types-list');
@@ -161,8 +180,8 @@ export function ItemTypesView() {
                 tr.className = 'item-type-row';
                 
                 tr.innerHTML = `
-                    <td><code class="data-mono">${pt.id}</code></td>
-                    <td class="fw-bold">${pt.name}</td>
+                    <td><code class="data-mono">${pt.catalog_id || pt.id}</code></td>
+                    <td class="fw-bold">${pt.item_name || pt.name || 'Unnamed'}<div class="text-muted small">${pt.item_type || 'Unknown'} - ${pt.provider || 'No provider'}</div></td>
                     <td>
                         <button class="btn-pico btn-pico-outline table-action-btn edit-pt me-1"><i class="bi bi-pencil"></i></button>
                         <button class="btn-pico btn-pico-danger-outline table-action-btn delete-pt"><i class="bi bi-trash"></i></button>
@@ -193,7 +212,7 @@ export function ItemTypesView() {
                         this.disabled = true;
                         this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
                         try {
-                            await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'item_types', pt.id));
+                            await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'item_catalog', pt.id));
                             firebase.logAction("Item Type Deleted", pt.id);
                             confirmModal.hide();
                         } catch(e) {

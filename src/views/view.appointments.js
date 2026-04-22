@@ -2,12 +2,16 @@ import { controller } from '../lib/controller.js';
 import { firebase } from '../lib/firebase.js';
 import { createModal } from '../lib/modal.js';
 import { CustomSelect } from '../lib/custom-select.js';
-import { calculateDistance, estimateDuration, findPrecedingLocation } from '../lib/travel-logic.js';
+import { calculateDistance, estimateDuration, findAdjacentAppointments } from '../lib/travel-logic.js';
 
 export function AppointmentsView() {
     const view = controller({
         stringComponent: `
             <div class="appointments-view">
+                <style>
+                    .locked-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.8); z-index: 50; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); border-radius: 8px; }
+                    .travel-pad { border-left: 4px solid #f97316 !important; background: #fff7ed !important; }
+                </style>
                 <div class="d-flex justify-content-end mb-4">
                     <button id="open-add-apt" class="btn-pico btn-pico-primary auth-appointments:create hidden">
                         <i class="bi bi-calendar-plus"></i>Schedule Appointment
@@ -99,25 +103,6 @@ export function AppointmentsView() {
                             <div class="col-12 mt-2" id="products-selection-container"></div>
                             <div class="col-12 mt-2" id="custom-fields-container"></div>
                             
-                            <!-- Hardware Pairing Section (similar to detail view) -->
-                            <div class="col-12 mt-3" id="hardware-deployment-container" style="display: none;">
-                                <label class="form-label small fw-bold">Deploy Hardware (Drag to Pair Slots)</label>
-                                <div class="row g-2">
-                                    <div class="col-md-5">
-                                        <div class="p-2 border rounded bg-light" style="height: 200px; overflow-y: auto;">
-                                            <div class="small fw-bold mb-2">Available Hardware</div>
-                                            <div id="available-hardware" class="d-flex flex-column gap-1"></div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-7">
-                                        <div class="small fw-bold mb-2">Assigned Pairs</div>
-                                        <div id="hardware-pairs" class="d-flex flex-column gap-2" style="max-height: 200px; overflow-y: auto;">
-                                            <!-- Dynamic pair slots go here based on quantity -->
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
                             <div class="col-12 mt-4">
                                 <button type="submit" class="btn-pico btn-pico-primary w-100">Book Appointment</button>
                             </div>
@@ -125,7 +110,14 @@ export function AppointmentsView() {
                     </div>
                     
                     <!-- Right Column: Daily Availability Grid -->
-                    <div class="col-lg-7 border-start">
+                    <div class="col-lg-7 border-start position-relative">
+                        <div id="availability-locked-overlay" class="locked-overlay">
+                            <div class="text-center">
+                                <div class="spinner-border spinner-border-sm text-accent mb-2 d-none" id="availability-loading"></div>
+                                <h6 class="fw-bold text-muted mb-1"><i class="bi bi-geo-alt me-1"></i>Location Required</h6>
+                                <p class="text-xs text-muted mb-0">Select a point on the map to unlock slots.</p>
+                            </div>
+                        </div>
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h6 class="fw-bold mb-0">Daily Schedule View</h6>
                             <h6 class="text-muted mb-0 small" id="daily-view-date">No date selected</h6>
@@ -133,7 +125,7 @@ export function AppointmentsView() {
                         <div class="calendar-grid w-100 rounded border overflow-auto" style="height: 60vh; min-height: 400px;">
                             <div id="daily-schedule-container" style="min-width: 600px;">
                                 <!-- Grid will heavily emulate standard calendar row headers -->
-                                <div class="text-muted small p-3 text-center">Please select a date to view availability.</div>
+                                <div class="text-muted small p-3 text-center">Please select a date and location.</div>
                             </div>
                         </div>
                     </div>
@@ -144,13 +136,13 @@ export function AppointmentsView() {
         modal.show();
 
         // Data for selects and grids
-        const [vans, users, items, rawApts, rawForms, rawProductTypes] = await Promise.all([
+        const [vans, users, rawApts, rawForms, rawProductTypes, rawItemCatalog] = await Promise.all([
             firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'vans')),
             firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'users')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'items')),
             firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'appointments')),
             firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'product_types'))
+            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'product_types')),
+            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'))
         ]);
         
         let allAppointments = rawApts.docs.map(d => d.data());
@@ -159,9 +151,26 @@ export function AppointmentsView() {
             formSchemas = rawForms.docs.map(d => d.data()).filter(f => f.entities && f.entities.includes('appointments'));
         }
         
+        const hardwareMap = {};
+        if (rawItemCatalog && rawItemCatalog.docs) {
+            rawItemCatalog.docs.forEach(doc => {
+                hardwareMap[doc.id] = doc.data();
+            });
+        }
+
         let allProductTypes = [];
         if (rawProductTypes && rawProductTypes.docs) {
-            allProductTypes = rawProductTypes.docs.map(d => d.data());
+            allProductTypes = rawProductTypes.docs.map(d => {
+                const pt = d.data();
+                // Inherit duration from hardware if not explicitly set on product
+                const hw = hardwareMap[pt.catalog_id];
+                const inheritedDuration = hw ? parseInt(hw.duration_minutes || '30', 10) : 30;
+                return {
+                    ...pt,
+                    id: d.id,
+                    duration_minutes: pt.duration_minutes || inheritedDuration
+                };
+            });
         }
 
         const userDataArray = users.docs.map(u => ({ id: u.id, ...u.data() }));
@@ -170,21 +179,38 @@ export function AppointmentsView() {
         // Render Product Types Selection
         const productsContainer = modal.element.querySelector('#products-selection-container');
         if (productsContainer && allProductTypes.length > 0) {
-            let html = `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">Products & Quantities</h6><div class="row g-2">`;
+            let html = `<div class="col-12 mt-3 p-3 border rounded bg-white shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-1">
+                    <h6 class="text-accent mb-0 fw-bold">Inventory - Product Configuration</h6>
+                    <div id="total-duration-tracker" class="badge bg-pico-primary">Total: 0 min</div>
+                </div>
+                <div class="row g-2">`;
             allProductTypes.forEach(pt => {
                 html += `
                     <div class="col-md-6">
-                        <div class="d-flex align-items-center justify-content-between border rounded p-1">
-                            <label class="form-label small mb-0 ms-2" for="pt-${pt.id}">
-                                ${pt.name} <span class="text-muted">(${pt.duration_minutes} min)</span>
+                        <div class="form-check product-card-minimal">
+                            <input class="form-check-input product-type-chk" type="checkbox" value="${pt.id}" id="pt-${pt.id}" data-duration="${pt.duration_minutes}">
+                            <label class="form-check-label small" for="pt-${pt.id}">
+                                <strong>${pt.name}</strong> 
+                                <br><span class="text-muted text-xs">Est. ${pt.duration_minutes} min (via Hardware: ${hardwareMap[pt.catalog_id]?.item_name || 'Generic'})</span>
                             </label>
-                            <input class="form-control form-control-sm product-type-qty text-center" type="number" min="0" value="0" max="10" data-id="${pt.id}" data-duration="${pt.duration_minutes}" data-hw='${JSON.stringify(pt.hardware_requirements || [])}' id="pt-${pt.id}" style="width: 60px;">
                         </div>
                     </div>
                 `;
             });
             html += `</div></div>`;
             productsContainer.innerHTML = html;
+            
+            // Auto-update duration badge
+            productsContainer.addEventListener('change', () => {
+                let total = 0;
+                productsContainer.querySelectorAll('.product-type-chk:checked').forEach(c => total += parseInt(c.dataset.duration || '0', 10));
+                const tracker = modal.element.querySelector('#total-duration-tracker');
+                if(tracker) {
+                    tracker.textContent = `Total: ${total} min`;
+                    tracker.className = total > 480 ? 'badge bg-danger' : 'badge bg-pico-primary';
+                }
+            });
         }
 
         // Render Custom Fields
@@ -285,9 +311,22 @@ export function AppointmentsView() {
         };
 
         // Define updateDailyGrid before we use it
-        const updateDailyGrid = (dateStr) => {
+        const updateDailyGrid = async (dateStr) => {
             if (!dateStr) return;
+            const lat = modal.element.querySelector('[name="lat"]').value;
+            const lng = modal.element.querySelector('[name="lng"]').value;
+
+            const overlay = modal.element.querySelector('#availability-locked-overlay');
+            const loader = modal.element.querySelector('#availability-loading');
             const container = modal.element.querySelector('#daily-schedule-container');
+
+            if (!lat || !lng) {
+                overlay.classList.remove('d-none');
+                return;
+            }
+
+            loader.classList.remove('d-none');
+            
             const headerDate = modal.element.querySelector('#daily-view-date');
             headerDate.textContent = new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
@@ -303,31 +342,28 @@ export function AppointmentsView() {
                 return `${hInt}:${m} ${ampm}`;
             }
 
-            // Compute target appt duration
-            let totalDurationMin = 60; // fallback if 0 products selected
-            let sumProducts = 0;
-            modal.element.querySelectorAll('.product-type-qty').forEach(input => {
-                const qty = parseInt(input.value || '0', 10);
-                sumProducts += qty * parseInt(input.dataset.duration || '0', 10);
-            });
-            if (sumProducts > 0) totalDurationMin = sumProducts;
-
-            const targetLatStr = modal.element.querySelector('[name="lat"]').value;
-            const targetLngStr = modal.element.querySelector('[name="lng"]').value;
-            const targetLat = parseFloat(targetLatStr);
-            const targetLng = parseFloat(targetLngStr);
+            // Pre-calculate travel for all techs to this location at start of day (approx)
+            const travelMetrics = new Map(); // techId -> { prevTravel, nextTravel }
+            
+            await Promise.all(currentValidTechs.map(async (t) => {
+                const adj = findAdjacentAppointments(t.id, dateStr, '12:00', dailyApts, t.metadata?.base_location);
+                let prevTravel = 0;
+                if (adj.prev) {
+                    prevTravel = await estimateDuration(parseFloat(lat), parseFloat(lng), adj.prev.lat, adj.prev.lng);
+                }
+                travelMetrics.set(t.id, { prevTravel, adj });
+            }));
 
             const gridHtml = `
                 <div class="calendar-grid bg-white" style="display: grid; grid-template-columns: 80px 1fr; gap: 0;">
                     <!-- Headers -->
                     <div class="p-2 border-bottom border-end bg-light text-center fw-bold small sticky-top position-sticky" style="z-index: 3; left: 0;">Time</div>
-                    <div class="p-2 border-bottom border-end bg-light text-center fw-bold small sticky-top" style="z-index: 2;">Availability</div>
+                    <div class="p-2 border-bottom border-end bg-light text-center fw-bold small sticky-top" style="z-index: 2;">Availability (Inc. Travel Padding)</div>
                     
                     <!-- Time Rows -->
                     ${hours.map(hour => {
-                        const cellHourInt = parseInt(hour.split(':')[0], 10);
-                        const targetStartMin = cellHourInt * 60;
-                        const targetEndMin = targetStartMin + totalDurationMin;
+                        const [cellH, cellM] = hour.split(':').map(Number);
+                        const cellTotal = cellH * 60 + cellM;
                         const dDay = new Date(dateStr).getDay();
 
                         let availableTechs = [];
@@ -342,73 +378,52 @@ export function AppointmentsView() {
                                 endHour = parseInt(scheduleForDay.end.split(':')[0], 10);
                             }
 
-                            const isWorking = cellHourInt >= startHour && cellHourInt < endHour;
+                            const isWorking = cellH >= startHour && cellH < endHour;
                             if (isWorking) {
                                 totalServiceableTechs++;
-                                let isBooked = false;
+                                
+                                // Check for direct overlap
+                                const overlappingApt = dailyApts.find(a => {
+                                    if (a.tech_id !== t.id) return false;
+                                    const [ah, am] = (a.appointment_time || '08:00').split(':').map(Number);
+                                    const s = ah * 60 + am;
+                                    const e = s + (a.metadata?.duration_minutes || 60);
+                                    return cellTotal >= s && cellTotal < e;
+                                });
 
-                                // Check if appt exceeds shift
-                                if (targetEndMin > endHour * 60) {
-                                    isBooked = true;
-                                } else {
-                                    const techApts = dailyApts.filter(a => a.tech_id === t.id);
-                                    for (const a of techApts) {
-                                        const aTime = a.appointment_time || '08:00';
-                                        const aStartMin = parseInt(aTime.split(':')[0], 10) * 60 + parseInt(aTime.split(':')[1], 10);
-                                        const aDur = a.metadata?.duration_minutes || 60;
-                                        const aEndMin = aStartMin + aDur;
-
-                                        // 1. Check strict time overlap
-                                        if (Math.max(targetStartMin, aStartMin) < Math.min(targetEndMin, aEndMin)) {
-                                            isBooked = true;
-                                            break;
-                                        }
-
-                                        // 2. Check travel time
-                                        let travelMins = 15; // default prep time
-                                        if (targetLatStr && targetLngStr && a.metadata?.location?.lat && a.metadata?.location?.lng) {
-                                            const aLat = parseFloat(a.metadata.location.lat);
-                                            const aLng = parseFloat(a.metadata.location.lng);
-                                            const dist = calculateDistance(targetLat, targetLng, aLat, aLng);
-                                            travelMins = estimateDuration(dist);
-                                        } else {
-                                            travelMins = estimateDuration(0); // applies default prep time
-                                        }
-
-                                        if (aEndMin <= targetStartMin) {
-                                            if (aEndMin + travelMins > targetStartMin) {
-                                                isBooked = true;
-                                                break;
-                                            }
-                                        }
-                                        if (targetEndMin <= aStartMin) {
-                                            if (targetEndMin + travelMins > aStartMin) {
-                                                isBooked = true;
-                                                break;
-                                            }
+                                if (!overlappingApt) {
+                                    // Check travel padding from PREVIOUS appt
+                                    const metric = travelMetrics.get(t.id);
+                                    const prevApt = dailyApts
+                                        .filter(a => a.tech_id === t.id && (a.appointment_time || '00:00') < hour)
+                                        .sort((a,b) => (b.appointment_time || '00:00').localeCompare(a.appointment_time || '00:00'))[0];
+                                    
+                                    let travelBlocked = false;
+                                    if (prevApt) {
+                                        const [ph, pm] = prevApt.appointment_time.split(':').map(Number);
+                                        const prevEnd = (ph * 60 + pm) + (prevApt.metadata?.duration_minutes || 60);
+                                        if (cellTotal < prevEnd + metric.prevTravel) {
+                                            travelBlocked = true;
                                         }
                                     }
-                                }
 
-                                if (!isBooked) {
-                                    availableTechs.push(t);
+                                    if (!travelBlocked) {
+                                        availableTechs.push(t);
+                                    }
                                 }
                             }
                         });
 
                         const isBlocked = availableTechs.length === 0;
                         const hasNoCoverage = currentValidTechs.length === 0;
-                        const noLocation = !modal.element.querySelector('[name="lat"]').value;
 
-                        // Density-based color coding
                         let availOpacity = 0.1 + (Math.min(availableTechs.length, 3) * 0.15);
                         let bgStyle = isBlocked ? 'background: rgba(0,0,0,0.03);' : `background: rgba(34, 197, 94, ${availOpacity});`;
 
                         let slotText = '';
-                        if (noLocation) slotText = '<span class="text-muted"><i class="bi bi-geo-alt-fill me-1"></i>Select location first</span>';
-                        else if (hasNoCoverage) slotText = '<span class="text-muted"><i class="bi bi-geo-alt-fill me-1"></i>Select valid location</span>';
+                        if (hasNoCoverage) slotText = '<span class="text-muted"><i class="bi bi-geo-alt-fill me-1"></i>Select valid location</span>';
                         else if (totalServiceableTechs === 0) slotText = '<span class="text-muted"><i class="bi bi-moon-stars me-1"></i>Off Hours</span>';
-                        else if (isBlocked) slotText = '<span class="text-muted"><i class="bi bi-x-circle me-1"></i>Fully Booked</span>';
+                        else if (isBlocked) slotText = '<span class="text-muted"><i class="bi bi-truck me-1"></i>Travel / Booked</span>';
                         else slotText = `<span class="text-success fw-bold"><i class="bi bi-check-circle me-1"></i>Available</span>`;
 
                         return `
@@ -427,8 +442,10 @@ export function AppointmentsView() {
                 </div>
             `;
             container.innerHTML = gridHtml;
+            overlay.classList.add('d-none');
+            loader.classList.add('d-none');
 
-            // Bind click events
+            // ... rest of binding
             container.querySelectorAll('.select-slot-btn').forEach(cell => {
                 cell.addEventListener('click', (e) => {
                     // Prevent click if clicking on an existing task or blocked cell
@@ -471,135 +488,12 @@ export function AppointmentsView() {
             updateDailyGrid(dateInput.value);
         }
 
-        let hardwarePairsAssigned = [];
-        
-        const renderHardwarePairs = () => {
-            const container = modal.element.querySelector('#hardware-deployment-container');
-            if (!container) return;
-            
-            let newGroups = [];
-            let gId = 1;
-            modal.element.querySelectorAll('.product-type-qty').forEach(input => {
-                const qty = parseInt(input.value || '0', 10);
-                const reqsStr = input.getAttribute('data-hw');
-                let hwReqs = [];
-                try { hwReqs = JSON.parse(reqsStr || '[]'); } catch(e){}
-                
-                if (hwReqs.length > 0) {
-                    for(let i=0; i<qty; i++) {
-                        newGroups.push({
-                            id: gId++,
-                            sourceProductId: input.dataset.id,
-                            requirements: hwReqs,
-                            assigned_items: {}
-                        });
-                    }
-                }
-            });
-
-            if (newGroups.length === 0) {
-                container.style.display = 'none';
-                hardwarePairsAssigned = [];
-                return;
-            } else {
-                container.style.display = 'block';
-            }
-
-            // Re-map existing assigned_items if the sourceProductId matches
-            newGroups.forEach((ng, i) => {
-                const existing = hardwarePairsAssigned[i];
-                if (existing && existing.sourceProductId === ng.sourceProductId) {
-                    ng.assigned_items = existing.assigned_items || {};
-                }
-            });
-            hardwarePairsAssigned = newGroups;
-
-            const pairsContainer = modal.element.querySelector('#hardware-pairs');
-            pairsContainer.innerHTML = '';
-            
-            hardwarePairsAssigned.forEach(group => {
-                const slotHtml = document.createElement('div');
-                slotHtml.className = 'border rounded p-2 bg-white d-flex flex-column gap-2 mb-2';
-                
-                let dropZones = group.requirements.map(reqType => {
-                    const assignedId = group.assigned_items[reqType];
-                    return `
-                        <div class="drop-slot border-dashed p-2 text-center small rounded flex-grow-1" data-group="${group.id}" data-type="${reqType}" style="border: 1px dashed #ccc; min-width: 100px;">
-                            ${assignedId ? `<span class="badge bg-primary">${assignedId}</span>` : `Drop ${reqType}`}
-                        </div>
-                    `;
-                }).join('');
-
-                slotHtml.innerHTML = `
-                    <div class="fw-bold small text-muted">Slot ${group.id} (${group.sourceProductId})</div>
-                    <div class="d-flex flex-wrap gap-2 w-100">
-                        ${dropZones}
-                    </div>
-                `;
-                pairsContainer.appendChild(slotHtml);
-
-                // Bind drag over and drop
-                group.requirements.forEach(reqType => {
-                    const dropEl = slotHtml.querySelector(`.drop-slot[data-group="${group.id}"][data-type="${reqType}"]`);
-                    dropEl.ondragover = (e) => e.preventDefault();
-                    dropEl.ondrop = (e) => {
-                        e.preventDefault();
-                        const draggedId = e.dataTransfer.getData('id');
-                        const draggedType = e.dataTransfer.getData('type');
-
-                        if (draggedType === reqType) {
-                            group.assigned_items[reqType] = draggedId;
-                            renderHardwarePairs();
-                        } else {
-                            alert(`Invalid slot for ${draggedType}. Please drop in the ${reqType} slot.`);
-                        }
-                    };
-                });
-            });
-        };
-
-        const renderAvailableHardwareList = () => {
-            const listEl = modal.element.querySelector('#available-hardware');
-            if(!listEl) return;
-            listEl.innerHTML = '';
-            items.docs.forEach(doc => {
-                const item = doc.data();
-                const isAvail = item.status === 'available' || (!item.status && item.is_available);
-                if (!isAvail) return;
-
-                const el = document.createElement('div');
-                el.className = 'p-2 bg-white border rounded small cursor-move mb-1';
-                el.draggable = true;
-                const displayType = item.item_type || 'Unknown';
-                el.textContent = `${displayType}: ${item.item_id}`;
-                el.dataset.id = item.item_id;
-                el.dataset.type = displayType;
-
-                el.ondragstart = (e) => {
-                    e.dataTransfer.setData('id', el.dataset.id);
-                    e.dataTransfer.setData('type', el.dataset.type);
-                };
-                listEl.appendChild(el);
-            });
-        };
-        
-        renderAvailableHardwareList();
-
-        // Listen for product changes
-        modal.element.querySelectorAll('.product-type-qty').forEach(input => {
-            input.addEventListener('change', () => {
-                const dt = modal.element.querySelector('[name="schedule_date"]').value;
-                if (dt) updateDailyGrid(dt);
-                renderHardwarePairs();
-            });
-        });
-
         // Map
         const map = L.map('apt-map').setView([24.7136, 46.6753], 10);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         let marker;
 
-        const updateTravelHints = () => {
+        const updateTravelHints = async () => {
             const dateStr = modal.element.querySelector('[name="schedule_date"]').value;
             const timeStr = modal.element.querySelector('[name="appointment_time"]').value;
             const lat = modal.element.querySelector('[name="lat"]').value;
@@ -613,26 +507,28 @@ export function AppointmentsView() {
                 return;
             }
 
-            hintsContent.innerHTML = '';
+            hintsContent.innerHTML = '<div class="text-xs text-muted">Calculating road network routes...</div>';
             hintsContainer.classList.remove('d-none');
 
-            vans.docs.forEach(vDoc => {
-                const van = vDoc.data();
-                const origin = findPrecedingLocation(vDoc.id, dateStr, timeStr, allAppointments, van);
+            let hintsHtml = '';
+            const promises = currentValidTechs.map(async (tech) => {
+                const adj = findAdjacentAppointments(tech.id, dateStr, timeStr, allAppointments, tech.metadata?.base_location);
                 
-                if (origin) {
-                    const dist = calculateDistance(parseFloat(lat), parseFloat(lng), origin.lat, origin.lng);
-                    const dur = estimateDuration(dist);
+                if (adj.prev) {
+                    const dist = calculateDistance(parseFloat(lat), parseFloat(lng), adj.prev.lat, adj.prev.lng);
+                    const dur = await estimateDuration(parseFloat(lat), parseFloat(lng), adj.prev.lat, adj.prev.lng);
                     
-                    const hintHtml = `
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span><strong>${van.van_id}:</strong> ${dur} mins from ${origin.source}</span>
+                    hintsHtml += `
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span><strong>${tech.user_name}:</strong> ${dur} mins from ${adj.prev.source}</span>
                             <span class="text-xs badge badge-pale-info">${dist.toFixed(1)} km</span>
                         </div>
                     `;
-                    hintsContent.insertAdjacentHTML('beforeend', hintHtml);
                 }
             });
+
+            await Promise.all(promises);
+            hintsContent.innerHTML = hintsHtml || '<div class="text-xs text-muted">No preceding travel context found for this technician.</div>';
         };
 
         map.on('click', async (e) => {
@@ -696,41 +592,96 @@ export function AppointmentsView() {
                 }
             }
 
-            // Extract Products
+            // Extract Products & Snapshot Hardware Requirements (Instruction 1 & 2)
             const selectedProducts = [];
+            const requiredHardwareMap = {}; // catalog_id -> { item_name, count }
             let totalDurationMin = 0;
-            modal.element.querySelectorAll('.product-type-qty').forEach(input => {
-                const qty = parseInt(input.value || '0', 10);
-                if (qty > 0) {
-                    selectedProducts.push({ id: input.dataset.id, quantity: qty });
-                    totalDurationMin += qty * parseInt(input.dataset.duration || '0', 10);
+            
+            const prodCheckboxes = modal.element.querySelectorAll('.product-type-chk:checked');
+            for (const chk of prodCheckboxes) {
+                const ptId = chk.value;
+                selectedProducts.push(ptId);
+                totalDurationMin += parseInt(chk.dataset.duration || '0', 10);
+                
+                const pt = allProductTypes.find(p => p.id === ptId);
+                if (!pt || !pt.catalog_id) {
+                    return alert(`Critical Data Error: Product ${ptId} lacks a mandatory Hardware Type link.`);
                 }
-            });
 
-            const validPairs = hardwarePairsAssigned.filter(g => {
-                return g.requirements.every(req => g.assigned_items[req]);
-            });
+                // Primary Hardware
+                const primaryHw = hardwareMap[pt.catalog_id];
+                if (!primaryHw) return alert(`Hardware Type ${pt.catalog_id} not found in inventory catalog.`);
+                
+                requiredHardwareMap[pt.catalog_id] = requiredHardwareMap[pt.catalog_id] || { item_name: primaryHw.item_name, count: 0 };
+                requiredHardwareMap[pt.catalog_id].count++;
 
-            if (validPairs.length < hardwarePairsAssigned.length && hardwarePairsAssigned.length > 0) {
-                if(!confirm("You haven't fully assigned hardware to all requested product slots. Proceed anyway?")) {
-                    return;
+                // Additional Requirements
+                if (pt.hardware_requirements) {
+                    pt.hardware_requirements.forEach(extraHwId => {
+                        const extraHw = hardwareMap[extraHwId];
+                        if (!extraHw) return alert(`Additional Hardware Type ${extraHwId} not found in inventory.`);
+                        requiredHardwareMap[extraHwId] = requiredHardwareMap[extraHwId] || { item_name: extraHw.item_name, count: 0 };
+                        requiredHardwareMap[extraHwId].count++;
+                    });
+                }
+            }
+
+            if (selectedProducts.length === 0) {
+                return alert("Please select at least one product for this appointment.");
+            }
+
+            const requiredHardwareSnapshot = Object.entries(requiredHardwareMap).map(([cid, val]) => ({
+                catalog_id: cid,
+                item_name: val.item_name,
+                count: val.count
+            }));
+
+            // Technician Context (Instruction 4)
+            const tech = userDataArray.find(u => u.id === selectedTechId);
+            const dateObj = new Date(data.schedule_date);
+            const dayIdx = dateObj.getDay();
+            const schedule = tech?.schedule?.[dayIdx] || { start: '09:00', end: '17:00' };
+            const shiftEndStr = schedule.end;
+            const [startH, startM] = data.appointment_time.split(':').map(Number);
+            const startTotal = startH * 60 + startM;
+            const [endH, endM] = shiftEndStr.split(':').map(Number);
+            const shiftEndTotal = endH * 60 + endM;
+
+            // Calculate Travel Buffers (Instruction 4)
+            const adj = findAdjacentAppointments(selectedTechId, data.schedule_date, data.appointment_time, allAppointments, tech?.metadata?.base_location);
+            let travel_buffer_before = 0;
+            let travel_buffer_after = 0;
+            
+            if (adj.prev) {
+                travel_buffer_before = await estimateDuration(parseFloat(data.lat), parseFloat(data.lng), adj.prev.lat, adj.prev.lng);
+            }
+            if (adj.next) {
+                travel_buffer_after = await estimateDuration(parseFloat(data.lat), parseFloat(data.lng), adj.next.lat, adj.next.lng);
+            }
+
+            // Duration Validation (Instruction 4)
+            const appEndWithTravel = startTotal + totalDurationMin + travel_buffer_after;
+
+            if (appEndWithTravel > shiftEndTotal) {
+                return alert(`Appointment duration + Travel (${totalDurationMin + travel_buffer_after} min) exceeds technician's shift. Shift ends at ${shiftEndStr}.`);
+            }
+
+            // Check for overlaps with other appointments (Inc. Travel Padding)
+            const dayApts = allAppointments.filter(a => a.schedule_date === data.schedule_date && a.tech_id === selectedTechId && !a.is_deleted);
+            for (const apt of dayApts) {
+                const aptStart = apt.appointment_time;
+                const aptDuration = apt.metadata?.duration_minutes || 60;
+                const [ah, am] = aptStart.split(':').map(Number);
+                const s = ah * 60 + am;
+                const e = s + aptDuration;
+                
+                // If the new appointment start - travel overlaps with existing end
+                if (startTotal - travel_buffer_before < e && startTotal + totalDurationMin + travel_buffer_after > s) {
+                    return alert(`Schedule conflict! Travel or Job duration overlaps with an existing booking at ${aptStart}.`);
                 }
             }
             
             try {
-                // Batch update items as assigned
-                const itemUpdates = [];
-                validPairs.forEach(group => {
-                    for (const reqType of group.requirements) {
-                        const itemId = group.assigned_items[reqType];
-                        itemUpdates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', itemId), { is_available: false, status: 'assigned', location_name: data.location_name }));
-                    }
-                });
-                if(itemUpdates.length > 0) {
-                    await Promise.all(itemUpdates);
-                }
-                const hwPayload = validPairs.map(g => g.assigned_items);
-
                 await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'appointments', id), {
                     appointment_id: id,
                     ...data,
@@ -739,11 +690,14 @@ export function AppointmentsView() {
                     status: 'pending',
                     created_at: firebase.db.serverTimestamp(),
                     metadata: { 
-                        hardware: hwPayload,
+                        hardware: [], 
                         location: { lat: data.lat, lng: data.lng },
                         custom_data: customData,
                         products: selectedProducts,
-                        duration_minutes: totalDurationMin
+                        required_hardware: requiredHardwareSnapshot, // Frozen snapshot of what is needed
+                        duration_minutes: totalDurationMin,
+                        travel_buffer_before,
+                        travel_buffer_after
                     }
                 });
 
@@ -852,14 +806,16 @@ export function AppointmentsView() {
                                                     updates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', hw.pico_id), {
                                                         status: 'available',
                                                         is_available: true,
-                                                        location_name: ''
+                                                        current_location_type: 'WAREHOUSE',
+                                                        current_location_id: ''
                                                     }));
                                                 }
                                                 if (hw.sim_id) {
                                                     updates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', hw.sim_id), {
                                                         status: 'available',
                                                         is_available: true,
-                                                        location_name: ''
+                                                        current_location_type: 'WAREHOUSE',
+                                                        current_location_id: ''
                                                     }));
                                                 }
                                             });
@@ -883,7 +839,8 @@ export function AppointmentsView() {
                         if (list) list.appendChild(row);
                     });
             }
-            view.emit('rendered');
+            
+            document.dispatchEvent(new CustomEvent('apply-auth'));
         }));
     });
 

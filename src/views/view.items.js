@@ -47,7 +47,7 @@ export function ItemsView() {
         .onboard({ id: 'download-csv-template' });
 
     view.trigger('click', 'download-csv-template', () => {
-        const csvContent = "data:text/csv;charset=utf-8,item_type,item_id,provider\nPico Device,P-1234,Pax\nSim Card,SIM-9876,STC\nPico Device,P-5555,Verifone";
+        const csvContent = "data:text/csv;charset=utf-8,catalog_id,item_id,van_id\ncatalog-pico-device,P-1234,VAN-001\ncatalog-sim-card,SIM-9876,VAN-001\ncatalog-pico-device,P-5555,";
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -70,17 +70,19 @@ export function ItemsView() {
             const rows = text.split('\n').map(r => r.trim()).filter(r => r);
             if (rows.length < 2) return alert("File too short or missing headers.");
             
-            // Assume format: item_type,item_id,provider
+            // Assume format: catalog_id,item_id,van_id
             const headers = rows[0].split(',').map(s => s.trim().toLowerCase());
             const promises = [];
             
             for (let i = 1; i < rows.length; i++) {
                 const cols = rows[i].split(',').map(s => s.trim());
                 window.console.log("Cols:", cols);
+                const van_id = cols[2];
                 const data = {
-                    item_type: cols[0],
+                    catalog_id: cols[0],
                     item_id: cols[1],
-                    provider: cols[2],
+                    current_location_type: van_id ? 'VAN' : 'WAREHOUSE',
+                    current_location_id: van_id || '',
                     status: 'available',
                     is_available: true,
                     is_deleted: false,
@@ -88,7 +90,6 @@ export function ItemsView() {
                     updated_at: firebase.db.serverTimestamp()
                 };
                 if (!data.item_id) continue;
-                data.item_name = `${data.item_type} - ${data.provider}`;
                 
                 const ref = firebase.db.doc(firebase.db.db, 'items', data.item_id);
                 promises.push(firebase.db.setDoc(ref, data));
@@ -107,13 +108,16 @@ export function ItemsView() {
 
     view.trigger('click', 'open-add-item', async () => {
         // Fetch Vans for selection
-        const [vansSnap, formsSnap, itemTypesSnap] = await Promise.all([
+        const [vansSnap, formsSnap, catalogSnap] = await Promise.all([
             firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'vans')),
             firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_types'))
+            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'))
         ]);
         const vans = [];
         vansSnap.forEach(doc => vans.push(doc.data()));
+
+        const catalogs = [];
+        catalogSnap.forEach(doc => catalogs.push(doc.data()));
 
         const formSchemas = (formsSnap?.docs || []).map(d => d.data()).filter(f => f.entities && f.entities.includes('items'));
         let customFieldsHtml = '';
@@ -149,7 +153,7 @@ export function ItemsView() {
             body: `
                 <form id="add-item-form" class="row g-3">
                     <div class="col-12">
-                        <label class="form-label small fw-bold">Item Type</label>
+                        <label class="form-label small fw-bold">Item Catalog Model</label>
                         <div id="type-select-container"></div>
                     </div>
                     <div class="col-12">
@@ -157,13 +161,9 @@ export function ItemsView() {
                         <input type="text" name="item_id" class="form-control" placeholder="S/N or SIM ID" required>
                     </div>
                     <div class="col-12">
-                        <label class="form-label small fw-bold">Provider/Model</label>
-                        <input type="text" name="provider" class="form-control" placeholder="e.g. Pax / STC" required>
-                    </div>
-                    <div class="col-12">
                         <label class="form-label small fw-bold">Assign to VAN (Optional)</label>
                         <select name="van_id" class="form-select">
-                            <option value="">Unassigned</option>
+                            <option value="">Warehouse (Unassigned)</option>
                             ${vans.map(v => `<option value="${v.van_id}">${v.van_id} (${v.location_id})</option>`).join('')}
                         </select>
                     </div>
@@ -177,21 +177,10 @@ export function ItemsView() {
 
         modal.show();
 
-        const dynamicItemTypes = [];
-        if (itemTypesSnap) {
-            itemTypesSnap.forEach(doc => {
-                const it = doc.data();
-                dynamicItemTypes.push({ label: it.name, value: it.name });
-            });
-        }
-        if (dynamicItemTypes.length === 0) {
-            dynamicItemTypes.push({ label: 'Pico Device', value: 'Pico Device' });
-            dynamicItemTypes.push({ label: 'Sim Card', value: 'Sim Card' });
-        }
-
+        const typeSelectOptions = catalogs.map(c => ({ label: `${c.item_name} (${c.item_type} - ${c.provider})`, value: c.catalog_id || c.id }));
         const typeSelect = CustomSelect({
-            options: dynamicItemTypes,
-            placeholder: 'Select Type...',
+            options: typeSelectOptions,
+            placeholder: 'Search Catalog Models...',
             id: 'item-type-select'
         });
         modal.element.querySelector('#type-select-container').appendChild(typeSelect.element);
@@ -201,9 +190,9 @@ export function ItemsView() {
             e.preventDefault();
             const fd = new FormData(form);
             const data = Object.fromEntries(fd);
-            data.item_type = typeSelect.getValue();
+            const catalog_id = typeSelect.getValue();
 
-            if (!data.item_type) return alert("Please select a type");
+            if (!catalog_id) return alert("Please select a catalog model");
             
             const customData = {};
             for (const key in data) {
@@ -231,16 +220,17 @@ export function ItemsView() {
                 }
 
                 await firebase.db.setDoc(itemRef, {
-                    ...data,
-                    custom_data: customData,
-                    item_name: `${data.item_type} - ${data.provider}`,
+                    item_id: data.item_id,
+                    catalog_id: catalog_id,
+                    current_location_type: data.van_id ? 'VAN' : 'WAREHOUSE',
+                    current_location_id: data.van_id || '',
                     is_available: true,
-                    is_deleted: false,
+                    status: 'available',
+                    metadata: { custom_fields: customData },
                     created_at: firebase.db.serverTimestamp(),
-                    updated_at: firebase.db.serverTimestamp(),
-                    metadata: {}
+                    updated_at: firebase.db.serverTimestamp()
                 });
-                firebase.logAction("Item Registered", `${data.item_type} ${data.item_id} added ${data.van_id ? `to ${data.van_id}` : ''}`);
+                firebase.logAction("Item Registered", `Item ${data.item_id} added ${data.van_id ? `to ${data.van_id}` : ''}`);
                 modal.hide();
             } catch (err) {
                 alert("Error: " + err.message);
@@ -250,31 +240,38 @@ export function ItemsView() {
 
     view.on('init', () => {
         view.emit('loading:start');
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'items'), (snap) => {
+        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'items'), async (snap) => {
             view.delete('items-list');
             const list = view.$('items-list');
             view.emit('loading:end');
-            view.emit('rendered');
             if (!list) return;
+
+            const catalogSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'));
+            const catalogMap = {};
+            catalogSnap.forEach(doc => {
+                const c = doc.data();
+                catalogMap[c.catalog_id || c.id] = c;
+            });
 
             if (snap && snap.forEach) {
                 snap.forEach(doc => {
                     const item = doc.data();
                     const row = document.createElement('tr');
                     
+                    const catalog = catalogMap[item.catalog_id] || { item_type: 'Unknown', provider: 'Unknown' };
                     const itemStatus = item.status || (item.is_available ? 'available' : 'assigned');
                     let statusBadge = 'badge-pale-secondary';
                     if (itemStatus === 'available') statusBadge = 'badge-pale-success';
                     else if (itemStatus === 'damaged') statusBadge = 'badge-pale-danger';
                     else if (itemStatus === 'returned') statusBadge = 'badge-pale-warning';
 
-                    const locationField = itemStatus === 'assigned' ? (item.location_name || item.van_id || 'Unknown Location') : '—';
+                    const locationField = item.current_location_id ? `${item.current_location_type}: ${item.current_location_id}` : 'WAREHOUSE';
 
                     row.innerHTML = `
-                        <td><span class="badge ${item.item_type === 'Sim Card' ? 'badge-pale-info' : 'badge-pale-primary'}">${item.item_type}</span></td>
+                        <td><span class="badge ${catalog.item_type === 'Sim Card' ? 'badge-pale-info' : 'badge-pale-primary'}">${catalog.item_type}</span></td>
                         <td><code class="data-mono fw-bold">${item.item_id}</code></td>
-                        <td>${item.provider}</td>
-                        <td><span class="text-muted">${item.van_id || '—'}</span></td>
+                        <td>${catalog.provider}</td>
+                        <td><span class="text-muted">${item.current_location_type === 'VAN' ? item.current_location_id : '—'}</span></td>
                         <td>${locationField}</td>
                         <td><span class="badge ${statusBadge} text-capitalize">${itemStatus}</span></td>
                         <td>
@@ -299,22 +296,18 @@ export function ItemsView() {
                             body: `
                                 <form id="edit-item-form" class="row g-3">
                                     <div class="col-12">
-                                        <label class="form-label small fw-bold">Item Type</label>
-                                        <input type="text" class="form-control" value="${item.item_type}" disabled>
+                                        <label class="form-label small fw-bold">Catalog Model</label>
+                                        <input type="text" class="form-control" value="${catalog.item_name} (${catalog.item_type})" disabled>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label small fw-bold">Serial / ID</label>
                                         <input type="text" class="form-control" value="${item.item_id}" disabled>
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label small fw-bold">Provider/Model</label>
-                                        <input type="text" name="provider" class="form-control" value="${item.provider || ''}" required>
-                                    </div>
-                                    <div class="col-12">
                                         <label class="form-label small fw-bold">Assign to VAN (Optional)</label>
                                         <select name="van_id" class="form-select">
-                                            <option value="">Unassigned</option>
-                                            ${vans.map(v => `<option value="${v.van_id}" ${item.van_id === v.van_id ? 'selected' : ''}>${v.van_id} (${v.location_id})</option>`).join('')}
+                                            <option value="">Warehouse (Unassigned)</option>
+                                            ${vans.map(v => `<option value="${v.van_id}" ${item.current_location_id === v.van_id ? 'selected' : ''}>${v.van_id} (${v.location_id})</option>`).join('')}
                                         </select>
                                     </div>
                                     <div class="col-12">
@@ -326,10 +319,6 @@ export function ItemsView() {
                                             <option value="damaged" ${itemStatus === 'damaged' ? 'selected' : ''}>Damaged</option>
                                         </select>
                                     </div>
-                                    <div class="col-12" id="location-container" style="display: ${itemStatus === 'assigned' ? 'block' : 'none'};">
-                                    <label class="form-label small fw-bold">Location</label>
-                                    <input type="text" name="location_name" class="form-control" placeholder="Device location..." value="${item.location_name || ''}">
-                                </div>
                                 <div class="col-12 mt-4">
                                     <button type="submit" class="btn-pico btn-pico-primary w-100">Save Changes</button>
                                 </div>
@@ -337,12 +326,6 @@ export function ItemsView() {
                         `
                     });
                     modal.show();
-
-                    const statusSelect = modal.element.querySelector('#item-status-select');
-                    const locationContainer = modal.element.querySelector('#location-container');
-                    statusSelect.onchange = (e) => {
-                        locationContainer.style.display = e.target.value === 'assigned' ? 'block' : 'none';
-                    };
 
                     const form = modal.element.querySelector('#edit-item-form');
                     form.onsubmit = async (e) => {
@@ -352,15 +335,13 @@ export function ItemsView() {
                         const statusVal = fd.get('status');
                         try {
                             await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', item.item_id), {
-                                provider: fd.get('provider'),
-                                van_id: van_id,
+                                current_location_type: van_id ? 'VAN' : 'WAREHOUSE',
+                                current_location_id: van_id || '',
                                 status: statusVal,
-                                location_name: fd.get('location_name') || null,
-                                is_available: statusVal === 'available', // keep backwards compatibility
-                                item_name: `${item.item_type} - ${fd.get('provider')}`,
+                                is_available: statusVal === 'available',
                                 updated_at: firebase.db.serverTimestamp()
                             });
-                            firebase.logAction("Item Updated", `${item.item_type} ${item.item_id} updated to ${statusVal}`);
+                            firebase.logAction("Item Updated", `${catalog.item_type} ${item.item_id} updated to ${statusVal}`);
                             modal.hide();
                         } catch (err) { alert(err.message); }
                     };
@@ -383,7 +364,7 @@ export function ItemsView() {
                         modal.hide();
                         try {
                             await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'items', item.item_id));
-                            firebase.logAction("Item Removed", `${item.item_type} ${item.item_id} deleted`);
+                            firebase.logAction("Item Removed", `${catalog.item_type} ${item.item_id} deleted`);
                         } catch (err) {
                             alert("Delete failed: " + err.message);
                         }

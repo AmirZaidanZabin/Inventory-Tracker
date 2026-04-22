@@ -46,6 +46,11 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use((req, res, next) => {
+    console.log(`Server received request: ${req.method} ${req.url}`);
+    next();
+  });
+
   app.use(express.json());
 
   // Test DB connection (NON-BLOCKING or removed for primary RTDB)
@@ -65,12 +70,42 @@ async function startServer() {
       return res.status(401).json({ error: "Unauthorized", details: error.message || error.toString() });
     }
     
-    req.user = decodedToken;
+    // Fetch user role and authorities for server-side enforcement
+    const [userDoc, userErr] = await _tc(async () => await getNormalized("users", decodedToken.uid));
+    const authorities = [];
+    let roleId = 'viewer';
+    
+    if (userDoc) {
+        roleId = userDoc.role_id || 'viewer';
+        const roleData = await getNormalized("roles", roleId);
+        if (roleData) {
+            authorities.push(...(roleData.authorities || []));
+        }
+    }
+
+    req.user = { 
+        ...decodedToken, 
+        role_id: roleId, 
+        authorities,
+        isAdmin: decodedToken.email?.toLowerCase() === "amir.zaidan.zabin@gmail.com" || 
+                 decodedToken.email?.toLowerCase() === "amirzaidanzabin@gmail.com" ||
+                 roleId === 'admin'
+    };
     next();
+  };
+
+  const authorize = (permission) => {
+      return (req, res, next) => {
+          if (req.user.isAdmin || req.user.authorities.includes(permission)) {
+              return next();
+          }
+          res.status(403).json({ error: "Insufficient permissions", required: permission });
+      };
   };
 
     // API Routes
   app.get("/api/health", async (req, res) => {
+    // ... rest of health check
     // Quick RTDB connection check (lightweight)
     let rtdbAccessible = false;
     const [_, rtdbErr] = await _tc(async () => await rtdb.ref('.info/connected').once('value'));
@@ -94,14 +129,20 @@ async function startServer() {
 
   // RTDB Normalization Schemas
   const SCHEMAS = {
-    users: { essentials: ['user_id', 'id', 'user_name', 'name', 'email', 'role_id', 'created_at'] },
-    vans: { essentials: ['van_id', 'location_id', 'created_at', 'default_lat', 'default_lng'] },
-    items: { essentials: ['item_id', 'item_type', 'provider', 'created_at'] },
-    appointments: { essentials: ['appointment_id', 'id', 'appointment_name', 'schedule_date', 'lat', 'lng', 'created_at'] },
-    product_types: { essentials: ['id', 'name', 'duration_minutes', 'created_at'] },
-    item_types: { essentials: ['id', 'name', 'created_at'] },
-    roles: { essentials: ['role_id', 'role_name', 'created_at'] },
-    forms: { essentials: ['id', 'name', 'created_at'] }
+    roles: { essentials: ['role_id', 'id', 'role_name', 'authorities', 'created_at', 'updated_at', 'metadata'] },
+    users: { essentials: ['user_id', 'id', 'role_id', 'user_name', 'email', 'created_at', 'updated_at', 'metadata'] },
+    vans: { essentials: ['van_id', 'id', 'location_id', 'created_at', 'updated_at', 'metadata'] },
+    product_types: { essentials: ['type_id', 'id', 'name', 'catalog_id', 'duration_minutes', 'created_at', 'updated_at', 'metadata'] },
+    item_types: { essentials: ['type_id', 'id', 'name', 'created_at', 'updated_at', 'metadata'] },
+    item_catalog: { essentials: ['catalog_id', 'id', 'item_name', 'provider', 'item_type', 'duration_minutes', 'created_at', 'updated_at', 'metadata'] },
+    items: { essentials: ['item_id', 'id', 'catalog_id', 'current_location_type', 'current_location_id', 'is_available', 'created_at', 'updated_at', 'metadata'] },
+    appointments: { essentials: ['appointment_id', 'id', 'tech_id', 'user_id', 'van_id', 'product_type_id', 'status', 'created_at', 'updated_at', 'metadata'] },
+    stock_take_logs: { essentials: ['log_id', 'id', 'user_id', 'van_id', 'log_type', 'scanned_items', 'discrepancies', 'created_at', 'updated_at', 'metadata'] },
+    custom_forms: { essentials: ['id', 'form_name', 'schema_definition', 'created_at', 'updated_at', 'metadata'] },
+    forms: { essentials: ['id', 'name', 'created_at', 'updated_at', 'metadata'] },
+    form_submissions: { essentials: ['id', 'form_id', 'appointment_id', 'submitted_by', 'data', 'created_at', 'updated_at', 'metadata'] },
+    saved_reports: { essentials: ['id', 'creator_id', 'name', 'query', 'created_at', 'updated_at', 'metadata'] },
+    triggers: { essentials: ['id', 'event_type', 'action_to_take', 'condition_logic', 'created_at', 'updated_at', 'metadata'] }
   };
 
   const getNormalized = async (col, id) => {
@@ -131,8 +172,10 @@ async function startServer() {
     
     const processData = (d) => {
        const out = { ...d };
+       const sensitiveFields = ['password', 'secret', 'token'];
        Object.keys(out).forEach(k => {
          if (out[k] === '__server_timestamp__') out[k] = admin.database.ServerValue.TIMESTAMP;
+         if (sensitiveFields.includes(k.toLowerCase())) delete out[k];
        });
        return out;
     };
@@ -257,7 +300,7 @@ async function startServer() {
   }
 
   // Generic CRUD implementation
-  const collections = ["vans", "items", "appointments", "roles", "users", "audit_logs", "stock_takes", "test_collection", "triggers", "forms", "saved_reports", "product_types", "item_types"];
+  const collections = ["vans", "item_catalog", "items", "appointments", "stock_take_logs", "roles", "users", "audit_logs", "stock_takes", "test_collection", "triggers", "forms", "saved_reports", "product_types", "item_types", "custom_forms", "form_submissions"];
 
   // Admin: Change User Password
   app.post("/api/admin/users/:uid/password", authenticate, async (req, res) => {
@@ -276,25 +319,87 @@ async function startServer() {
         return res.status(400).json({ error: "Password must be at least 6 characters" });
     }
 
-    const [_, error] = await _tc(async () => await admin.auth().updateUser(uid, { password }));
+    let [_, error] = await _tc(async () => await admin.auth().updateUser(uid, { password }));
+    
+    if (error && error.code === 'auth/user-not-found') {
+        console.log(`User ${uid} not found in Auth. Checking RTDB to auto-provision...`);
+        const userData = await getNormalized("users", uid);
+        if (userData && userData.metadata?.email) {
+            console.log(`Auto-provisioning Auth account for ${userData.metadata.email} with UID ${uid}`);
+            const [created, createErr] = await _tc(async () => await admin.auth().createUser({
+                uid: uid,
+                email: userData.metadata.email,
+                password: password,
+                displayName: userData.user_name
+            }));
+            if (!createErr) error = null; // Success!
+            else if (createErr.code === 'auth/email-already-exists') {
+                console.log(`Email ${userData.metadata.email} taken. Merging manual user ${uid} into existing Auth account.`);
+                const [existingUser, fetchErr] = await _tc(async () => await admin.auth().getUserByEmail(userData.metadata.email));
+                if (existingUser) {
+                    const existingUid = existingUser.uid;
+                    // Update password for the existing account
+                    await admin.auth().updateUser(existingUid, { password });
+                    
+                    // Migrate RTDB Main Data
+                    const snap = await rtdb.ref(`users/${uid}`).once('value');
+                    if (snap.exists()) {
+                        await rtdb.ref(`users/${existingUid}`).set({ 
+                            ...snap.val(), 
+                            user_id: existingUid,
+                            id: existingUid 
+                        });
+                        await rtdb.ref(`users/${uid}`).remove();
+                    }
+                    
+                    // Migrate RTDB History
+                    const hSnap = await rtdb.ref(`users_history/${uid}`).once('value');
+                    if (hSnap.exists()) {
+                        await rtdb.ref(`users_history/${existingUid}`).update(hSnap.val());
+                        await rtdb.ref(`users_history/${uid}`).remove();
+                    }
+                    error = null; // Successfully merged
+                } else {
+                    error = fetchErr || new Error("Failed to fetch existing user by email.");
+                }
+            } else {
+                error = createErr;
+            }
+        } else {
+            error = new Error("User not found in Auth and no email found in RTDB to auto-provision.");
+        }
+    }
     
     if (error) {
-        console.error(`Admin Error: Failed to change password for ${uid}:`, error);
+        console.error(`Admin Error: Failed to change/provision password for ${uid}:`, error);
         return res.status(500).json({ error: `Admin Auth Error: ${error.message}` });
     }
 
     res.json({ success: true, message: "Password updated successfully" });
   });
 
+  // Mapping of collections to base permissions
+  const PERMISSION_MAP = {
+      users: 'manage_users',
+      roles: 'manage_users',
+      vans: 'inventory:view',
+      item_catalog: 'inventory:view',
+      items: 'inventory:view',
+      item_types: 'inventory:view',
+      appointments: 'appointments:view',
+      product_types: 'admin',
+      triggers: 'admin',
+      forms: 'forms:view',
+      saved_reports: 'reporting:view'
+  };
+
   collections.forEach(colName => {
+    const basePerm = PERMISSION_MAP[colName] || 'viewer';
+
     // List
-    app.get(`/api/${colName}`, authenticate, async (req, res) => {
+    app.get(`/api/${colName}`, authenticate, authorize(basePerm), async (req, res) => {
       console.log(`Backend: Fetching ${colName} (RTDB)...`);
-      let queryRef = rtdb.ref(colName);
-      if (req.query.limit) {
-          queryRef = queryRef.limitToFirst(parseInt(req.query.limit));
-      }
-      const [snap, error] = await _tc(async () => await queryRef.once('value'));
+      const [snap, error] = await _tc(async () => await rtdb.ref(colName).once('value'));
       
       if (error) {
         console.error(`Backend Error: Error fetching ${colName}:`, error);
@@ -309,7 +414,7 @@ async function startServer() {
     });
 
     // Get One
-    app.get(`/api/${colName}/:id`, authenticate, async (req, res) => {
+    app.get(`/api/${colName}/:id`, authenticate, authorize(basePerm), async (req, res) => {
       console.log(`Backend: Getting ${colName}/${req.params.id} (RTDB)...`);
       const data = await getNormalized(colName, req.params.id);
       
@@ -317,8 +422,8 @@ async function startServer() {
       res.json(data);
     });
 
-    // Create / Update (Normalized)
-    app.post(`/api/${colName}`, authenticate, async (req, res) => {
+    // Create (Normalized)
+    app.post(`/api/${colName}`, authenticate, authorize(`${basePerm}:create`), async (req, res) => {
       const data = req.body;
       console.log(`Backend: Saving normalized ${colName} (RTDB)...`, data.id);
       
@@ -341,7 +446,7 @@ async function startServer() {
     });
 
     // Update
-    app.put(`/api/${colName}/:id`, authenticate, async (req, res) => {
+    app.put(`/api/${colName}/:id`, authenticate, authorize(`${basePerm}:edit`), async (req, res) => {
       const data = req.body;
       const id = req.params.id;
       console.log(`Backend: Updating normalized ${colName}/${id} (RTDB)...`);
@@ -368,7 +473,7 @@ async function startServer() {
     });
 
     // Delete
-    app.delete(`/api/${colName}/:id`, authenticate, async (req, res) => {
+    app.delete(`/api/${colName}/:id`, authenticate, authorize(`${basePerm}:delete`), async (req, res) => {
       console.log(`Backend: Deleting essentials for ${colName}/${req.params.id} (RTDB)...`);
       const [_, error] = await _tc(async () => await rtdb.ref(`${colName}/${req.params.id}`).remove());
       
@@ -379,6 +484,15 @@ async function startServer() {
       
       res.json({ success: true });
     });
+  });
+
+  // Catch-all for unknown /api routes to prevent HTML fallback
+  app.use("/api", (req, res) => {
+      res.status(404).json({ 
+          error: "API Endpoint Not Found", 
+          path: req.originalUrl,
+          method: req.method
+      });
   });
 
   // Vite middleware for development

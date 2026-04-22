@@ -1,3 +1,0 @@
-{"id":"1","description":"Update firebase blueprint to include item_types","status":"pending","assignee":"Agent"}
-{"id":"2","description":"Update view.forms.js to include product_types and item_types","status":"pending","assignee":"Agent"}
-{"id":"3","description":"Update polling interval and document.hidden check in firebase.js","status":"pending","assignee":"Agent"}

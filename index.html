@@ -24,17 +24,6 @@
             --sidebar-bg: #f9fafb;
             --sidebar-text: #4b5563;
         }
-        .card-clickable {
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-        .card-clickable:hover {
-            transform: translateY(-5px);
-            filter: brightness(0.98);
-        }
-        .card-clickable:active {
-            transform: translateY(-2px);
-        }
         body {
             background-color: var(--bg-main);
             font-family: 'Inter', -apple-system, sans-serif;
@@ -452,55 +441,39 @@
         /* SQL Highlighting */
         .sql-editor-container {
             position: relative;
-            background: #ffffff;
-            border-radius: var(--radius);
-            border: 1px solid #d1d5db;
-            min-height: 160px;
+            min-height: 120px;
+        }
+        .sql-backdrop {
+            position: absolute;
+            inset: 0;
+            padding: 0.6rem 1rem;
+            border: 1px solid transparent;
+            pointer-events: none;
+            white-space: pre-wrap;
+            word-wrap: break-word;
             overflow: hidden;
-        }
-        .sql-textarea, 
-        .sql-highlighted,
-        .sql-highlighted * {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace !important;
-            font-size: 14px !important;
-            line-height: 20px !important;
-            tab-size: 4 !important;
-        }
-        .sql-textarea, 
-        .sql-highlighted {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            margin: 0 !important;
-            padding: 1.5rem !important;
-            border: none !important;
-            width: 100% !important;
-            height: 100% !important;
-            white-space: pre-wrap !important;
-            word-break: break-all !important;
-            overflow-wrap: break-word !important;
-            box-sizing: border-box !important;
-            display: block !important;
-            overflow-y: auto !important;
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            color: transparent;
         }
         .sql-textarea {
+            position: relative;
             background: transparent !important;
             color: transparent !important;
-            caret-color: #000;
-            z-index: 2;
-            resize: none;
-            -webkit-text-fill-color: transparent;
+            caret-color: #1f2937;
+            z-index: 1;
         }
         .sql-highlighted {
-            z-index: 1;
-            background: #fdfdfd !important;
+            position: absolute;
+            inset: 0;
+            padding: 0.6rem 1rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow: hidden;
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
             pointer-events: none;
-            color: #1f2937;
         }
-        .sql-highlighted .token.keyword { color: #7c3aed !important; font-weight: bold !important; }
-        .sql-highlighted .token.string { color: #059669 !important; }
-        .sql-highlighted .token.number { color: #d97706 !important; }
-        .sql-highlighted .token.function { color: #2563eb !important; }
         .sidebar-category {
             display: flex;
             align-items: center;
@@ -627,7 +600,7 @@
                     <a class="nav-link auth-items:view hidden" href="#" data-view="items"><i class="bi bi-phone me-2"></i><span class="sidebar-text">Hardware</span></a>
                     <a class="nav-link auth-vans:view hidden" href="#" data-view="vans"><i class="bi bi-truck me-2"></i><span class="sidebar-text">Van Fleet</span></a>
                     <a class="nav-link auth-admin hidden" href="#" data-view="product_types"><i class="bi bi-box-seam me-2"></i><span class="sidebar-text">Product Types</span></a>
-                    <a class="nav-link auth-admin hidden" href="#" data-view="item_types"><i class="bi bi-motherboard me-2"></i><span class="sidebar-text">Hardware Types</span></a>
+                    <a class="nav-link auth-admin hidden" href="#" data-view="item_types"><i class="bi bi-hdd-network me-2"></i><span class="sidebar-text">Hardware Types</span></a>
                 </div>
                 
                 <div class="sidebar-category collapsed auth-settings:view hidden" data-group="settings">

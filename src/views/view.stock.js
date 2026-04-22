@@ -169,22 +169,24 @@ T-002,S-002,Pico Terminal Auth,Mobily`;
                 if(row.terminal_id) {
                     batchPromises.push(firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'items', row.terminal_id), {
                         item_id: row.terminal_id,
-                        item_type: 'Pico Device',
+                        catalog_id: 'catalog-pico-device',
+                        current_location_type: 'WAREHOUSE',
                         is_available: true,
                         status: 'available',
                         updated_at: firebase.db.serverTimestamp()
-                    }, { merge: true }));
+                    }));
                     inventoryIds.push(row.terminal_id);
                     itemsProcessed++;
                 }
                 if(row.sim_id) {
                     batchPromises.push(firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'items', row.sim_id), {
                         item_id: row.sim_id,
-                        item_type: 'Sim Card',
+                        catalog_id: 'catalog-sim-card',
+                        current_location_type: 'WAREHOUSE',
                         is_available: true,
                         status: 'available',
                         updated_at: firebase.db.serverTimestamp()
-                    }, { merge: true }));
+                    }));
                     inventoryIds.push(row.sim_id);
                     itemsProcessed++;
                 }
@@ -196,9 +198,9 @@ T-002,S-002,Pico Terminal Auth,Mobily`;
 
             // Save Stock Take Log
             const logId = 'ST-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-            await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'stock_takes', logId), {
+            await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'stock_take_logs', logId), {
                 log_id: logId,
-                type: 'morning_load',
+                log_type: 'morning_load',
                 user_id: firebase.auth.currentUser ? firebase.auth.currentUser.uid : 'Unknown',
                 user_email: firebase.auth.currentUser ? firebase.auth.currentUser.email : 'Unknown',
                 timestamp: firebase.db.serverTimestamp(),
@@ -269,16 +271,18 @@ T-002,S-002,Pico Terminal Auth,Mobily`;
         
         try {
             const logId = 'ST-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-            await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'stock_takes', logId), {
+            await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'stock_take_logs', logId), {
                 log_id: logId,
-                type: 'evening_reconcile',
+                log_type: 'evening_reconcile',
                 user_id: firebase.auth.currentUser ? firebase.auth.currentUser.uid : 'Unknown',
                 user_email: firebase.auth.currentUser ? firebase.auth.currentUser.email : 'Unknown',
                 timestamp: firebase.db.serverTimestamp(),
                 scanned_items: pendingReconcileData.uploaded,
                 count: pendingReconcileData.count,
-                missing: pendingReconcileData.missing,
-                extra: pendingReconcileData.extra
+                discrepancies: {
+                    missing: pendingReconcileData.missing,
+                    extra: pendingReconcileData.extra
+                }
             });
             
             alert("Evening reconciliation saved historically!");
@@ -293,33 +297,40 @@ T-002,S-002,Pico Terminal Auth,Mobily`;
 
     view.on('init', () => {
         view.emit('loading:start');
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'stock_takes'), (snap) => {
+        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'stock_take_logs'), (snap) => {
             const histList = view.$('history-list');
             view.emit('loading:end');
-            view.emit('rendered');
             if (histList) histList.innerHTML = '';
             const docs = snap.docs.map(t => t.data()).sort((a,b) => {
-                if(!a.timestamp || !b.timestamp) return 0;
-                return b.timestamp.seconds - a.timestamp.seconds;
+                const aTime = a.timestamp?.seconds || new Date(a.timestamp).getTime()/1000 || 0;
+                const bTime = b.timestamp?.seconds || new Date(b.timestamp).getTime()/1000 || 0;
+                return bTime - aTime;
             });
 
             docs.forEach(doc => {
                 const tr = document.createElement('tr');
-                const dateRaw = doc.timestamp ? new Date(doc.timestamp.seconds * 1000).toLocaleString() : 'N/A';
-                const discCount = (doc.missing ? doc.missing.length : 0) + (doc.extra ? doc.extra.length : 0);
+                let dateRaw = 'N/A';
+                if (doc.timestamp?.seconds) dateRaw = new Date(doc.timestamp.seconds * 1000).toLocaleString();
+                else if (doc.timestamp) dateRaw = new Date(doc.timestamp).toLocaleString();
+
+                const missingCount = doc.discrepancies?.missing?.length || 0;
+                const extraCount = doc.discrepancies?.extra?.length || 0;
+                const discCount = missingCount + extraCount;
                 
                 tr.innerHTML = `
                     <td><div class="small fw-bold">${dateRaw}</div><div class="text-muted" style="font-size:0.7rem;">${doc.log_id}</div></td>
-                    <td><span class="badge ${doc.type === 'morning_load' ? 'bg-primary' : 'bg-warning text-dark'}">${doc.type === 'morning_load' ? 'Morning Load' : 'Evening Check'}</span></td>
+                    <td><span class="badge ${doc.log_type === 'morning_load' ? 'bg-primary' : 'bg-warning text-dark'}">${doc.log_type === 'morning_load' ? 'Morning Load' : 'Evening Check'}</span></td>
                     <td>${doc.user_email || doc.user_id}</td>
                     <td>${doc.count} items</td>
-                    <td>${doc.type === 'evening_reconcile' ? (discCount > 0 ? `<span class="text-danger fw-bold">${discCount} mismatch(es)</span>` : `<span class="text-success"><i class="bi bi-check"></i> Perfect</span>`) : '-'}</td>
+                    <td>${doc.log_type === 'evening_reconcile' ? (discCount > 0 ? `<span class="text-danger fw-bold">${discCount} mismatch(es)</span>` : `<span class="text-success"><i class="bi bi-check"></i> Perfect</span>`) : '-'}</td>
                 `;
                 const list = view.$('history-list');
                 if (list) {
                     list.appendChild(tr);
                 }
             });
+            
+            document.dispatchEvent(new CustomEvent('apply-auth'));
         }));
     });
 

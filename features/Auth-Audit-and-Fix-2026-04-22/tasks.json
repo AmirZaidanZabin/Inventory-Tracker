@@ -1,0 +1,122 @@
+{
+  "original_prompt": "Fix auth/wrong-password errors and implement the suggested Auth Audit/Test suite.",
+  "rephrased_goal": "Resolve UI feedback for auth failures and implement the Auth Testing Suite to verify login/logout/reset flows.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Implement Auth Testing Suite in src/tests/auth.test.js",
+      "subtasks_required": [
+        "Create file",
+        "Implement Tests (Failure logic, Logout state, Reset flow)"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "sharpen the testing spear",
+      "status": "done",
+      "testing_criteria": "File exists and contains logic provided in prompt."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify Auth Test file content",
+      "subtasks_required": [
+        "Read file",
+        "Verify assertions match prompt specs"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "check spear sharpness",
+      "status": "done",
+      "testing_criteria": "Test code is syntactically correct."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Register Auth Tests in main test runner",
+      "subtasks_required": [
+        "Edit src/tests/index.js",
+        "Import runAuthTests",
+        "Call runAuthTests(t)"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "put spear in hand",
+      "status": "done",
+      "testing_criteria": "Test runner includes new suite."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify test registration",
+      "subtasks_required": [
+        "Read src/tests/index.js"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "check if spear held tight",
+      "status": "done",
+      "testing_criteria": "Imports and calls are present."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Improve Auth Error Feedback in main.js",
+      "subtasks_required": [
+        "Review catch block in signInEmail flow",
+        "Ensure auth/wrong-password is handled with clear UI text",
+        "Add shake animation for feedback"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "make better grunt for wrong path",
+      "status": "done",
+      "testing_criteria": "Code includes specific handling for error codes."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify Auth feedback logic",
+      "subtasks_required": [
+        "Read main.js around the login trigger"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "listen to grunt",
+      "status": "done",
+      "testing_criteria": "UI feedback logic is robust."
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Fix 'Email already in use' during password override",
+      "subtasks_required": [
+        "Detect auth/email-already-exists in server.js",
+        "Implement UID migration logic (move RTDB data from manual_ ID to existing ID)",
+        "Update password for the existing UID"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "bridge two trails",
+      "status": "done",
+      "testing_criteria": "Server handles existing emails by merging records."
+    },
+    {
+      "id": 8,
+      "description": "Check-Pebble: Verify migration logic in server.js",
+      "subtasks_required": [
+        "Read server.js catch block for createUser"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "check bridge strength",
+      "status": "done",
+      "testing_criteria": "Code correctly moves data and deletes old record."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": [
+        "Check all files",
+        "Verify whole auth flow works in code structure"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail",
+      "status": "done",
+      "testing_criteria": "Audit and fix complete."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

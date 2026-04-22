@@ -1,3 +1,0 @@
-{"ts":"2026-04-21T02:30:30Z","id":"1","action":"enforce location UI","artifact":"src/views/view.appointments.js","status":"PASS","resume_ctx":"UI now listens to products and location status"}
-{"ts":"2026-04-21T02:32:00Z","id":"3","action":"implement travel block logic","artifact":"src/views/view.appointments.js","status":"PASS","resume_ctx":"grid now computes travel overlap constraints"}
-{"ts":"2026-04-21T03:00:00Z","id":"FINAL","action":"sweep checkpoint","artifact":"src/views/view.appointments.js","status":"PASS","resume_ctx":"confirmed travel block and default prep time handles adjacent slots"}

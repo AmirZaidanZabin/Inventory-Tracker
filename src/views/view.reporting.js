@@ -105,18 +105,18 @@ export function ReportingView() {
                 <div id="save-modal-backdrop" class="modal-backdrop fade show hidden"></div>
                 <div id="save-modal" class="modal fade show hidden" tabindex="-1" style="display: block;">
                     <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-header border-0 pb-0">
+                        <div class="modal-content border-0 shadow rounded-4">
+                            <div class="modal-header border-0 pb-0 pt-4 px-4">
                                 <h6 class="modal-title fw-bold">Save Report</h6>
                             </div>
-                            <div class="modal-body">
+                            <div class="modal-body p-4">
                                 <label class="form-label small fw-semibold text-secondary">Report Name</label>
                                 <input id="new-report-name" type="text" class="form-control" placeholder="e.g. Monthly Van Load">
                                 <div id="save-modal-error" class="text-danger small mt-2 hidden"></div>
                             </div>
-                            <div class="modal-footer border-0 pt-0">
-                                <button id="cancel-save" class="btn btn-sm btn-light">Cancel</button>
-                                <button id="confirm-save" class="btn btn-sm btn-primary">Save Now</button>
+                            <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                                <button id="cancel-save" class="btn btn-sm btn-light rounded-pill px-3">Cancel</button>
+                                <button id="confirm-save" class="btn btn-sm btn-primary rounded-pill px-3">Save Now</button>
                             </div>
                         </div>
                     </div>
@@ -167,7 +167,7 @@ export function ReportingView() {
         highlighted.scrollLeft = textarea.scrollLeft;
     };
 
-    const SYSTEM_TABLES = ["vans", "items", "appointments", "roles", "users", "audit_logs", "stock_takes", "triggers", "forms", "saved_reports", "product_types", "item_types"];
+    const SYSTEM_TABLES = ["vans", "items", "item_catalog", "appointments", "stock_take_logs", "roles", "users", "audit_logs", "stock_takes", "triggers", "custom_forms", "forms", "saved_reports", "product_types", "form_submissions", "item_types"];
     let tableSchemas = {};
 
     const initDb = async () => {
@@ -180,9 +180,14 @@ export function ReportingView() {
             view.$('db-status').textContent = "Loading schemas...";
             
             // Fetch limit=1 for all tables to get schema
-            const snaps = await Promise.all(SYSTEM_TABLES.map(t => 
-                firebase.db.getDocs(firebase.db.collection(firebase.db.db, t), { limit: 1 })
-            ));
+            const snaps = await Promise.all(SYSTEM_TABLES.map(async (t) => {
+                try {
+                    return await firebase.db.getDocs(firebase.db.collection(firebase.db.db, t), { limit: 1 });
+                } catch (e) {
+                    console.warn(`Failed to fetch schema for ${t}:`, e.message);
+                    return { empty: true, docs: [] };
+                }
+            }));
             
             snaps.forEach((snap, idx) => {
                 const tableName = SYSTEM_TABLES[idx];
