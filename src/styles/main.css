@@ -1,0 +1,410 @@
+/* src/styles/main.css */
+
+/* 1. Core Brand Tokens */
+:root {
+    --sidebar-width: 240px;
+    --sidebar-min-width: 80px;
+    --primary-color: #532870;
+    --accent-color: #532870;
+    --bg-main: #f4f5f7;
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --radius: 8px;
+    --sidebar-bg: #f9fafb;
+    --sidebar-text: #4b5563;
+}
+
+/* 2. Base Typography & Body */
+body {
+    background-color: var(--bg-main);
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #1f2937;
+}
+h1, h2, h3, h4, h5, h6, .fw-bold {
+    font-family: 'Outfit', sans-serif;
+}
+
+/* 3. Sidebar Styling */
+#sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    border-right: 1px solid #e5e7eb;
+    z-index: 1000;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#sidebar.minimized { width: var(--sidebar-min-width); }
+#sidebar.minimized .sidebar-text,
+#sidebar.minimized .user-details { display: none; }
+#sidebar.minimized .nav-link { justify-content: center; padding: 0.8rem 0; }
+#sidebar.minimized .nav-link i { margin-right: 0 !important; font-size: 1.2rem; }
+#sidebar.minimized .p-4.border-bottom h5 { display: none; }
+#sidebar.minimized .p-4.border-bottom { text-align: center; }
+#sidebar.minimized .sidebar-category { display: none; }
+
+#main-content {
+    margin-left: var(--sidebar-width);
+    padding: 2rem;
+    min-height: 100vh;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#sidebar.minimized + #main-content { margin-left: var(--sidebar-min-width); }
+
+#sidebar .nav-link {
+    color: #4b5563;
+    padding: 0.8rem 1.5rem;
+    border-radius: 4px;
+    margin: 0.2rem 1.2rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+}
+#sidebar .nav-link:hover { background-color: #f3f4f6; color: #111827; }
+#sidebar .nav-link.active {
+    background-color: #f3e8ff;
+    color: var(--primary-color);
+    border-left: 4px solid var(--primary-color);
+    border-radius: 0 4px 4px 0;
+}
+
+.sidebar-category {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9ca3af;
+    margin: 1.5rem 1.7rem 0.5rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+}
+.sidebar-category:hover { color: #4b5563; }
+.sidebar-category .chevron { transition: transform 0.2s; font-size: 0.8rem; }
+.sidebar-category.collapsed .chevron { transform: rotate(-90deg); }
+
+/* 4. Core Component Styles */
+.card {
+    border: 1px solid #e5e7eb;
+    box-shadow: var(--card-shadow);
+    border-radius: var(--radius);
+    background: #fff;
+}
+.card-header {
+    background: #fff !important;
+    border-bottom: 1px solid #f3f4f6;
+    padding: 1.25rem;
+    font-weight: 600;
+}
+
+.form-control, .form-select {
+    border: 1px solid #e5e7eb;
+    padding: 0.6rem 1rem;
+    border-radius: var(--radius);
+}
+.form-control:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(83, 40, 112, 0.1); 
+}
+
+/* 5. Consistent Buttons */
+.btn-dark {
+    background: var(--primary-color);
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: var(--radius);
+    font-weight: 500;
+}
+.btn-dark:hover { background: #333; }
+
+.btn-pico {
+    padding: 0.6rem 1.2rem;
+    border-radius: var(--radius);
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+}
+.btn-pico-primary { background-color: var(--primary-color); color: #fff; }
+.btn-pico-primary:hover { background-color: #333; color: #fff; transform: translateY(-1px); }
+.btn-pico-outline { background-color: #fff; border-color: #e5e7eb; color: #374151; }
+.btn-pico-outline:hover { background-color: #f9fafb; border-color: #d1d5db; }
+.btn-pico-danger-outline { background-color: #fff; border-color: #fee2e2; color: #b91c1c; }
+.btn-pico-danger-outline:hover { background-color: #fef2f2; border-color: #fecaca; }
+
+.table-action-btn {
+    width: 32px; height: 32px; padding: 0;
+    border-radius: 6px; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 1rem;
+}
+
+/* 6. Original Badges (6px radius, no pills) */
+.badge {
+    padding: 0.5em 0.8em;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+}
+.badge-pale-primary { background-color: #eff6ff; color: #1d4ed8; }
+.badge-pale-success { background-color: #f0fdf4; color: #15803d; }
+.badge-pale-warning { background-color: #fffbeb; color: #a16207; }
+.badge-pale-danger { background-color: #fef2f2; color: #b91c1c; }
+.badge-pale-info { background-color: #f0f9ff; color: #0369a1; }
+.badge-pale-secondary { background-color: #f9fafb; color: #4b5563; }
+
+/* 7. Strictly Standardized Table */
+.table-responsive { width: 100%; overflow-x: auto; }
+.modern-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid #f3f4f6;
+}
+.modern-table thead th {
+    background: #ffffff;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: none;
+    color: #111827;
+    padding: 16px;
+    border-bottom: 2px solid #f3f4f6;
+    text-align: left;
+}
+.modern-table tbody tr { transition: background 0.2s ease; cursor: pointer; }
+.modern-table tbody tr:hover { background: #f9fafb; }
+.modern-table tbody td {
+    padding: 16px;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 0.875rem;
+    vertical-align: middle;
+}
+.modern-table tbody tr:last-child td { border-bottom: none; }
+
+.data-mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4b5563; }
+
+/* 8. Modals & Overlays */
+#auth-overlay {
+    position: fixed; inset: 0; background: #fff; z-index: 2000;
+    display: flex; align-items: center; justify-content: center;
+}
+.modal-overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px);
+    z-index: 3000; display: flex; align-items: center; justify-content: center;
+    opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.modal-overlay.show { opacity: 1; visibility: visible; }
+.modal-content-custom {
+    background: #fff; width: 100%; max-width: 500px; border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    transform: translateY(20px); transition: transform 0.3s ease; padding: 2rem;
+}
+.modal-overlay.show .modal-content-custom { transform: translateY(0); }
+.modal-fade-out { opacity: 0 !important; transform: translateY(20px) !important; }
+
+/* 9. Loaders & View Transitions */
+#global-loader {
+    position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(2px); opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+}
+#global-loader.show { opacity: 1; pointer-events: auto; }
+.loader-spinner { width: 50px; height: 50px; animation: rotate 2s linear infinite; }
+.loader-spinner circle {
+    stroke: var(--primary-color); stroke-width: 4; stroke-dasharray: 1, 200;
+    stroke-dashoffset: 0; animation: dash 1.5s ease-in-out infinite; stroke-linecap: round;
+}
+
+@keyframes rotate { 100% { transform: rotate(360deg); } }
+@keyframes dash {
+    0% { stroke-dasharray: 1, 200; stroke-dashoffset: 0; }
+    50% { stroke-dasharray: 90, 200; stroke-dashoffset: -35px; }
+    100% { stroke-dasharray: 90, 200; stroke-dashoffset: -124px; }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+.shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+
+#view-container { transition: opacity 0.3s ease-in-out; opacity: 1; }
+#view-container.fade-out { opacity: 0; }
+.hidden { display: none !important; }
+
+/* 10. Mobile Header */
+#mobile-header {
+    display: none; background: #fff; padding: 1rem;
+    border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 900;
+}
+@media (max-width: 992px) {
+    #sidebar { left: -100%; }
+    #sidebar.show { left: 0; width: var(--sidebar-width) !important; }
+    #sidebar.show .sidebar-text, #sidebar.show .user-details { display: inline !important; }
+    #main-content { margin-left: 0 !important; padding: 1rem; }
+    #mobile-header { display: flex; justify-content: space-between; align-items: center; }
+    .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; }
+    .sidebar-overlay.show { display: block; }
+}
+
+/* 11. Clean Tabs */
+.nav-tabs { border-bottom: 2px solid #f3f4f6; margin-bottom: 1rem; }
+.nav-tabs .nav-link {
+    border: none; color: #6b7280; font-weight: 500;
+    padding: 0.5rem 1rem; margin: 0; background: transparent;
+    border-bottom: 2px solid transparent; border-radius: 0; margin-bottom: -2px;
+}
+.nav-tabs .nav-link:hover { color: #111827; background: transparent; }
+.nav-tabs .nav-link.active {
+    color: var(--primary-color); background: transparent;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+/* 12. SQL Editor Overrides (Ghosting & Alignment Fix) */
+.sql-editor-container { 
+    position: relative; 
+    min-height: 120px;
+    background: #fff;
+    border-radius: var(--radius);
+}
+
+.sql-textarea, .sql-highlighted {
+    font-family: 'JetBrains Mono', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace !important;
+    font-size: 0.875rem !important;
+    line-height: 1.5 !important;
+    padding: 0.8rem 2rem 0.8rem 0.8rem !important; /* Extra right padding for scrollbar */
+    margin: 0 !important;
+    border: 1px solid #e5e7eb !important; 
+    box-sizing: border-box !important;
+    tab-size: 4 !important;
+    letter-spacing: normal !important;
+    text-rendering: optimizeLegibility !important;
+}
+
+.sql-textarea { 
+    position: relative; 
+    background: transparent !important; 
+    color: transparent !important; 
+    caret-color: #1f2937; 
+    z-index: 2;
+    width: 100%;
+    resize: none; 
+    overflow-y: scroll; /* Force gutter */
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.sql-highlighted { 
+    position: absolute; 
+    inset: 0; 
+    background: #fff;
+    pointer-events: none; 
+    z-index: 1;
+    overflow-y: scroll; /* Force matching gutter */
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Fix Prism token styling to not add extra spacing */
+.sql-highlighted code {
+    font-family: inherit !important;
+    font-size: inherit !important;
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+/* Ensure selected text remains transparent */
+.sql-textarea::selection {
+    background: rgba(83, 40, 112, 0.2); 
+    color: transparent !important;
+}
+
+/* 13. Leaflet Geocoder Modernization */
+.leaflet-control-geocoder {
+    border-radius: var(--radius) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--card-shadow) !important;
+    overflow: hidden;
+}
+.leaflet-control-geocoder-form input {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.875rem !important;
+    color: var(--text-main) !important;
+    padding: 4px 10px !important;
+}
+.leaflet-control-geocoder-icon {
+    background-color: #f8fafc !important;
+    border-right: 1px solid var(--border-color);
+}
+
+/* 14. JSON Editor Overrides (Strict Alignment Fix) */
+.json-editor-container { 
+    position: relative; 
+    min-height: 140px; 
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.json-textarea, .json-highlighted {
+    /* These MUST be identical to prevent text shifting */
+    font-family: 'JetBrains Mono', Consolas, monospace !important;
+    font-size: 0.875rem !important;
+    line-height: 1.5 !important;
+    padding: 0.6rem 1rem !important;
+    border: 1px solid #e2e8f0 !important; /* Visible border on both helps sync */
+    margin: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+    tab-size: 2;
+}
+
+.json-textarea { 
+    position: relative; 
+    background: transparent !important; 
+    color: transparent !important; 
+    caret-color: #1f2937; 
+    z-index: 2; 
+    resize: vertical;
+    white-space: pre !important; /* Prevents wrapping mismatches */
+    overflow-wrap: normal !important;
+}
+
+.json-highlighted { 
+    position: absolute; 
+    inset: 0; 
+    background-color: #fff !important;
+    z-index: 1; 
+    pointer-events: none; 
+    overflow: hidden;
+    white-space: pre !important; /* Must match textarea */
+    color: #1f2937;
+    border-radius: var(--radius);
+}
+
+/* Hide scrollbars on the highlight layer so it doesn't block the textarea */
+.json-highlighted::-webkit-scrollbar {
+    display: none;
+}
+
+/* Postman-style selection color */
+.json-textarea::selection {
+    background: rgba(83, 40, 112, 0.2) !important;
+    color: transparent !important;
+}

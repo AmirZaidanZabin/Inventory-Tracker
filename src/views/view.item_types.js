@@ -1,42 +1,35 @@
 import { controller } from '../lib/controller.js';
 import { firebase } from '../lib/firebase.js';
+import { renderTable } from '../lib/table.js';
 
 export function ItemTypesView() {
     const view = controller({
         stringComponent: `
-            <div>
+            <div class="item-types-view">
                 <style>
-                    .item-type-row:hover { background-color: #f8f9fa; }
+                    .custom-field-item { background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 8px; display: flex; gap: 8px; align-items: center; border: 1px solid #e2e8f0; }
                 </style>
-                <div class="card p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="mb-0 fw-bold">Hardware Item Types</h5>
-                        <button class="btn-pico btn-pico-primary" id="btn-add-item-type">
-                            <i class="bi bi-plus-lg me-2"></i>New Item Type
-                        </button>
-                    </div>
-                    
-                    <div class="table-responsive">
-                        <table class="modern-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Name</th>
-                                    <th width="100">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="item-types-list">
-                                <tr><td colspan="3" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading...</td></tr>
-                            </tbody>
-                        </table>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-hdd-network text-primary me-2"></i>Hardware Catalog</h5>
+                    <button class="btn-pico btn-pico-primary" id="btn-add-item-type">
+                        <i class="bi bi-plus-lg me-2"></i>New Hardware Type
+                    </button>
+                </div>
+                
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-0">
+                        ${renderTable({
+                            headers: ['Catalog ID', 'Name & Details', 'Duration', 'Custom Fields', { label: 'Actions', width: 100 }],
+                            tbodyId: 'item-types-list',
+                            emptyMessage: 'Loading hardware catalog...'
+                        })}
                     </div>
                 </div>
             </div>
         `
     });
 
-    view.onboard({ id: 'btn-add-item-type' })
-        .onboard({ id: 'item-types-list' });
+    view.onboard({ id: 'btn-add-item-type' }).onboard({ id: 'item-types-list' });
 
     let activeModal = null;
 
@@ -44,9 +37,9 @@ export function ItemTypesView() {
         if(activeModal) activeModal.hide();
         const html = `
             <div class="modal fade" id="itemTypeModal" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content border-0 shadow">
-                        <div class="modal-header bg-light">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content border-0 shadow-lg rounded-4">
+                        <div class="modal-header bg-light border-0 pt-4 px-4">
                             <h5 class="modal-title fw-bold">${title}</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
@@ -78,83 +71,135 @@ export function ItemTypesView() {
         return `
             <form id="it-form">
                 <div class="row g-3">
-                    <div class="col-12">
+                    <div class="col-12 col-md-6">
                         <label class="form-label small fw-bold">Catalog ID</label>
-                        <input type="text" class="form-control" name="catalog_id" value="${pt ? (pt.catalog_id || pt.id) : ''}" ${pt ? 'readonly' : 'required'} placeholder="e.g. pico-device-v2">
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label small fw-bold">Item Type</label>
-                        <select class="form-select" name="item_type" required>
-                            <option value="Sim Card" ${pt && pt.item_type === 'Sim Card' ? 'selected' : ''}>Sim Card</option>
-                            <option value="Pico Device" ${pt && pt.item_type === 'Pico Device' ? 'selected' : ''}>Pico Device</option>
-                        </select>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label small fw-bold">Item Name</label>
-                        <input type="text" class="form-control" name="item_name" value="${pt ? (pt.item_name || pt.name || '') : ''}" placeholder="e.g. Pico Device V2" required>
+                        <input type="text" class="form-control" name="catalog_id" value="${pt ? (pt.catalog_id || pt.id) : ''}" ${pt ? 'readonly' : 'required'} placeholder="e.g. catalog-pico-device">
                     </div>
                     <div class="col-12 col-md-6">
                         <label class="form-label small fw-bold">Installation Duration (min)</label>
                         <input type="number" class="form-control" name="duration_minutes" value="${pt ? (pt.duration_minutes || 30) : 30}" required min="0">
                     </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">Hardware Category</label>
+                        <select class="form-select" name="item_type" required>
+                            <option value="Pico Device" ${pt && pt.item_type === 'Pico Device' ? 'selected' : ''}>Pico Device</option>
+                            <option value="Sim Card" ${pt && pt.item_type === 'Sim Card' ? 'selected' : ''}>Sim Card</option>
+                            <option value="Accessory" ${pt && pt.item_type === 'Accessory' ? 'selected' : ''}>Accessory / Cable</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">Display Name</label>
+                        <input type="text" class="form-control" name="item_name" value="${pt ? (pt.item_name || pt.name || '') : ''}" placeholder="e.g. Pico Device V2" required>
+                    </div>
                     <div class="col-12">
-                        <label class="form-label small fw-bold">Provider</label>
+                        <label class="form-label small fw-bold">Provider / Manufacturer</label>
                         <input type="text" class="form-control" name="provider" value="${pt ? (pt.provider || '') : ''}" placeholder="e.g. Verizon">
                     </div>
                 </div>
                 
-                <div class="mt-4 text-end">
-                    <button type="submit" class="btn-pico btn-pico-primary">Save Item Type</button>
+                <hr class="my-4 border-secondary-subtle">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h6 class="fw-bold mb-0">Custom Data Fields</h6>
+                        <div class="text-xs text-muted">Prompt technicians for extra info (e.g., Color, Cable Length) during booking.</div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary bg-white border-dashed" id="btn-add-cf">
+                        <i class="bi bi-plus-circle me-1"></i>Add Field
+                    </button>
+                </div>
+                
+                <div id="cf-container" class="d-flex flex-column gap-2"></div>
+                
+                <div class="mt-4 pt-3 border-top text-end">
+                    <button type="submit" class="btn-pico btn-pico-primary px-4">Save Hardware Configuration</button>
                 </div>
             </form>
         `;
     };
 
     const initFormJS = (modalEl, pt) => {
+        const cfContainer = modalEl.querySelector('#cf-container');
+        const btnAddCf = modalEl.querySelector('#btn-add-cf');
         const form = modalEl.querySelector('#it-form');
+        
+        let cfs = pt ? (pt.custom_fields || []) : [];
+
+        const renderCfs = () => {
+            cfContainer.innerHTML = '';
+            if(cfs.length === 0) {
+                cfContainer.innerHTML = '<div class="text-muted small text-center py-3 bg-light rounded border">No custom fields defined.</div>';
+                return;
+            }
+            cfs.forEach((cf, i) => {
+                const div = document.createElement('div');
+                div.className = 'custom-field-item';
+                div.innerHTML = `
+                    <input type="text" class="form-control form-control-sm" placeholder="Field Label (e.g. Color)" value="${cf.label}" onchange="updateCf(${i}, 'label', this.value)" required>
+                    <select class="form-select form-select-sm" style="max-width: 150px;" onchange="updateCf(${i}, 'type', this.value)">
+                        <option value="text" ${cf.type==='text'?'selected':''}>Text</option>
+                        <option value="number" ${cf.type==='number'?'selected':''}>Number</option>
+                        <option value="boolean" ${cf.type==='boolean'?'selected':''}>Checkbox</option>
+                    </select>
+                    <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeCf(${i})"><i class="bi bi-x-circle fs-6"></i></button>
+                `;
+                cfContainer.appendChild(div);
+            });
+        };
+
+        window.updateCf = (i, k, v) => cfs[i][k] = v;
+        window.removeCf = (i) => { cfs.splice(i, 1); renderCfs(); };
+        
+        btnAddCf.onclick = () => {
+            cfs.push({ label: '', type: 'text' });
+            renderCfs();
+        };
+
+        renderCfs();
 
         form.onsubmit = async (e) => {
             e.preventDefault();
             const fd = new FormData(form);
 
             const data = {
-                id: fd.get('catalog_id'), // Need an ID for firebase doc
+                id: fd.get('catalog_id'), 
                 catalog_id: fd.get('catalog_id'),
                 item_type: fd.get('item_type'),
                 item_name: fd.get('item_name'),
                 duration_minutes: parseInt(fd.get('duration_minutes') || '0', 10),
-                provider: fd.get('provider')
+                provider: fd.get('provider'),
+                custom_fields: cfs.map(c => ({...c, key: c.label.toLowerCase().replace(/[^a-z0-9]/g, '_')}))
             };
 
             const btn = form.querySelector('button[type="submit"]');
+            const ogHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
 
             try {
                 const docRef = firebase.db.doc(firebase.db.db, 'item_catalog', data.id);
-                if(!pt) { // Creating
+                if(!pt) { 
                     const snap = await firebase.db.getDoc(docRef);
                     if(snap.exists()) {
-                        alert("An Item Type with this ID already exists.");
+                        alert("Hardware Type with this ID already exists.");
                         btn.disabled = false;
-                        btn.innerHTML = 'Save Item Type';
+                        btn.innerHTML = ogHtml;
                         return;
                     }
                 }
                 
                 await firebase.db.setDoc(docRef, data);
-                firebase.logAction(`Item Type ${pt ? 'Updated' : 'Created'}`, data.id);
+                firebase.logAction(`Hardware Catalog ${pt ? 'Updated' : 'Created'}`, data.id);
                 activeModal.hide();
             } catch(err) {
                 alert("Error: " + err.message);
                 btn.disabled = false;
-                btn.innerHTML = 'Save Item Type';
+                btn.innerHTML = ogHtml;
             }
         };
     };
 
     view.trigger('click', 'btn-add-item-type', () => {
-        const modal = createModal('New Item Type', getFormHTML());
+        const modal = createModal('New Hardware Type', getFormHTML());
         modal.show();
         initFormJS(modal.element, null);
     });
@@ -165,11 +210,10 @@ export function ItemTypesView() {
         view.unsub(firebase.db.subscribe(q, (snap) => {
             const list = view.$('item-types-list');
             view.emit('loading:end');
-            view.emit('rendered');
             if(!list) return;
             
             if(snap.empty) {
-                list.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">No item types found.</td></tr>';
+                list.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted small">No hardware types configured.</td></tr>';
                 return;
             }
 
@@ -177,32 +221,38 @@ export function ItemTypesView() {
             snap.forEach(doc => {
                 const pt = doc.data();
                 const tr = document.createElement('tr');
-                tr.className = 'item-type-row';
+                
+                const cfBadges = (pt.custom_fields || []).map(cf => `<span class="badge bg-light text-dark border me-1">${cf.label}</span>`).join('');
                 
                 tr.innerHTML = `
-                    <td><code class="data-mono">${pt.catalog_id || pt.id}</code></td>
-                    <td class="fw-bold">${pt.item_name || pt.name || 'Unnamed'}<div class="text-muted small">${pt.item_type || 'Unknown'} - ${pt.provider || 'No provider'}</div></td>
+                    <td><code class="data-mono fw-bold">${pt.catalog_id || pt.id}</code></td>
                     <td>
-                        <button class="btn-pico btn-pico-outline table-action-btn edit-pt me-1"><i class="bi bi-pencil"></i></button>
-                        <button class="btn-pico btn-pico-danger-outline table-action-btn delete-pt"><i class="bi bi-trash"></i></button>
+                        <div class="fw-bold text-dark">${pt.item_name || pt.name || 'Unnamed'}</div>
+                        <div class="text-muted" style="font-size: 0.75rem;">${pt.item_type || 'Unknown'} • ${pt.provider || 'No provider'}</div>
+                    </td>
+                    <td><span class="badge bg-pale-primary">${pt.duration_minutes} min</span></td>
+                    <td>${cfBadges || '<span class="text-muted small">—</span>'}</td>
+                    <td>
+                        <button class="btn-pico btn-pico-outline table-action-btn edit-pt me-1" title="Edit"><i class="bi bi-pencil"></i></button>
+                        <button class="btn-pico btn-pico-danger-outline table-action-btn delete-pt" title="Delete"><i class="bi bi-trash"></i></button>
                     </td>
                 `;
 
                 tr.querySelector('.edit-pt').onclick = () => {
-                    const modal = createModal('Edit Item Type', getFormHTML(pt));
+                    const modal = createModal('Edit Hardware Type', getFormHTML(pt));
                     modal.show();
                     initFormJS(modal.element, pt);
                 };
 
                 tr.querySelector('.delete-pt').onclick = async () => {
-                    const confirmModal = createModal('Delete Item Type', `
-                        <div class="text-center">
-                            <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size: 3rem;"></i>
-                            <h5 class="mt-3">Are you sure?</h5>
-                            <p class="text-muted">You are about to delete <b>${pt.name}</b>. This action cannot be undone.</p>
+                    const confirmModal = createModal('Delete Hardware Type', `
+                        <div class="text-center py-3">
+                            <i class="bi bi-exclamation-triangle-fill text-danger mb-3" style="font-size: 3rem;"></i>
+                            <h5 class="fw-bold">Are you sure?</h5>
+                            <p class="text-muted small">You are about to delete <b>${pt.item_name || pt.catalog_id}</b>. Jobs requiring this hardware may break.</p>
                             <div class="d-flex justify-content-center gap-2 mt-4">
-                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                <button type="button" class="btn btn-danger" id="confirm-del-btn">Delete</button>
+                                <button type="button" class="btn-pico btn-pico-outline" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" class="btn-pico btn-pico-danger-outline" id="confirm-del-btn">Delete Type</button>
                             </div>
                         </div>
                     `);
@@ -213,11 +263,11 @@ export function ItemTypesView() {
                         this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
                         try {
                             await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'item_catalog', pt.id));
-                            firebase.logAction("Item Type Deleted", pt.id);
+                            firebase.logAction("Hardware Type Deleted", pt.id);
                             confirmModal.hide();
                         } catch(e) {
                             alert("Error deleting: " + e.message);
-                            this.innerHTML = 'Delete';
+                            this.innerHTML = 'Delete Type';
                             this.disabled = false;
                         }
                     };
@@ -225,6 +275,7 @@ export function ItemTypesView() {
 
                 list.appendChild(tr);
             });
+            document.dispatchEvent(new CustomEvent('apply-auth'));
         }));
     });
 

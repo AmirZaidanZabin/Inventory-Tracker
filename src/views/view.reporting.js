@@ -18,8 +18,8 @@ export function ReportingView() {
                                 <div class="mb-3">
                                     <label class="form-label small fw-bold">SQLite Query</label>
                                     <div class="sql-editor-container">
-                                        <pre id="sql-highlighted" class="sql-highlighted language-sql"></pre>
-                                        <textarea id="sql-query" class="form-control font-mono sql-textarea" rows="4">SELECT * FROM appointments LIMIT 10;</textarea>
+                                        <pre id="sql-highlighted" class="sql-highlighted language-sql"><code id="sql-code"></code></pre>
+                                        <textarea id="sql-query" class="form-control font-mono sql-textarea" rows="5" spellcheck="false" autocorrect="off" autocapitalize="off">SELECT * FROM appointments LIMIT 10;</textarea>
                                     </div>
                                 </div>
                                 <div class="d-flex flex-wrap gap-2 mb-3">
@@ -52,8 +52,8 @@ export function ReportingView() {
                                 </button>
                             </div>
                             <div class="card-body p-0 overflow-auto" style="max-height: 500px;">
-                                <table class="table table-sm table-hover mb-0">
-                                    <thead id="results-head" class="table-light"></thead>
+                                <table class="modern-table">
+                                    <thead id="results-head"></thead>
                                     <tbody id="results-body">
                                         <tr><td class="text-center py-4 text-muted">Run a query to see results</td></tr>
                                     </tbody>
@@ -130,6 +130,7 @@ export function ReportingView() {
 
     view.onboard({ id: 'sql-query' })
         .onboard({ id: 'sql-highlighted' })
+        .onboard({ id: 'sql-code' })
         .onboard({ id: 'run-query' })
         .onboard({ id: 'db-status' })
         .onboard({ id: 'query-error' })
@@ -153,9 +154,12 @@ export function ReportingView() {
     const updateHighlighting = () => {
         const query = view.$('sql-query').value;
         const highlighted = view.$('sql-highlighted');
-        if (!highlighted) return;
-        highlighted.textContent = query + (query.endsWith('\n') ? ' ' : '');
-        if (window.Prism) Prism.highlightElement(highlighted);
+        const code = view.$('sql-code');
+        if (!highlighted || !code) return;
+        
+        // Add space at end if query ends with newline to allow scrolling past last line
+        code.textContent = query + (query.endsWith('\n') ? ' ' : '');
+        if (window.Prism) Prism.highlightElement(code);
         syncScroll();
     };
 

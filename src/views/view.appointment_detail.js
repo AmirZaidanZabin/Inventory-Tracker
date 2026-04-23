@@ -1,463 +1,431 @@
 import { controller } from '../lib/controller.js';
 import { firebase } from '../lib/firebase.js';
-import { createModal } from '../lib/modal.js';
 
 export function AppointmentDetailView(appointmentId) {
     const view = controller({
         stringComponent: `
-            <div class="appointment-detail">
+            <div class="appointment-detail-view pb-5">
+                <style>
+                    .req-slot { border: 2px dashed #cbd5e1; border-radius: var(--radius); padding: 1rem; min-height: 80px; transition: all 0.2s; display: flex; align-items: center; justify-content: space-between; background: #f8fafc; }
+                    .req-slot.drag-over { border-color: var(--primary-color); background: #f3e8ff; }
+                    .req-slot.fulfilled { border: 2px solid #10b981; background: #f0fdf4; }
+                    
+                    .draggable-hw { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; cursor: grab; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+                    .draggable-hw:active { cursor: grabbing; }
+                    
+                    .scanner-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; flex-direction: column; }
+                    .scanner-header { padding: 1rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); color: #fff; }
+                    #hw-reader { flex-grow: 1; width: 100%; }
+                </style>
+                
+                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold mb-1">Job Execution</h4>
+                        <div class="text-muted font-monospace small">${appointmentId}</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <span id="det-status" class="badge bg-secondary d-flex align-items-center px-3">Loading</span>
+                    </div>
+                </div>
+
                 <div class="row g-4">
-                    <div class="col-lg-4">
-                        <div class="card mb-4">
-                            <div class="card-header">Job Info</div>
-                            <div class="card-body">
-                                <h4 id="det-name" class="fw-bold">...</h4>
-                                <div id="det-id" class="text-muted small mb-3"></div>
-                                <div class="mb-2"><i class="bi bi-calendar me-2"></i><span id="det-date"></span></div>
-                                <div class="mb-2"><i class="bi bi-clock me-2"></i><span id="det-time"></span></div>
-                                <div class="mb-2"><i class="bi bi-geo-alt me-2"></i><span id="det-location"></span></div>
-                                <div class="mb-2"><i class="bi bi-person me-2"></i><span id="det-tech"></span></div>
-                                <div class="mb-2"><i class="bi bi-box-seam me-2"></i><span id="det-products"></span></div>
-                                <div id="det-products-list" class="mt-2 mb-2 p-2 bg-light rounded" style="max-height: 150px; overflow-y: auto;"></div>
-                                <div id="det-status" class="badge bg-warning text-dark mt-2"></div>
-                                <button id="delete-apt-btn" class="btn btn-outline-danger btn-sm w-100 mt-3 auth-admin hidden">
-                                    <i class="bi bi-trash me-2"></i>Delete Appointment
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body p-4">
+                                <h5 id="det-name" class="fw-bold mb-3">...</h5>
+                                <div class="d-flex flex-column gap-2 text-sm text-muted mb-4">
+                                    <div><i class="bi bi-calendar-event me-2 text-primary"></i><span id="det-time"></span></div>
+                                    <div><i class="bi bi-geo-alt me-2 text-primary"></i><span id="det-location"></span></div>
+                                    <div><i class="bi bi-truck me-2 text-primary"></i><span id="det-van"></span></div>
+                                </div>
+                                
+                                <div id="apt-detail-map" class="border rounded" style="height: 200px; z-index: 1;"></div>
+                            </div>
+                        </div>
+
+                        <div id="completion-panel" class="card border-0 shadow-sm">
+                            <div class="card-body p-4">
+                                <h6 class="fw-bold mb-3"><i class="bi bi-journal-check text-primary me-2"></i>Completion Notes</h6>
+                                <textarea id="completion-desc" class="form-control mb-4" rows="4" placeholder="Enter signal strength, port numbers, or installation notes..."></textarea>
+                                
+                                <button id="btn-complete-job" class="btn-pico btn-pico-primary w-100 py-3 fw-bold fs-6">
+                                    <i class="bi bi-check2-circle me-2"></i>Complete Job
                                 </button>
-                            </div>
-                        </div>
-                        <div class="card mb-4">
-                            <div class="card-header">Location</div>
-                            <div class="card-body p-0">
-                                <div id="apt-detail-map" style="height: 200px; width: 100%;"></div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">Required Hardware (Frozen from Booking)</div>
-                            <div class="card-body">
-                                <div id="required-hardware-snapshot" class="mb-3"></div>
-                                <hr>
-                                <div class="small fw-bold mb-1">Status:</div>
-                                <div id="hardware-list-display" class="small text-muted">Awaiting completion...</div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-8">
-                        <div class="card mb-4">
-                            <div class="card-header">Job Execution & Hardware Pairing</div>
-                            <div class="card-body">
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold">Scan & Pair Hardware (Must match requirements)</label>
-                                    <div class="row g-2">
-                                        <div class="col-md-4">
-                                            <div class="p-2 border rounded bg-light" style="height: 350px; overflow-y: auto;">
-                                                <div class="small fw-bold mb-2">Technician Van Stock</div>
-                                                <div id="available-hardware" class="d-flex flex-column gap-1"></div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-8">
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <div class="small fw-bold">Installation Audit Slots</div>
-                                                <div class="text-xs text-muted">Drag stock into specific slots</div>
-                                            </div>
-                                            <div id="hardware-slots-container" class="d-flex flex-column gap-2" style="max-height: 350px; overflow-y: auto;">
-                                                <!-- Dynamic requirement slots go here -->
-                                            </div>
-                                        </div>
-                                    </div>
+
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body p-4 d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-bold mb-0"><i class="bi bi-box-seam text-primary me-2"></i>Hardware Fulfillment</h6>
+                                    <button id="btn-open-scanner" class="btn-pico btn-pico-outline text-primary border-primary">
+                                        <i class="bi bi-upc-scan me-1"></i>Scan Barcode
+                                    </button>
                                 </div>
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold">Photos (URLs)</label>
-                                    <div class="input-group mb-2">
-                                        <input type="text" id="photo-url" class="form-control" placeholder="Paste photo URL...">
-                                        <button id="add-photo" class="btn btn-dark">Add</button>
+                                <p class="text-xs text-muted mb-4">Drag items from the van inventory into the required slots, or use the scanner.</p>
+
+                                <div class="row g-4 flex-grow-1">
+                                    <div class="col-md-7 d-flex flex-column gap-2" id="required-slots-container">
+                                        <div class="text-center py-4 text-muted small"><span class="spinner-border spinner-border-sm"></span></div>
                                     </div>
-                                    <div id="photo-list" class="d-flex flex-wrap gap-2 mt-3"></div>
-                                </div>
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold">Customer Signature</label>
-                                    <div id="sig-pad" class="border rounded bg-light" style="height: 150px; cursor: crosshair;">
-                                        <div class="h-100 d-flex align-items-center justify-content-center text-muted small">
-                                            [ Signature Pad Placeholder ]
+                                    
+                                    <div class="col-md-5 border-start">
+                                        <h6 class="fw-bold text-sm mb-3 text-muted">Available in Van</h6>
+                                        <div id="van-inventory-container" class="d-flex flex-column overflow-auto pe-2" style="max-height: 400px;">
+                                            <div class="text-center py-4 text-muted small">Loading van stock...</div>
                                         </div>
                                     </div>
-                                    <button id="clear-sig" class="btn btn-sm btn-link text-danger mt-1">Clear</button>
                                 </div>
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold">Completion Description</label>
-                                    <textarea id="completion-desc" class="form-control" rows="3" placeholder="Enter details about the completed job..."></textarea>
-                                </div>
-                                <button id="complete-job" class="btn btn-success w-100 py-3 fw-bold">
-                                    <i class="bi bi-check-circle me-2"></i>Complete & Close Job
-                                </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div id="hw-scanner-modal" class="scanner-overlay hidden">
+                    <div class="scanner-header">
+                        <span class="fw-bold"><i class="bi bi-upc-scan me-2"></i>Scan Hardware Barcode</span>
+                        <button id="btn-close-scanner" class="btn btn-sm btn-outline-light border-0"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                    <div id="hw-reader"></div>
+                    <div class="p-3 text-center text-white bg-dark small">
+                        Align the barcode. It will auto-assign to the correct slot.
                     </div>
                 </div>
             </div>
         `
     });
 
-    view.onboard({ id: 'det-name' }).onboard({ id: 'det-id' }).onboard({ id: 'det-date' })
-        .onboard({ id: 'det-time' }).onboard({ id: 'det-location' })
-        .onboard({ id: 'det-tech' }).onboard({ id: 'det-status' })
-        .onboard({ id: 'photo-url' }).onboard({ id: 'add-photo' })
-        .onboard({ id: 'photo-list' }).onboard({ id: 'complete-job' }).onboard({ id: 'completion-desc' })
-        .onboard({ id: 'delete-apt-btn' })
-        .onboard({ id: 'available-hardware' })
-        .onboard({ id: 'hardware-pairs' })
-        .onboard({ id: 'add-pair-btn' })
-        .onboard({ id: 'hardware-list-display' });
+    view.onboard({ id: 'det-name' }).onboard({ id: 'det-time' }).onboard({ id: 'det-location' })
+        .onboard({ id: 'det-van' }).onboard({ id: 'det-status' })
+        .onboard({ id: 'required-slots-container' }).onboard({ id: 'van-inventory-container' })
+        .onboard({ id: 'btn-complete-job' }).onboard({ id: 'completion-desc' }).onboard({ id: 'completion-panel' })
+        .onboard({ id: 'btn-open-scanner' }).onboard({ id: 'hw-scanner-modal' }).onboard({ id: 'btn-close-scanner' });
 
-    let photos = [];
+    let aptData = null;
+    let hardwareSlots = []; // { index, catalog_id, item_name, assigned_id }
+    let availableVanInventory = []; // { item_id, catalog_id }
+    let isCompleted = false;
+    let map = null;
+    let html5QrcodeScanner = null;
 
-    view.trigger('click', 'add-photo', () => {
-        const urlInput = view.$('photo-url');
-        const url = urlInput ? urlInput.value : '';
-        if (!url) return;
-        photos.push(url);
-        const img = document.createElement('img');
-        img.src = url;
-        img.className = 'rounded border';
-        img.style = 'width: 100px; height: 100px; object-fit: cover;';
-        const list = view.$('photo-list');
-        if (list) list.appendChild(img);
-        if (urlInput) urlInput.value = '';
-    });
+    // --- Drag and Drop & Rendering Logic ---
 
-    let hardwareSlots = []; // { id, catalog_id, item_name, assigned_id, assigned_type }
+    const renderHardwareUI = () => {
+        const slotsCont = view.$('required-slots-container');
+        const invCont = view.$('van-inventory-container');
+        if(!slotsCont || !invCont) return;
 
-    const renderHardwareSlots = () => {
-        const container = view.$('hardware-slots-container');
-        if(!container) return;
-        container.innerHTML = '';
-        
-        hardwareSlots.forEach((slot, index) => {
-            const div = document.createElement('div');
-            div.className = 'border rounded p-2 bg-white d-flex align-items-center gap-2';
-            div.innerHTML = `
-                <div class="flex-grow-1">
-                    <div class="text-xs fw-bold text-accent">${slot.item_name}</div>
-                    <div class="text-xxs text-muted">ID: ${slot.catalog_id}</div>
-                </div>
-                <div class="drop-slot border-dashed p-2 text-center small rounded flex-grow-1" 
-                     id="slot-${index}" 
-                     style="border: 2px dashed ${slot.assigned_id ? '#22c55e' : '#cbd5e1'}; min-width: 150px; background: ${slot.assigned_id ? '#f0fdf4' : ''}">
-                    ${slot.assigned_id ? `<span class="badge bg-success">${slot.assigned_id}</span>` : `<span class="text-muted text-xs">Drop ${slot.item_name} here</span>`}
-                </div>
-                ${slot.assigned_id ? `<button class="btn btn-sm text-danger clear-slot-btn" data-index="${index}"><i class="bi bi-x-circle"></i></button>` : ''}
-            `;
-            container.appendChild(div);
-
-            const dropEl = div.querySelector(`#slot-${index}`);
-            dropEl.ondragover = (e) => e.preventDefault();
-            dropEl.ondrop = (e) => {
-                e.preventDefault();
-                const draggedId = e.dataTransfer.getData('id');
-                const draggedCatalogId = e.dataTransfer.getData('catalog_id');
-
-                if (draggedCatalogId === slot.catalog_id) {
-                    slot.assigned_id = draggedId;
-                    renderHardwareSlots();
-                } else {
-                    alert(`Invalid Hardware. Slot requires [${slot.catalog_id}], but you attempted to deploy [${draggedCatalogId}].`);
-                }
-            };
-
+        // Render Drop Zones (Slots)
+        slotsCont.innerHTML = hardwareSlots.map((slot, idx) => {
             if (slot.assigned_id) {
-                div.querySelector('.clear-slot-btn').onclick = () => {
-                    slot.assigned_id = null;
-                    renderHardwareSlots();
-                };
+                return `
+                    <div class="req-slot fulfilled">
+                        <div>
+                            <div class="fw-bold text-success text-sm">${slot.item_name}</div>
+                            <code class="data-mono text-dark">${slot.assigned_id}</code>
+                        </div>
+                        ${!isCompleted ? `<button class="btn btn-sm btn-outline-danger p-1 btn-unassign" data-idx="${idx}" title="Remove"><i class="bi bi-x-lg"></i></button>` : ''}
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="req-slot drop-zone" data-catalog="${slot.catalog_id}" data-idx="${idx}">
+                        <div>
+                            <div class="fw-bold text-dark text-sm">${slot.item_name}</div>
+                            <div class="text-xs text-muted">Needs: ${slot.catalog_id}</div>
+                        </div>
+                        <div class="text-muted"><i class="bi bi-box-arrow-in-down fs-4"></i></div>
+                    </div>
+                `;
             }
+        }).join('');
+
+        // Render Draggable Inventory
+        if (isCompleted) {
+            invCont.innerHTML = '<div class="text-center text-muted small py-4">Job is completed. Inventory locked.</div>';
+        } else {
+            invCont.innerHTML = availableVanInventory.length > 0 ? availableVanInventory.map(item => `
+                <div class="draggable-hw" draggable="true" data-id="${item.item_id}" data-catalog="${item.catalog_id}">
+                    <code class="data-mono text-dark">${item.item_id}</code>
+                    <span class="badge bg-light text-muted border text-xs">${item.catalog_id}</span>
+                </div>
+            `).join('') : '<div class="text-center text-muted small py-4">No available hardware in van.</div>';
+        }
+
+        attachDnDHandlers();
+    };
+
+    const attachDnDHandlers = () => {
+        if (isCompleted) return;
+
+        // Unassign Button
+        view.$('required-slots-container').querySelectorAll('.btn-unassign').forEach(btn => {
+            btn.onclick = () => {
+                const idx = btn.dataset.idx;
+                const itemId = hardwareSlots[idx].assigned_id;
+                const catalogId = hardwareSlots[idx].catalog_id;
+                
+                hardwareSlots[idx].assigned_id = null;
+                availableVanInventory.push({ item_id: itemId, catalog_id: catalogId }); // Put back in van
+                renderHardwareUI();
+            };
+        });
+
+        // Draggables
+        view.$('van-inventory-container').querySelectorAll('.draggable-hw').forEach(el => {
+            el.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', JSON.stringify({ item_id: el.dataset.id, catalog_id: el.dataset.catalog }));
+                e.dataTransfer.effectAllowed = 'move';
+                el.style.opacity = '0.5';
+            });
+            el.addEventListener('dragend', (e) => {
+                el.style.opacity = '1';
+            });
+        });
+
+        // Drop Zones
+        view.$('required-slots-container').querySelectorAll('.drop-zone').forEach(zone => {
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault(); // Necessary to allow dropping
+                e.dataTransfer.dropEffect = 'move';
+                zone.classList.add('drag-over');
+            });
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('drag-over');
+            });
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                
+                try {
+                    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                    const targetCatalog = zone.dataset.catalog;
+                    
+                    if (data.catalog_id !== targetCatalog) {
+                        return alert(`Hardware mismatch! This slot requires a '${targetCatalog}', but you dropped a '${data.catalog_id}'.`);
+                    }
+
+                    const idx = zone.dataset.idx;
+                    hardwareSlots[idx].assigned_id = data.item_id;
+                    
+                    // Remove from available inventory
+                    availableVanInventory = availableVanInventory.filter(i => i.item_id !== data.item_id);
+                    renderHardwareUI();
+
+                } catch(err) { console.error("Drop failed", err); }
+            });
         });
     };
 
-    view.trigger('click', 'delete-apt-btn', async () => {
-        const modal = createModal({
-            title: 'Confirm Deletion',
-            body: `
-                <p>Are you sure you want to delete this appointment?</p>
-                <div class="d-flex justify-content-end gap-2 mt-4">
-                    <button type="button" class="btn-pico btn-pico-outline cancel-btn">Cancel</button>
-                    <button type="button" class="btn-pico btn-pico-danger-outline confirm-btn">Delete</button>
-                </div>
-            `
-        });
-        
-        modal.element.querySelector('.cancel-btn').onclick = () => modal.hide();
-        modal.element.querySelector('.confirm-btn').onclick = async () => {
-            modal.hide();
-            try {
-                // Fetch appointment to check its status and hardware
-                const docSnap = await firebase.db.getDoc(firebase.db.doc(firebase.db.db, 'appointments', appointmentId));
-                if (docSnap.exists()) {
-                    const apt = docSnap.data();
-                    
-                    // If appointment is not complete, free up hardware (wait, actually completion assigns it now)
-                    // But if it was completely deployed, we might want to un-deploy. 
-                    // Let's release ALL tracked hardware in this appointment array.
-                    if (apt.status !== 'completed' && apt.metadata && Array.isArray(apt.metadata.hardware)) {
-                        const updates = [];
-                        apt.metadata.hardware.forEach(pair => {
-                            if (pair.pico_id) {
-                                updates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', pair.pico_id), {
-                                    status: 'available',
-                                    is_available: true,
-                                    current_location_type: 'WAREHOUSE',
-                                    current_location_id: ''
-                                }));
-                            }
-                            if (pair.sim_id) {
-                                updates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', pair.sim_id), {
-                                    status: 'available',
-                                    is_available: true,
-                                    current_location_type: 'WAREHOUSE',
-                                    current_location_id: ''
-                                }));
-                            }
-                        });
-                        
-                        if (updates.length > 0) {
-                            await Promise.all(updates);
-                            console.log("Hardware released to available.");
-                        }
-                    }
-                }
+    // --- Scanner Logic ---
 
-                await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), { is_deleted: true });
-                window.location.hash = '#appointments';
-            } catch (err) {
-                console.error('Delete failed:', err.message);
+    const handleScan = (decodedText) => {
+        if (html5QrcodeScanner) html5QrcodeScanner.pause();
+
+        try {
+            // 1. Is it already slotted?
+            if (hardwareSlots.some(s => s.assigned_id === decodedText)) {
+                alert("Item already assigned to a slot.");
+                if (html5QrcodeScanner) html5QrcodeScanner.resume();
+                return;
             }
-        };
-        modal.show();
-    });
-    
-    view.trigger('click', 'complete-job', async () => {
-        const completionDesc = view.$('completion-desc').value;
-        const incomplete = hardwareSlots.some(s => !s.assigned_id);
 
-        if (incomplete) {
-            return alert("Job Integrity Error: You must assign all required hardware types as per the booking snapshot before completing.");
+            // 2. Is it in the van inventory?
+            const itemInVan = availableVanInventory.find(i => i.item_id === decodedText);
+            if (!itemInVan) {
+                alert(`Barcode ${decodedText} not found in this Van's available inventory.`);
+                if (html5QrcodeScanner) html5QrcodeScanner.resume();
+                return;
+            }
+
+            // 3. Is there an open slot for this catalog type?
+            const openSlot = hardwareSlots.find(s => s.catalog_id === itemInVan.catalog_id && !s.assigned_id);
+            if (!openSlot) {
+                alert(`No open requirements found for hardware type: ${itemInVan.catalog_id}.`);
+                if (html5QrcodeScanner) html5QrcodeScanner.resume();
+                return;
+            }
+
+            // 4. Assign it!
+            openSlot.assigned_id = decodedText;
+            availableVanInventory = availableVanInventory.filter(i => i.item_id !== decodedText);
+            
+            if (navigator.vibrate) navigator.vibrate(100);
+            renderHardwareUI();
+            stopScanner(); // Auto-close on success
+            
+        } catch (e) {
+            alert("Scan error: " + e.message);
+            if (html5QrcodeScanner) html5QrcodeScanner.resume();
         }
+    };
 
-        const modal = createModal({
-            title: 'Confirm Job Completion',
-            body: `
-                <p>Are you sure you want to complete this job? Correct inventory associations will be saved.</p>
-                <div class="d-flex justify-content-end gap-2 mt-4">
-                    <button type="button" class="btn-pico btn-pico-outline cancel-btn">Cancel</button>
-                    <button type="button" class="btn-pico btn-pico-primary confirm-btn">Complete & Save</button>
-                </div>
-            `
+    const startScanner = () => {
+        view.$('hw-scanner-modal').classList.remove('hidden');
+        if (!html5QrcodeScanner) {
+            // Use window global for qrcode library
+            html5QrcodeScanner = new window.Html5Qrcode("hw-reader");
+        }
+        html5QrcodeScanner.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 250, height: 100 } },
+            handleScan,
+            () => {} // ignore errors
+        ).catch(err => {
+            alert("Camera init failed. Check permissions.");
+            stopScanner();
         });
-        
-        modal.element.querySelector('.cancel-btn').onclick = () => modal.hide();
-        modal.element.querySelector('.confirm-btn').onclick = async () => {
-            modal.hide();
-            try {
-                // Batch update items as assigned
-                const itemUpdates = [];
-                const location_string = view.$('det-id').textContent;
-                
-                hardwareSlots.forEach(slot => {
-                    itemUpdates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', slot.assigned_id), { 
-                        is_available: false, 
-                        status: 'assigned', 
-                        current_location_type: 'APPOINTMENT', 
-                        current_location_id: location_string 
-                    }));
-                });
-                
-                if(itemUpdates.length > 0) {
-                    await Promise.all(itemUpdates);
-                }
+    };
 
-                // Prepare hardware results (legacy support for pair format if needed, but going generic)
-                const deployedHw = hardwareSlots.map(s => ({ catalog_id: s.catalog_id, item_id: s.assigned_id }));
+    const stopScanner = () => {
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+            html5QrcodeScanner.stop().then(() => {
+                view.$('hw-scanner-modal').classList.add('hidden');
+            }).catch(console.error);
+        } else {
+            view.$('hw-scanner-modal').classList.add('hidden');
+        }
+    };
 
-                await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), {
-                    status: 'completed',
-                    'metadata.hardware': deployedHw,
-                    'metadata.photos': photos,
-                    'metadata.completion_description': completionDesc,
-                    'metadata.completed_at': firebase.db.serverTimestamp()
+    view.trigger('click', 'btn-open-scanner', startScanner);
+    view.trigger('click', 'btn-close-scanner', stopScanner);
+
+    // --- Completion Logic ---
+
+    view.trigger('click', 'btn-complete-job', async () => {
+        const incomplete = hardwareSlots.some(s => !s.assigned_id);
+        if (incomplete) return alert("You must fill all hardware slots before completing the job.");
+
+        const btn = view.$('btn-complete-job');
+        const ogHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Completing...';
+        btn.disabled = true;
+
+        try {
+            // Update items to APPOINTMENT location
+            const itemUpdates = hardwareSlots.map(slot => {
+                return firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', slot.assigned_id), { 
+                    is_available: false, 
+                    status: 'assigned', 
+                    current_location_type: 'APPOINTMENT', 
+                    current_location_id: appointmentId 
                 });
-                firebase.logAction("Job Completed", `Appointment ${appointmentId} closed with ${deployedHw.length} items.`);
-                window.location.hash = '#appointments';
-            } catch (err) {
-                console.error('Completion failed:', err.message);
-                alert("Completion failed: " + err.message);
-            }
-        };
-        modal.show();
+            });
+            if(itemUpdates.length > 0) await Promise.all(itemUpdates);
+
+            const deployedHw = hardwareSlots.map(s => ({ catalog_id: s.catalog_id, item_id: s.assigned_id }));
+            const completionDesc = view.$('completion-desc').value;
+
+            await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), {
+                status: 'completed',
+                'metadata.hardware': deployedHw,
+                'metadata.completion_description': completionDesc,
+                'metadata.completed_at': firebase.db.serverTimestamp()
+            });
+
+            firebase.logAction("Job Completed", `Appointment ${appointmentId} closed.`);
+            alert("Job Completed Successfully!");
+            // The view will auto-update via the snapshot listener
+            
+        } catch (err) {
+            alert("Completion failed: " + err.message);
+        } finally {
+            btn.innerHTML = ogHtml;
+            btn.disabled = false;
+        }
     });
+
+    // --- Initialization ---
 
     view.on('init', () => {
-        let map;
         view.emit('loading:start');
         
-        const renderAvailableHardwareList = async () => {
-            const listEl = view.$('available-hardware');
-            if(!listEl) return;
-            listEl.innerHTML = '';
-
-            const catalogSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'));
-            const catalogMap = {};
-            catalogSnap.forEach(doc => {
-                const c = doc.data();
-                catalogMap[c.catalog_id || c.id] = c.item_type;
-            });
-
-            const itemsRes = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'items'));
-            itemsRes.docs.forEach(doc => {
-                const item = doc.data();
-                const isAvail = item.status === 'available' || (!item.status && item.is_available);
-                if (!isAvail) return;
-
-                const el = document.createElement('div');
-                el.className = 'p-2 bg-white border rounded small cursor-move mb-1';
-                el.draggable = true;
-                const displayType = catalogMap[item.catalog_id] || 'Unknown';
-                el.textContent = `${displayType}: ${item.item_id}`;
-                el.dataset.id = item.item_id;
-                el.dataset.type = displayType;
-                el.dataset.catalogId = item.catalog_id; // PASS CATALOG ID FOR VALIDATION
-
-                el.ondragstart = (e) => {
-                    e.dataTransfer.setData('id', el.dataset.id);
-                    e.dataTransfer.setData('type', el.dataset.type);
-                    e.dataTransfer.setData('catalog_id', el.dataset.catalogId);
-                };
-                listEl.appendChild(el);
-            });
-        };
-
-        let initialLoadDone = false;
-
-        view.unsub(firebase.db.subscribe(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), (snap) => {
+        view.unsub(firebase.db.subscribe(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), async (snap) => {
+            view.emit('loading:end');
             if (!snap.exists()) return;
-            const apt = snap.data();
+            aptData = snap.data();
+            isCompleted = aptData.status === 'completed';
+
+            // Hydrate UI Text
+            if(view.$('det-name')) view.$('det-name').textContent = aptData.appointment_name;
+            if(view.$('det-time')) view.$('det-time').textContent = `${aptData.schedule_date} @ ${aptData.appointment_time || 'N/A'}`;
+            if(view.$('det-location')) view.$('det-location').textContent = aptData.location_name || 'N/A';
+            if(view.$('det-van')) view.$('det-van').textContent = aptData.van_id || 'No Van Assigned';
             
-            renderAvailableHardwareList();
-
-            // Render Required Snapshot (Instruction 4)
-            const snapshotEl = view.$('required-hardware-snapshot');
-            if (snapshotEl && apt.metadata?.required_hardware) {
-                const reqs = apt.metadata.required_hardware;
-                snapshotEl.innerHTML = reqs.map(r => `
-                    <div class="d-flex justify-content-between align-items-center mb-1 text-xs">
-                        <span><i class="bi bi-tag-fill me-1"></i>${r.item_name}</span>
-                        <span class="badge bg-pale-secondary text-dark">${r.count} required</span>
-                    </div>
-                `).join('') || '<div class="text-muted small">No hardware requirements frozen for this booking.</div>';
-
-                // Initialize Slots ONLY once
-                if (!initialLoadDone && apt.status !== 'completed' && hardwareSlots.length === 0) {
-                    reqs.forEach(r => {
-                        for(let i=0; i<r.count; i++) {
-                            hardwareSlots.push({ catalog_id: r.catalog_id, item_name: r.item_name, assigned_id: null });
-                        }
-                    });
-                    renderHardwareSlots();
-                    initialLoadDone = true;
-                }
-            }
-
-            const nameEl = view.$('det-name');
-            const idEl = view.$('det-id');
-            const dateEl = view.$('det-date');
-            const timeEl = view.$('det-time');
-            const locEl = view.$('det-location');
-            const techEl = view.$('det-tech');
-            const prodEl = view.$('det-products');
             const statusEl = view.$('det-status');
-
-            if(nameEl) nameEl.textContent = apt.appointment_name;
-            if(idEl) idEl.textContent = apt.appointment_id;
-            if(dateEl) dateEl.textContent = apt.schedule_date;
-            if(timeEl) timeEl.textContent = `${apt.appointment_time || 'N/A'} (${apt.metadata?.duration_minutes || 60}m)`;
-            if(locEl) locEl.textContent = apt.location_name || 'N/A';
-            if(techEl) techEl.textContent = apt.tech_id;
-            if(prodEl) {
-                const p = apt.metadata?.products;
-                if(!p || p.length === 0) {
-                    prodEl.textContent = "No Products Selected";
+            if(statusEl) {
+                statusEl.textContent = aptData.status;
+                if (isCompleted) {
+                    statusEl.className = 'badge bg-success text-white px-3';
                 } else {
-                    prodEl.textContent = `${p.length} Product(s) [Total Effort: ${apt.metadata?.duration_minutes || 0} min]`;
+                    statusEl.className = 'badge bg-warning text-dark px-3';
                 }
             }
-            if(statusEl) statusEl.textContent = apt.status;
 
-            // Render Product Breakdown (Instruction 4)
-            const productsBreakdown = view.$('det-products-list');
-            if (productsBreakdown && apt.metadata?.products) {
-                const pIds = apt.metadata.products;
-                firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'product_types')).then(snap => {
-                    const products = snap.docs.map(d => ({id: d.id, ...d.data()})).filter(pt => pIds.includes(pt.id));
-                    productsBreakdown.innerHTML = products.map(pt => `
-                        <div class="small d-flex justify-content-between border-bottom py-1">
-                            <span>${pt.name}</span>
-                            <span class="text-muted">${pt.duration_minutes} min</span>
-                        </div>
-                    `).join('') || '<div class="small text-muted">No specific product data found.</div>';
+            if (isCompleted) {
+                if(view.$('completion-panel')) view.$('completion-panel').style.display = 'none';
+                if(view.$('btn-open-scanner')) view.$('btn-open-scanner').style.display = 'none';
+                if(view.$('completion-desc')) view.$('completion-desc').value = aptData.metadata?.completion_description || '';
+            } else {
+                if(view.$('completion-desc')) view.$('completion-desc').value = aptData.metadata?.completion_description || '';
+            }
+
+            // Map Initialization
+            if (aptData.metadata?.location && !map) {
+                const mapEl = document.getElementById('apt-detail-map');
+                if (mapEl) {
+                    map = L.map('apt-detail-map').setView([aptData.metadata.location.lat, aptData.metadata.location.lng], 13);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                        maxZoom: 19
+                    }).addTo(map);
+                    L.marker([aptData.metadata.location.lat, aptData.metadata.location.lng]).addTo(map);
+                }
+            }
+
+            // Build Hardware Slots & Fetch Van Inventory
+            hardwareSlots = [];
+            if (aptData.metadata?.required_hardware) {
+                aptData.metadata.required_hardware.forEach(req => {
+                    for(let i=0; i<req.count; i++) {
+                        hardwareSlots.push({ catalog_id: req.catalog_id, item_name: req.item_name, assigned_id: null });
+                    }
                 });
             }
-            
-            // Render array of hardware
-            const hwArray = apt.metadata?.hardware || [];
-            const hwDisplay = view.$('hardware-list-display');
-            if (hwDisplay) {
-                if (apt.status === 'completed' && Array.isArray(hwArray) && hwArray.length > 0) {
-                    hwDisplay.innerHTML = hwArray.map((hw, i) => `
-                        <div class="mb-2 p-2 border rounded">
-                            <strong>Item ${i+1}:</strong><br>
-                            Type: <span class="badge bg-secondary">${hw.catalog_id || 'N/A'}</span><br>
-                            Serial: <span class="badge bg-primary">${hw.item_id || 'N/A'}</span>
-                        </div>
-                    `).join('');
-                } else if (apt.status === 'completed') {
-                    hwDisplay.innerHTML = 'No hardware assigned.';
-                } else {
-                    hwDisplay.innerHTML = '<span class="text-warning">Awaiting deployment...</span>';
-                }
-            }
-            
-            if (apt.metadata?.location && apt.metadata.location.lat) {
-                if (!map) {
-                    const mapEl = document.getElementById('apt-detail-map');
-                    if (mapEl) {
-                        map = L.map('apt-detail-map').setView([apt.metadata.location.lat, apt.metadata.location.lng], 13);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            if (isCompleted && aptData.metadata?.hardware) {
+                // If completed, just populate slots from saved data
+                aptData.metadata.hardware.forEach(h => {
+                    const slot = hardwareSlots.find(s => s.catalog_id === h.catalog_id && !s.assigned_id);
+                    if (slot) slot.assigned_id = h.item_id;
+                });
+                renderHardwareUI();
+            } else if (!isCompleted && aptData.van_id) {
+                // Fetch van inventory
+                const itemsSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'items'));
+                availableVanInventory = [];
+                itemsSnap.forEach(doc => {
+                    const item = doc.data();
+                    const isAvail = item.status === 'available' || (!item.status && item.is_available);
+                    if (isAvail && item.current_location_type === 'VAN' && item.current_location_id === aptData.van_id) {
+                        availableVanInventory.push({ item_id: item.item_id, catalog_id: item.catalog_id });
                     }
-                }
-                if (map) L.marker([apt.metadata.location.lat, apt.metadata.location.lng]).addTo(map);
-            }
-            
-            if (apt.status === 'completed') {
-                const completeBtn = view.$('complete-job');
-                if(completeBtn) {
-                    completeBtn.disabled = true;
-                    completeBtn.textContent = 'Job Already Completed';
-                }
-                if(statusEl) statusEl.className = 'badge bg-success';
-                const descEl = view.$('completion-desc');
-                if(descEl) {
-                    descEl.value = apt.metadata?.completion_description || '';
-                    descEl.disabled = true;
-                }
-                const addPairBtn = view.$('add-pair-btn');
-                    if(addPairBtn) addPairBtn.style.display = 'none';
-                const hwSlots = view.$('hardware-slots-container');
-                    if(hwSlots) hwSlots.style.display = 'none';
-                const availHw = view.$('available-hardware');
-                    if(availHw && availHw.parentElement) availHw.parentElement.style.display = 'none';
+                });
+                renderHardwareUI();
+            } else {
+                renderHardwareUI();
             }
             
             document.dispatchEvent(new CustomEvent('apply-auth'));
-            view.emit('loading:end');
         }));
     });
+
+    view.destroy = () => {
+        stopScanner();
+        if(map) map.remove();
+    };
 
     return view;
 }

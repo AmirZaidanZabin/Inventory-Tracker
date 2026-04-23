@@ -85,3 +85,27 @@ export function findAdjacentAppointments(techId, dateStr, timeStr, allAppointmen
         next: formatLoc(following, 'Job') || base
     };
 }
+
+/**
+ * Hardened check to see if a technician is on vacation 
+ */
+export function isUserOnVacation(user, dateStr) {
+    if (!user.metadata?.vacation || !Array.isArray(user.metadata.vacation)) return false; 
+    
+    // Normalize targetDate to midnight for reliable comparison
+    const targetDate = new Date(dateStr);
+    targetDate.setHours(0, 0, 0, 0);
+    const targetTime = targetDate.getTime();
+    
+    return user.metadata.vacation.some(range => {
+        if (!range.start || !range.end) return false;
+        
+        const start = new Date(range.start);
+        start.setHours(0, 0, 0, 0);
+        
+        const end = new Date(range.end);
+        end.setHours(23, 59, 59, 999); // Inclusion check for full day
+        
+        return targetTime >= start.getTime() && targetTime <= end.getTime();
+    });
+}

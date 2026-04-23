@@ -1,0 +1,95 @@
+{
+  "original_prompt": "Deprecate the Product Types entity. Upgrade view.item_types.js to absorb custom field configurations. Refactor view.appointments.js to use a quantity-based hardware counter UI instead of product checkboxes. Ensure view.appointment_detail.js perfectly maps these quantities to drag-and-drop validation slots.",
+  "rephrased_goal": "Migrate core booking logic from Product Types to a quantity-based Hardware Type system. This involves unifying item catalog with custom field builders, updating the appointment creation UI with counters, and syncing the completion audit logic.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Upgrade Hardware Types View",
+      "subtasks_required": ["Replace src/views/view.item_types.js with provided code including custom fields builder"],
+      "owner": "Caveman",
+      "analogy_reference": "Upgrade the sharpen-stick tool",
+      "status": "pending",
+      "testing_criteria": "File content matches requested Hardware Catalog implementation"
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify Hardware Types Upgrade",
+      "subtasks_required": ["Inspect src/views/view.item_types.js"],
+      "owner": "Caveman",
+      "analogy_reference": "Check if tool sharp",
+      "status": "pending",
+      "testing_criteria": "Verify presence of custom-field-item CSS and cf-container logic"
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Refactor Appointments Booking UI",
+      "subtasks_required": ["Replace src/views/view.appointments.js with provided code including hardware counters"],
+      "owner": "Caveman",
+      "analogy_reference": "Make new hunt trap",
+      "status": "pending",
+      "testing_criteria": "File content matches requested Hardware Quantity counter implementation"
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify Appointments Booking UI",
+      "subtasks_required": ["Inspect src/views/view.appointments.js"],
+      "owner": "Caveman",
+      "analogy_reference": "Check if trap work",
+      "status": "pending",
+      "testing_criteria": "Verify presence of hw-counter-box and getHardwarePayload logic"
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Clean Product Types from Appointment Detail View",
+      "subtasks_required": ["Remove product breakdown HTML and JS logic from src/views/view.appointment_detail.js"],
+      "owner": "Caveman",
+      "analogy_reference": "Remove old bone from cave",
+      "status": "pending",
+      "testing_criteria": "Code referencing 'product_types' or 'det-products' is removed"
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify Appointment Detail Cleanup",
+      "subtasks_required": ["Inspect src/views/view.appointment_detail.js"],
+      "owner": "Caveman",
+      "analogy_reference": "Check if cave clean",
+      "status": "pending",
+      "testing_criteria": "Verify removal of productsBreakdown code block"
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Final Deprecation of Product Types",
+      "subtasks_required": ["Remove Product Types link from src/index.html", "Remove ProductTypesView import and router case from src/main.js", "Delete src/views/view.product_types.js"],
+      "owner": "Caveman",
+      "analogy_reference": "Throw old stone spear away",
+      "status": "pending",
+      "testing_criteria": "Legacy Product Types logic is purged from shells"
+    },
+    {
+      "id": 8,
+      "description": "Check-Pebble: Verify System-Wide Deprecation",
+      "subtasks_required": ["Check index.html and main.js content"],
+      "owner": "Caveman",
+      "analogy_reference": "Check if trail clear",
+      "status": "pending",
+      "testing_criteria": "Navigation and router no longer contain product_types"
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Lint applet", "Compile applet", "Restart dev server", "Update wiki to reflect unified hardware logistics"],
+      "owner": "Caveman",
+      "analogy_reference": "Walk whole trail before sleep",
+      "status": "pending",
+      "testing_criteria": "App builds, tech stack is unified, Product Types are gone"
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

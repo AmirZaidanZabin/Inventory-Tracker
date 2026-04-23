@@ -378,6 +378,82 @@ async function startServer() {
     res.json({ success: true, message: "Password updated successfully" });
   });
 
+  // Bulk Stock Take
+  app.post("/api/stock_takes/bulk", authenticate, async (req, res) => {
+    const { items, van_id, log_type } = req.body;
+    
+    if (!items || !Array.isArray(items) || !van_id || !log_type) {
+      return res.status(400).json({ error: "Missing required fields: items (array), van_id, log_type" });
+    }
+
+    try {
+      let resultPayload = { success: true };
+      const inventoryIds = items.map(i => i.item_id).filter(id => id);
+
+      if (log_type === 'morning_load') {
+        const batchPromises = items.map(item => {
+          const { item_id, catalog_id, ...metadata } = item;
+          if (!item_id) return Promise.resolve();
+          
+          return saveNormalized("items", item_id, {
+            item_id,
+            catalog_id: catalog_id || 'unknown',
+            current_location_type: 'VAN',
+            current_location_id: van_id,
+            is_available: true,
+            status: item.status || 'available',
+            updated_at: '__server_timestamp__',
+            metadata: {
+                ...metadata,
+                loaded_by: req.user.email
+            }
+          });
+        });
+        await Promise.all(batchPromises);
+        
+        resultPayload.count = inventoryIds.length;
+      } else if (log_type === 'evening_reconcile') {
+        // Query system for items currently in this van
+        const snap = await rtdb.ref('items').once('value');
+        const allItems = snap.val() || {};
+        const systemIdsInVan = Object.keys(allItems).filter(id => {
+            const item = allItems[id];
+            return item.current_location_type === 'VAN' && item.current_location_id === van_id;
+        });
+
+        const uploadedIds = new Set(inventoryIds);
+        const systemIds = new Set(systemIdsInVan);
+
+        const missing = systemIdsInVan.filter(x => !uploadedIds.has(x));
+        const extra = inventoryIds.filter(x => !systemIds.has(x));
+
+        resultPayload.discrepancies = { missing, extra };
+        resultPayload.count = inventoryIds.length;
+      }
+
+      // Create Stock Take Log
+      const logId = 'ST-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+      await saveNormalized("stock_take_logs", logId, {
+          log_id: logId,
+          log_type: log_type,
+          van_id: van_id,
+          user_id: req.user.uid,
+          user_email: req.user.email,
+          timestamp: '__server_timestamp__',
+          scanned_items: inventoryIds,
+          count: inventoryIds.length,
+          discrepancies: resultPayload.discrepancies || null,
+          created_at: '__server_timestamp__',
+          updated_at: '__server_timestamp__'
+      });
+
+      res.json(resultPayload);
+    } catch (err) {
+      console.error("Bulk Stock Take Error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Mapping of collections to base permissions
   const PERMISSION_MAP = {
       users: 'manage_users',

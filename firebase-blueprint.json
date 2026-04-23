@@ -71,7 +71,21 @@
         "email": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" },
         "updated_at": { "type": "string", "format": "date-time" },
-        "metadata": { "type": "object" }
+        "metadata": { 
+          "type": "object",
+          "properties": {
+            "vacation": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "start": { "type": "string", "format": "date" },
+                  "end": { "type": "string", "format": "date" }
+                }
+              }
+            }
+          }
+        }
       },
       "required": ["user_id", "role_id"]
     },

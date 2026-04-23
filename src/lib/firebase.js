@@ -78,6 +78,13 @@ export const firebase = {
         });
     },
 
+    bulkStockTake: async (data) => {
+        return apiFetch('/api/stock_takes/bulk', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
     logAction: async (action, details) => {
         try {
             await apiFetch('/api/audit_logs', {

@@ -1,0 +1,59 @@
+{
+  "original_prompt": "Extract core CSS from index.html into src/styles/main.css and update index.html to link to it.",
+  "rephrased_goal": "Move presentational CSS to external file to improve caching and separation of concerns.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Create src/styles/main.css",
+      "subtasks_required": ["Create directory src/styles", "Create main.css with provided rules"],
+      "owner": "Caveman",
+      "analogy_reference": "move campfire stones to new pit",
+      "status": "done",
+      "testing_criteria": "File src/styles/main.css exists with correct content."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify main.css",
+      "subtasks_required": ["View main.css content"],
+      "owner": "Caveman",
+      "analogy_reference": "check stone heat",
+      "status": "done",
+      "testing_criteria": "File content matches expected CSS."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Refactor index.html",
+      "subtasks_required": ["Remove style block", "Add link tag"],
+      "owner": "Caveman",
+      "analogy_reference": "clean old cave wall",
+      "status": "done",
+      "testing_criteria": "Style tag gone, link tag present."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify index.html",
+      "subtasks_required": ["View index.html head section"],
+      "owner": "Caveman",
+      "analogy_reference": "look at clean wall",
+      "status": "done",
+      "testing_criteria": "Link points to /src/styles/main.css."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Compile app", "Check for any broken styles in other views"],
+      "owner": "Caveman",
+      "analogy_reference": "walk trail to check shadows",
+      "status": "done",
+      "testing_criteria": "App builds, look same as before."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

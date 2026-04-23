@@ -1,0 +1,113 @@
+{
+  "original_prompt": "Abstract table shell generation into a reusable utility in lib/table.js and update all views to use it.",
+  "rephrased_goal": "Standardize all table renderings across views using a central lib/table.js utility for consistent styling and DRY code.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Create src/lib/table.js utility",
+      "subtasks_required": ["Create file", "Export renderTable function"],
+      "owner": "Caveman",
+      "analogy_reference": "make better bark scraper",
+      "status": "pending",
+      "testing_criteria": "File exists with correct export."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Inspect lib/table.js",
+      "subtasks_required": ["Read back newly made file"],
+      "owner": "Caveman",
+      "analogy_reference": "look at scraper edge",
+      "status": "pending",
+      "testing_criteria": "Code matches prompt spec exactly."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Update UsersView",
+      "subtasks_required": ["Import renderTable", "Edit stringComponent"],
+      "owner": "Caveman",
+      "analogy_reference": "apply scraper to first hide",
+      "status": "pending",
+      "testing_criteria": "Card-body contains renderTable output."
+    },
+    {
+      "id": 4,
+      "description": "Do-Pebble: Update VansView",
+      "subtasks_required": ["Import renderTable", "Edit stringComponent"],
+      "owner": "Caveman",
+      "analogy_reference": "apply scraper to second hide",
+      "status": "pending",
+      "testing_criteria": "Table uses modern-table class."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Update AppointmentsView",
+      "subtasks_required": ["Import renderTable", "Edit stringComponent"],
+      "owner": "Caveman",
+      "analogy_reference": "clean big rug with new tool",
+      "status": "pending",
+      "testing_criteria": "Headers match job-list structure."
+    },
+    {
+      "id": 6,
+      "description": "Do-Pebble: Update ItemsView",
+      "subtasks_required": ["Import renderTable", "Edit stringComponent"],
+      "owner": "Caveman",
+      "analogy_reference": "scrape small bits",
+      "status": "pending",
+      "testing_criteria": "Empty state shows 'Loading hardware inventory...'."
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Update RolesView",
+      "subtasks_required": ["Import renderTable", "Edit stringComponent"],
+      "owner": "Caveman",
+      "analogy_reference": "scrape power hide",
+      "status": "pending",
+      "testing_criteria": "Table class uses modern-table."
+    },
+    {
+      "id": 8,
+      "description": "Do-Pebble: Update ItemTypes & ProductTypes Views",
+      "subtasks_required": ["Update both type views"],
+      "owner": "Caveman",
+      "analogy_reference": "finish special hides",
+      "status": "pending",
+      "testing_criteria": "Action column width set to 100."
+    },
+    {
+      "id": 9,
+      "description": "Do-Pebble: Fix ReportingView CSS",
+      "subtasks_required": ["Update raw table class in view.reporting.js"],
+      "owner": "Caveman",
+      "analogy_reference": "touch up last cave wall",
+      "status": "pending",
+      "testing_criteria": "Uses modern-table class."
+    },
+    {
+      "id": 10,
+      "description": "Check-Pebble: Lint whole project",
+      "subtasks_required": ["Run lint_applet"],
+      "owner": "Caveman",
+      "analogy_reference": "smell cave for rot",
+      "status": "pending",
+      "testing_criteria": "Zero errors."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Check for raw table tags in views folder", "Check all imports"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail",
+      "status": "pending",
+      "testing_criteria": "DRY goal met."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

@@ -16,8 +16,9 @@ import { StockView } from './views/view.stock.js';
 import { AppointmentsGanttView } from './views/view.gantt.js';
 import { TriggersView } from './views/view.triggers.js';
 import { FormsView } from './views/view.forms.js';
-import { ProductTypesView } from './views/view.product_types.js';
 import { ItemTypesView } from './views/view.item_types.js';
+import { MobileAppointmentView } from './views/view.mobile_appointment.js';
+import { MobileStockView } from './views/view.mobile_stock.js';
 
 const App = (() => {
     let state = {
@@ -377,8 +378,9 @@ const App = (() => {
                     case 'gantt': view = AppointmentsGanttView(); break;
                     case 'triggers': view = TriggersView(); break;
                     case 'forms': view = FormsView(); break;
-                    case 'product_types': view = ProductTypesView(); break;
                     case 'item_types': view = ItemTypesView(); break;
+                    case 'mobile_appointment': view = MobileAppointmentView(param); break;
+                    case 'mobile_stock': view = MobileStockView(); break;
                 }
 
                 if (view) {

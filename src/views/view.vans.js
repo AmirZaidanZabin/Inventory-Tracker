@@ -1,6 +1,7 @@
 import { controller } from '../lib/controller.js';
 import { firebase } from '../lib/firebase.js';
 import { createModal } from '../lib/modal.js';
+import { renderTable } from '../lib/table.js';
 
 export function VansView() {
     const view = controller({
@@ -14,17 +15,11 @@ export function VansView() {
 
                 <div class="card border-0 shadow-sm">
                     <div class="card-body p-0">
-                        <table class="modern-table">
-                            <thead>
-                                <tr>
-                                    <th>VAN ID</th>
-                                    <th>Location</th>
-                                    <th>Created</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="vans-list"></tbody>
-                        </table>
+                        ${renderTable({
+                            headers: ['VAN ID', 'Location', 'Created', 'Actions'],
+                            tbodyId: 'vans-list',
+                            emptyMessage: 'Loading fleet...'
+                        })}
                     </div>
                 </div>
             </div>
@@ -47,6 +42,7 @@ export function VansView() {
             formSchemas.forEach(schema => {
                 customFieldsHtml += `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">${schema.name}</h6><div class="row g-2">`;
                 schema.fields.forEach(f => {
+                    const existingVal = ''; 
                     customFieldsHtml += `<div class="col-12">`;
                     customFieldsHtml += `<label class="form-label small fw-bold">${f.label} ${f.required?'<span class="text-danger">*</span>':''}</label>`;
                     if (f.type === 'textarea') {
@@ -61,8 +57,11 @@ export function VansView() {
                             <input type="checkbox" name="custom_${f.name}" class="form-check-input" value="true" ${f.required?'required':''}>
                             <label class="form-check-label small">Yes</label>
                         </div>`;
+                    } else if (f.type === 'regex') {
+                        customFieldsHtml += `<input type="text" name="custom_${f.name}" class="form-control form-control-sm font-monospace" pattern="${f.pattern||''}" value="${existingVal}" ${f.required?'required':''} placeholder="Matches pattern: ${f.pattern||''}">`;
                     } else {
-                        customFieldsHtml += `<input type="${f.type==='number'?'number':f.type==='date'?'date':'text'}" name="custom_${f.name}" class="form-control form-control-sm" ${f.required?'required':''}>`;
+                        const nativeType = ['email', 'tel', 'number', 'date'].includes(f.type) ? f.type : 'text';
+                        customFieldsHtml += `<input type="${nativeType}" name="custom_${f.name}" class="form-control form-control-sm" value="${existingVal}" ${f.required?'required':''}>`;
                     }
                     customFieldsHtml += `</div>`;
                 });
@@ -113,7 +112,19 @@ export function VansView() {
 
         // Initialize Map
         const map = L.map('van-map-picker').setView([24.7136, 46.6753], 6); // Riyadh default
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Add Search Geocoder
+        L.Control.geocoder({
+            defaultMarkGeocode: false,
+            placeholder: 'Search for a city or region...',
+            position: 'topleft'
+        }).on('markgeocode', function(e) {
+            map.fitBounds(e.geocode.bbox);
+        }).addTo(map);
 
         const drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
@@ -256,6 +267,7 @@ export function VansView() {
                                             ${techCheckboxes}
                                         </div>
                                     </div>
+                                    <div id="edit-custom-fields-container"></div>
                                     <div class="col-12">
                                         <label class="form-label small fw-bold">Coverage Area (Map Selection)</label>
                                         <div id="van-map-picker-edit" class="border rounded" style="height: 300px; width: 100%;"></div>
@@ -270,9 +282,58 @@ export function VansView() {
                     });
                     modal.show();
 
+                    // Render Custom Fields for Edit
+                    const editFormsSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms'));
+                    const editFormSchemas = (editFormsSnap?.docs || []).map(d => d.data()).filter(f => f.entities && f.entities.includes('vans'));
+                    const editCfContainer = modal.element.querySelector('#edit-custom-fields-container');
+                    if (editCfContainer && editFormSchemas.length > 0) {
+                        let cfHtml = '';
+                        editFormSchemas.forEach(schema => {
+                            cfHtml += `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">${schema.name}</h6><div class="row g-2">`;
+                            schema.fields.forEach(f => {
+                                const existingVal = van.custom_data?.[f.name] || '';
+                                cfHtml += `<div class="col-12">`;
+                                cfHtml += `<label class="form-label small fw-bold">${f.label} ${f.required?'<span class="text-danger">*</span>':''}</label>`;
+                                if (f.type === 'textarea') {
+                                    cfHtml += `<textarea name="custom_${f.name}" class="form-control form-control-sm" ${f.required?'required':''}>${existingVal}</textarea>`;
+                                } else if (f.type === 'select') {
+                                    cfHtml += `<select name="custom_${f.name}" class="form-select form-select-sm" ${f.required?'required':''}>
+                                        <option value="">Select...</option>
+                                        ${(f.options||[]).map(o => `<option value="${o}" ${existingVal===o?'selected':''}>${o}</option>`).join('')}
+                                    </select>`;
+                                } else if (f.type === 'checkbox') {
+                                    cfHtml += `<div class="form-check">
+                                        <input type="checkbox" name="custom_${f.name}" class="form-check-input" value="true" ${existingVal==='true'?'checked':''} ${f.required?'required':''}>
+                                        <label class="form-check-label small">Yes</label>
+                                    </div>`;
+                                } else if (f.type === 'regex') {
+                                    cfHtml += `<input type="text" name="custom_${f.name}" class="form-control form-control-sm font-monospace" pattern="${f.pattern||''}" value="${existingVal}" ${f.required?'required':''} placeholder="Matches pattern: ${f.pattern||''}">`;
+                                } else {
+                                    const nativeType = ['email', 'tel', 'number', 'date'].includes(f.type) ? f.type : 'text';
+                                    cfHtml += `<input type="${nativeType}" name="custom_${f.name}" class="form-control form-control-sm" value="${existingVal}" ${f.required?'required':''}>`;
+                                }
+                                cfHtml += `</div>`;
+                            });
+                            cfHtml += `</div></div>`;
+                        });
+                        editCfContainer.innerHTML = cfHtml;
+                    }
+
                     // Initialize Map for Edit
                     const map = L.map('van-map-picker-edit').setView([van.default_lat || 24.7136, van.default_lng || 46.6753], 10);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                        maxZoom: 19
+                    }).addTo(map);
+
+                    // Add Search Geocoder
+                    L.Control.geocoder({
+                        defaultMarkGeocode: false,
+                        placeholder: 'Search for a city or region...',
+                        position: 'topleft'
+                    }).on('markgeocode', function(e) {
+                        map.fitBounds(e.geocode.bbox);
+                    }).addTo(map);
                     
                     const drawnItems = new L.FeatureGroup();
                     map.addLayer(drawnItems);
@@ -317,10 +378,26 @@ export function VansView() {
                         const assigned_users = Array.from(modal.element.querySelectorAll('.van-tech-chk-edit:checked')).map(cb => cb.value);
 
                         try {
+                            const customData = van.custom_data || {};
+                            for (let [key, val] of fd.entries()) {
+                                if (key.startsWith('custom_')) {
+                                    customData[key.replace('custom_', '')] = val;
+                                }
+                            }
+                            // Handle checkboxes
+                            editFormSchemas.forEach(schema => {
+                                schema.fields.forEach(f => {
+                                    if (f.type === 'checkbox' && !fd.has('custom_' + f.name)) {
+                                        customData[f.name] = 'false';
+                                    }
+                                });
+                            });
+
                             await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'vans', van.van_id), {
                                 location_id: fd.get('location_id'),
                                 coverage_area: fd.get('coverage_area'),
                                 assigned_users,
+                                custom_data: customData,
                                 updated_at: firebase.db.serverTimestamp()
                             });
                             firebase.logAction("VAN Updated", `VAN ${van.van_id} updated with location ${fd.get('location_id')}`);

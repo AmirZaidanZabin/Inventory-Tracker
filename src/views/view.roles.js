@@ -2,6 +2,7 @@ import { controller } from '../lib/controller.js';
 import { firebase } from '../lib/firebase.js';
 import { createModal } from '../lib/modal.js';
 import { PREDEFINED_AUTHORITIES } from '../constants.js';
+import { renderTable } from '../lib/table.js';
 
 export function RolesView() {
     const view = controller({
@@ -15,16 +16,11 @@ export function RolesView() {
 
                 <div class="card border-0 shadow-sm">
                     <div class="card-body p-0">
-                        <table class="modern-table">
-                            <thead>
-                                <tr>
-                                    <th>Role</th>
-                                    <th>Authorities</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="roles-list"></tbody>
-                        </table>
+                        ${renderTable({
+                            headers: ['Role', 'Authorities', 'Actions'],
+                            tbodyId: 'roles-list',
+                            emptyMessage: 'Loading security roles...'
+                        })}
                     </div>
                 </div>
             </div>

@@ -1,6 +1,32 @@
 import { controller } from '../lib/controller.js';
 import { firebase } from '../lib/firebase.js';
 import { createModal } from '../lib/modal.js';
+import { renderTable } from '../lib/table.js';
+
+function renderVacationManager(vacations = []) {
+    return `
+        <div class="mt-4 p-3 bg-light rounded border">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0 text-primary"><i class="bi bi-sun me-2"></i>Vacation Days</h6>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-vacation">
+                    <i class="bi bi-plus-lg"></i> Add Range
+                </button>
+            </div>
+            <div id="vacation-list" class="d-flex flex-column gap-2">
+                ${vacations.map((v, i) => `
+                    <div class="d-flex gap-2 align-items-center bg-white p-2 border rounded shadow-sm vac-row">
+                        <input type="date" class="form-control form-control-sm vac-start" value="${v.start}" data-idx="${i}">
+                        <span class="text-muted">to</span>
+                        <input type="date" class="form-control form-control-sm vac-end" value="${v.end}" data-idx="${i}">
+                        <button type="button" class="btn btn-sm text-danger btn-del-vac" data-idx="${i}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `).join('') || '<div class="text-center text-muted small py-2 no-vac-msg">No vacations scheduled</div>'}
+            </div>
+        </div>
+    `;
+}
 
 export function UsersView() {
     const view = controller({
@@ -12,19 +38,13 @@ export function UsersView() {
                     </button>
                 </div>
 
-                <div class="card">
+                <div class="card border-0 shadow-sm">
                     <div class="card-body p-0">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>User</th>
-                                    <th>Role</th>
-                                    <th>Joined</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-list"></tbody>
-                        </table>
+                        ${renderTable({
+                            headers: ['User', 'Role', 'Joined', 'Actions'],
+                            tbodyId: 'users-list',
+                            emptyMessage: 'Loading users...'
+                        })}
                     </div>
                 </div>
             </div>
@@ -62,8 +82,11 @@ export function UsersView() {
                             <input type="checkbox" name="custom_${f.name}" class="form-check-input" value="true" ${existingVal==='true'?'checked':''} ${f.required?'required':''}>
                             <label class="form-check-label small">Yes</label>
                         </div>`;
+                    } else if (f.type === 'regex') {
+                        customFieldsHtml += `<input type="text" name="custom_${f.name}" class="form-control form-control-sm font-monospace" pattern="${f.pattern||''}" value="${existingVal}" ${f.required?'required':''} placeholder="Matches pattern: ${f.pattern||''}">`;
                     } else {
-                        customFieldsHtml += `<input type="${f.type==='number'?'number':f.type==='date'?'date':'text'}" name="custom_${f.name}" class="form-control form-control-sm" value="${existingVal}" ${f.required?'required':''}>`;
+                        const nativeType = ['email', 'tel', 'number', 'date'].includes(f.type) ? f.type : 'text';
+                        customFieldsHtml += `<input type="${nativeType}" name="custom_${f.name}" class="form-control form-control-sm" value="${existingVal}" ${f.required?'required':''}>`;
                     }
                     customFieldsHtml += `</div>`;
                 });
@@ -89,6 +112,9 @@ export function UsersView() {
                             ${roles.map(r => `<option value="${r.id}" ${user?.role_id === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
                         </select>
                     </div>
+                    <div id="vacation-manager-container">
+                        ${renderVacationManager(user?.metadata?.vacation || [])}
+                    </div>
                     ${customFieldsHtml}
                     <div class="col-12 mt-4">
                         <button type="submit" class="btn-pico btn-pico-primary w-100">${user ? 'Save Changes' : 'Create User'}</button>
@@ -97,6 +123,40 @@ export function UsersView() {
             `
         });
         modal.show();
+
+        const vacationList = modal.element.querySelector('#vacation-list');
+        const btnAddVacation = modal.element.querySelector('#btn-add-vacation');
+
+        const updateVacationListeners = () => {
+            modal.element.querySelectorAll('.btn-del-vac').forEach(btn => {
+                btn.onclick = () => {
+                    btn.closest('.vac-row').remove();
+                    if (vacationList.children.length === 0) {
+                        vacationList.innerHTML = '<div class="text-center text-muted small py-2 no-vac-msg">No vacations scheduled</div>';
+                    }
+                };
+            });
+        };
+
+        btnAddVacation.onclick = () => {
+            const noMsg = vacationList.querySelector('.no-vac-msg');
+            if (noMsg) noMsg.remove();
+
+            const div = document.createElement('div');
+            div.className = 'd-flex gap-2 align-items-center bg-white p-2 border rounded shadow-sm vac-row';
+            div.innerHTML = `
+                <input type="date" class="form-control form-control-sm vac-start" value="">
+                <span class="text-muted">to</span>
+                <input type="date" class="form-control form-control-sm vac-end" value="">
+                <button type="button" class="btn btn-sm text-danger btn-del-vac">
+                    <i class="bi bi-trash"></i>
+                </button>
+            `;
+            vacationList.appendChild(div);
+            updateVacationListeners();
+        };
+
+        updateVacationListeners();
 
         const form = modal.element.querySelector('#user-form');
         form.onsubmit = async (e) => {
@@ -127,7 +187,14 @@ export function UsersView() {
                 user_name: fd.get('user_name'),
                 role_id: fd.get('role_id'),
                 custom_data: customData,
-                updated_at: firebase.db.serverTimestamp()
+                updated_at: firebase.db.serverTimestamp(),
+                metadata: {
+                    ...(user?.metadata || {}),
+                    vacation: Array.from(modal.element.querySelectorAll('#vacation-list > div')).map(div => ({
+                        start: div.querySelector('.vac-start').value,
+                        end: div.querySelector('.vac-end').value
+                    })).filter(v => v.start && v.end)
+                }
             };
 
             try {
@@ -143,7 +210,10 @@ export function UsersView() {
                         user_id: tempId,
                         created_at: firebase.db.serverTimestamp(),
                         is_deleted: false,
-                        metadata: { email }
+                        metadata: { 
+                            ...data.metadata,
+                            email 
+                        }
                     });
                     firebase.logAction("User Created", `User ${data.user_name} added manually`);
                 }

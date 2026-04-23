@@ -1,39 +1,35 @@
 {
   "general_facts": [
-    "App uses Vanilla JS with custom controller.js",
-    "Firebase used for Auth and DB",
-    "Reporting uses sql.js for client-side SQL",
-    "Vite server used for hosting"
+    "fire hot",
+    "mammoth big",
+    "stock reconciliation backbone of logistics",
+    "morning load moves items to VAN via bulk api",
+    "evening audit checks physical vs system count for specific VAN server-side",
+    "inventory uses generic (item_id, catalog_id) schema",
+    "product_types entity deprecated; unified under item_catalog (Hardware Types)",
+    "booking system uses hardware quantity counters with dynamic travel/duration calculation",
+    "maps modernized with CartoDB Voyager tiles and Leaflet Control Geocoder for global search",
+    "mobile field operations added with camera-based barcode scanning (html5-qrcode) for job completion and stock audit",
+    "AppointmentDetailView refactored into a hybrid interface with responsive drag-and-drop and integrated barcode scanning",
+    "Automation Rules Engine enhanced with real-time JSON validation and auto-pretty-printing for webhooks",
+    "Live Postman-style JSON syntax highlighting integrated into the Automation Rules Engine using Prism.js and layered ghosting CSS",
+    "JSON editor alignment shift resolved with strict box-model synchronization and scroll-coupled ghosting layers",
+    "Technician vacation management integrated with date-range picker and collision-aware scheduling logic in Appointments View"
   ],
   "tech_stack": {
-    "frontend": "Vanilla JS, Bootstrap 5, controller.js",
-    "backend": "Node.js (server.js), Firebase Admin SDK",
-    "database": "Firebase Realtime Database (proxied via /api)",
-    "testing": "Custom tester.js library",
-    "auth_logic": {
-      "provider": "Firebase Auth",
-      "methods": ["Google Popup", "Email/Password", "Anonymous"],
-      "errors": {
-        "auth/wrong-password": "Incorrect password",
-        "auth/user-not-found": "User does not exist"
-      }
-    },
-    "user_sync": {
-      "strategy": "Just-In-Time Provisioning",
-      "fact": "Manual users created in RTDB are provisioned in Firebase Auth when an admin sets their password for the first time."
-    }
+    "backend": "Node.js (Express) + Firebase Admin",
+    "frontend": "Vanilla JS, Pico CSS, controller.js",
+    "database": "Firebase RTDB (Normalized)"
   },
   "FAQ": {
-    "Auth": [
+    "Stock": [
       {
-        "Q": "How is auth handled?",
-        "A": "Firebase Auth on client, JWT token passed to /api, server.js verifies token."
-      }
-    ],
-    "Reporting": [
+        "Q": "where stock go in morning?",
+        "A": "into VAN"
+      },
       {
-        "Q": "Is SQL executed on server?",
-        "A": "No, sql.js runs in the browser. Data is synced from /api into local SQLite."
+        "Q": "what evening audit do?",
+        "A": "compare physical CSV to system items in VAN"
       }
     ]
   }

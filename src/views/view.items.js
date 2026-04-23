@@ -2,6 +2,7 @@ import { controller } from '../lib/controller.js';
 import { firebase } from '../lib/firebase.js';
 import { createModal } from '../lib/modal.js';
 import { CustomSelect } from '../lib/custom-select.js';
+import { renderTable } from '../lib/table.js';
 
 export function ItemsView() {
     const view = controller({
@@ -22,20 +23,11 @@ export function ItemsView() {
 
                 <div class="card border-0 shadow-sm">
                     <div class="card-body p-0">
-                        <table class="modern-table">
-                            <thead>
-                                <tr>
-                                    <th>Type</th>
-                                    <th>Serial / ID</th>
-                                    <th>Provider</th>
-                                    <th>Assigned To</th>
-                                    <th>Location</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="items-list"></tbody>
-                        </table>
+                        ${renderTable({
+                            headers: ['Type', 'Serial / ID', 'Provider', 'Assigned To', 'Location', 'Status', 'Actions'],
+                            tbodyId: 'items-list',
+                            emptyMessage: 'Loading hardware inventory...'
+                        })}
                     </div>
                 </div>
             </div>
@@ -125,6 +117,7 @@ export function ItemsView() {
             formSchemas.forEach(schema => {
                 customFieldsHtml += `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">${schema.name}</h6><div class="row g-2">`;
                 schema.fields.forEach(f => {
+                    const existingVal = '';
                     customFieldsHtml += `<div class="col-12">`;
                     customFieldsHtml += `<label class="form-label small fw-bold">${f.label} ${f.required?'<span class="text-danger">*</span>':''}</label>`;
                     if (f.type === 'textarea') {
@@ -139,8 +132,11 @@ export function ItemsView() {
                             <input type="checkbox" name="custom_${f.name}" class="form-check-input" value="true" ${f.required?'required':''}>
                             <label class="form-check-label small">Yes</label>
                         </div>`;
+                    } else if (f.type === 'regex') {
+                        customFieldsHtml += `<input type="text" name="custom_${f.name}" class="form-control form-control-sm font-monospace" pattern="${f.pattern||''}" value="${existingVal}" ${f.required?'required':''} placeholder="Matches pattern: ${f.pattern||''}">`;
                     } else {
-                        customFieldsHtml += `<input type="${f.type==='number'?'number':f.type==='date'?'date':'text'}" name="custom_${f.name}" class="form-control form-control-sm" ${f.required?'required':''}>`;
+                        const nativeType = ['email', 'tel', 'number', 'date'].includes(f.type) ? f.type : 'text';
+                        customFieldsHtml += `<input type="${nativeType}" name="custom_${f.name}" class="form-control form-control-sm" value="${existingVal}" ${f.required?'required':''}>`;
                     }
                     customFieldsHtml += `</div>`;
                 });
@@ -319,6 +315,7 @@ export function ItemsView() {
                                             <option value="damaged" ${itemStatus === 'damaged' ? 'selected' : ''}>Damaged</option>
                                         </select>
                                     </div>
+                                    <div id="edit-custom-fields-container"></div>
                                 <div class="col-12 mt-4">
                                     <button type="submit" class="btn-pico btn-pico-primary w-100">Save Changes</button>
                                 </div>
@@ -327,18 +324,72 @@ export function ItemsView() {
                     });
                     modal.show();
 
+                    // Render Custom Fields for Edit
+                    const editFormsSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms'));
+                    const editFormSchemas = (editFormsSnap?.docs || []).map(d => d.data()).filter(f => f.entities && f.entities.includes('items'));
+                    const editCfContainer = modal.element.querySelector('#edit-custom-fields-container');
+                    if (editCfContainer && editFormSchemas.length > 0) {
+                        let cfHtml = '';
+                        editFormSchemas.forEach(schema => {
+                            cfHtml += `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">${schema.name}</h6><div class="row g-2">`;
+                            schema.fields.forEach(f => {
+                                const existingVal = (item.metadata?.custom_fields?.[f.name]) || '';
+                                cfHtml += `<div class="col-12">`;
+                                cfHtml += `<label class="form-label small fw-bold">${f.label} ${f.required?'<span class="text-danger">*</span>':''}</label>`;
+                                if (f.type === 'textarea') {
+                                    cfHtml += `<textarea name="custom_${f.name}" class="form-control form-control-sm" ${f.required?'required':''}>${existingVal}</textarea>`;
+                                } else if (f.type === 'select') {
+                                    cfHtml += `<select name="custom_${f.name}" class="form-select form-select-sm" ${f.required?'required':''}>
+                                        <option value="">Select...</option>
+                                        ${(f.options||[]).map(o => `<option value="${o}" ${existingVal===o?'selected':''}>${o}</option>`).join('')}
+                                    </select>`;
+                                } else if (f.type === 'checkbox') {
+                                    cfHtml += `<div class="form-check">
+                                        <input type="checkbox" name="custom_${f.name}" class="form-check-input" value="true" ${existingVal==='true'?'checked':''} ${f.required?'required':''}>
+                                        <label class="form-check-label small">Yes</label>
+                                    </div>`;
+                                } else if (f.type === 'regex') {
+                                    cfHtml += `<input type="text" name="custom_${f.name}" class="form-control form-control-sm font-monospace" pattern="${f.pattern||''}" value="${existingVal}" ${f.required?'required':''} placeholder="Matches pattern: ${f.pattern||''}">`;
+                                } else {
+                                    const nativeType = ['email', 'tel', 'number', 'date'].includes(f.type) ? f.type : 'text';
+                                    cfHtml += `<input type="${nativeType}" name="custom_${f.name}" class="form-control form-control-sm" value="${existingVal}" ${f.required?'required':''}>`;
+                                }
+                                cfHtml += `</div>`;
+                            });
+                            cfHtml += `</div></div>`;
+                        });
+                        editCfContainer.innerHTML = cfHtml;
+                    }
+
                     const form = modal.element.querySelector('#edit-item-form');
                     form.onsubmit = async (e) => {
                         e.preventDefault();
                         const fd = new FormData(form);
                         const van_id = fd.get('van_id');
                         const statusVal = fd.get('status');
+
+                        const customData = item.metadata?.custom_fields || {};
+                        for (let [key, val] of fd.entries()) {
+                            if (key.startsWith('custom_')) {
+                                customData[key.replace('custom_', '')] = val;
+                            }
+                        }
+                        // Handle checkboxes
+                        editFormSchemas.forEach(schema => {
+                            schema.fields.forEach(f => {
+                                if (f.type === 'checkbox' && !fd.has('custom_' + f.name)) {
+                                    customData[f.name] = 'false';
+                                }
+                            });
+                        });
+
                         try {
                             await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', item.item_id), {
                                 current_location_type: van_id ? 'VAN' : 'WAREHOUSE',
                                 current_location_id: van_id || '',
                                 status: statusVal,
                                 is_available: statusVal === 'available',
+                                'metadata.custom_fields': customData,
                                 updated_at: firebase.db.serverTimestamp()
                             });
                             firebase.logAction("Item Updated", `${catalog.item_type} ${item.item_id} updated to ${statusVal}`);
