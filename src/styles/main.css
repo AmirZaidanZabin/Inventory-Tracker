@@ -408,3 +408,27 @@ h1, h2, h3, h4, h5, h6, .fw-bold {
     background: rgba(83, 40, 112, 0.2) !important;
     color: transparent !important;
 }
+
+/* 15. Gantt Redesign (Split-Pane & High Density) */
+.gantt-main-layout { display: flex; height: calc(100vh - 160px); min-height: 500px; background: #fff; border-radius: var(--radius); border: 1px solid #e5e7eb; overflow: hidden; }
+.gantt-sidebar { width: 340px; flex-shrink: 0; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; background: #fff; }
+.gantt-canvas-container { flex-grow: 1; overflow: auto; background: #fff; position: relative; }
+
+.gantt-sidebar-header { padding: 0.75rem 1rem; border-bottom: 1px solid #e5e7eb; }
+.gantt-sidebar-list { flex-grow: 1; overflow-y: auto; }
+.sidebar-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+.sidebar-table th { background: #f8fafc; padding: 0.5rem; text-align: left; font-weight: 600; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+.sidebar-table td { padding: 0.5rem; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+.apt-status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+
+.gantt-toolbar-nav { display: flex; align-items: center; justify-content: space-between; background: #fff; border-bottom: 2px solid #e5e7eb; padding: 0; height: 48px; }
+.gantt-tab-group { display: flex; height: 100%; }
+.gantt-tab { padding: 0 1.5rem; display: flex; align-items: center; font-weight: 600; font-size: 0.8rem; color: #64748b; border-bottom: 3px solid transparent; cursor: pointer; height: 100%; }
+.gantt-tab.active { color: var(--primary-color); border-bottom-color: var(--primary-color); background: #f8fafc; }
+
+.gantt-resource-cell { width: 300px; position: sticky; left: 0; z-index: 10; background: #fff; border-right: 1px solid #e5e7eb; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.75rem; transition: background 0.2s; }
+.utilization-badge { font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #fff; }
+
+.gantt-group-header { background: #d0d7de !important; color: #1f2328 !important; padding: 0.4rem 1rem; font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #afb8c1; }
+.hour-tick { border-right: 1px dashed #cbd5e1; }
+.day-tick { border-right: 1px solid #e2e8f0; }

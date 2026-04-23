@@ -1,0 +1,78 @@
+{
+  "original_prompt": "Enhance Appointments table to display technician names instead of IDs. Modularize the booking modal into a reusable function for both scheduling and rescheduling. Ensure consistent validation and state hydration for rescheduling.",
+  "rephrased_goal": "Refactor the Appointments module to improve UX with human-readable tech names and consolidate appointment management into a single, highly-validated modal for both new bookings and reschedules, ensuring strict adherence to business logic.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Analyze Appointments View for Refactoring",
+      "subtasks_required": [
+        "1.1 Read src/views/view.appointments.js",
+        "1.2 Identify the block of booking logic to be modularized"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "examining the trap to see how to make it portable",
+      "status": "done",
+      "testing_criteria": "Booking logic boundaries are identified."
+    },
+    {
+      "id": 2,
+      "description": "Do-Pebble: Implement Technician Name Lookup Map",
+      "subtasks_required": [
+        "2.1 Update init logic to fetch users collection",
+        "2.2 Populate a view-scoped userMap {user_id: user_name}",
+        "2.3 Update renderAptList to use userMap in table row generation"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "naming every hunter so elders know who is on trail",
+      "status": "done",
+      "testing_criteria": "Table displays names instead of hex IDs."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Modularize Appointment Modal",
+      "subtasks_required": [
+        "3.1 Extract booking logic into openAppointmentModal function",
+        "3.2 Add parameter for existingAptData to handle hydration",
+        "3.3 Implement hydration logic for form fields, map, and hardware counters"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "making a standard hunt layout that fits any weather (status)",
+      "status": "done",
+      "testing_criteria": "Modal opens for both 'Add' and 'Reschedule' with correct data."
+    },
+    {
+      "id": 4,
+      "description": "Do-Pebble: Implement Unified Form Handler",
+      "subtasks_required": [
+        "4.1 Update onsubmit logic to check for existingAptData",
+        "4.2 Branch between setDoc and updateDoc",
+        "4.3 Ensure firebase.logAction is called correctly for both cases"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "sharpening spear for either first throw or retry throw",
+      "status": "done",
+      "testing_criteria": "New appointments created, old ones updated, logs match."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS SWEEP",
+      "subtasks_required": [
+        "Review view.appointments.js for lint/logical flow",
+        "Validate filter performance with the new tech name display",
+        "Compile and verify"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "checking if all trails lead to same camp",
+      "status": "done",
+      "testing_criteria": "No missing pieces, app builds, rescheduling works perfect."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

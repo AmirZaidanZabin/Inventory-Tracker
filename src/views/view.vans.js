@@ -69,12 +69,7 @@ export function VansView() {
             });
         }
 
-        const techCheckboxes = techs.map(t => `
-            <div class="form-check">
-                <input class="form-check-input van-tech-chk" type="checkbox" value="${t.user_id}" id="chk-add-${t.user_id}">
-                <label class="form-check-label small" for="chk-add-${t.user_id}">${t.user_name} <span class="text-muted">(${t.role_id})</span></label>
-            </div>
-        `).join('');
+        const techOptions = techs.map(t => `<option value="${t.user_id}">${t.user_name} (${t.role_id})</option>`).join('');
 
         const modal = createModal({
             title: 'Add New VAN',
@@ -89,10 +84,11 @@ export function VansView() {
                         <input type="text" name="location_id" class="form-control" placeholder="e.g. Riyadh" required>
                     </div>
                     <div class="col-12">
-                        <label class="form-label small fw-bold">Assigned Technicians</label>
-                        <div class="border rounded p-2" style="max-height: 120px; overflow-y: auto;">
-                            ${techCheckboxes}
-                        </div>
+                        <label class="form-label small fw-bold">Assigned Technician</label>
+                        <select name="assigned_tech_id" class="form-select form-select-sm" required>
+                            <option value="">Select a technician...</option>
+                            ${techOptions}
+                        </select>
                     </div>
                     ${customFieldsHtml}
                     <div class="col-12">
@@ -182,7 +178,8 @@ export function VansView() {
                 });
             });
             
-            const assigned_users = Array.from(modal.element.querySelectorAll('.van-tech-chk:checked')).map(cb => cb.value);
+            const assigned_users = data.assigned_tech_id ? [data.assigned_tech_id] : [];
+            delete data.assigned_tech_id;
 
             try {
                 // Check if VAN already exists
@@ -241,12 +238,11 @@ export function VansView() {
                         const techs = [];
                         usersSnap.forEach(u => techs.push(u.data()));
 
-                        const vanAssigned = van.assigned_users || [];
-                        const techCheckboxes = techs.map(t => `
-                            <div class="form-check">
-                                <input class="form-check-input van-tech-chk-edit" type="checkbox" value="${t.user_id}" id="chk-edit-${van.van_id}-${t.user_id}" ${vanAssigned.includes(t.user_id) ? 'checked' : ''}>
-                                <label class="form-check-label small" for="chk-edit-${van.van_id}-${t.user_id}">${t.user_name} <span class="text-muted">(${t.role_id})</span></label>
-                            </div>
+                        const vanAssigned = van.assigned_users?.[0] || '';
+                        const techOptions = techs.map(t => `
+                            <option value="${t.user_id}" ${vanAssigned === t.user_id ? 'selected' : ''}>
+                                ${t.user_name} (${t.role_id})
+                            </option>
                         `).join('');
 
                         const modal = createModal({
@@ -262,10 +258,11 @@ export function VansView() {
                                         <input type="text" name="location_id" class="form-control" value="${van.location_id}" required>
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label small fw-bold">Assigned Technicians</label>
-                                        <div class="border rounded p-2" style="max-height: 120px; overflow-y: auto;">
-                                            ${techCheckboxes}
-                                        </div>
+                                        <label class="form-label small fw-bold">Assigned Technician</label>
+                                        <select name="assigned_tech_id" class="form-select form-select-sm" required>
+                                            <option value="">Select a technician...</option>
+                                            ${techOptions}
+                                        </select>
                                     </div>
                                     <div id="edit-custom-fields-container"></div>
                                     <div class="col-12">
@@ -375,7 +372,8 @@ export function VansView() {
                     form.onsubmit = async (e) => {
                         e.preventDefault();
                         const fd = new FormData(form);
-                        const assigned_users = Array.from(modal.element.querySelectorAll('.van-tech-chk-edit:checked')).map(cb => cb.value);
+                        const assigned_tech_id = fd.get('assigned_tech_id');
+                        const assigned_users = assigned_tech_id ? [assigned_tech_id] : [];
 
                         try {
                             const customData = van.custom_data || {};

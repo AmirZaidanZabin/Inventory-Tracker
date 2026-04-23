@@ -98,7 +98,7 @@
         "tech_id": { "type": "string" },
         "van_id": { "type": "string" },
         "product_type_id": { "type": "string" },
-        "status": { "type": "string", "enum": ["scheduled", "in_progress", "completed", "cancelled"] },
+        "status": { "type": "string", "enum": ["scheduled", "rescheduled", "in_progress", "completed", "cancelled"] },
         "created_at": { "type": "string", "format": "date-time" },
         "updated_at": { "type": "string", "format": "date-time" },
         "metadata": { "type": "object" }

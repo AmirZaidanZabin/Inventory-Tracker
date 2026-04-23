@@ -1,0 +1,50 @@
+{
+  "original_prompt": "Redesign AppointmentsGanttView to match Salesforce Field Service Lightning reference strictly.",
+  "rephrased_goal": "Implement the provided enterprise-grade Gantt view code strictly, ensuring split-pane layout, granular timeline, territory grouping, and resource utilization metrics match the requested spec.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Overwrite view.gantt.js with user provided code",
+      "subtasks_required": [
+        "1.1 Clean up existing view.gantt.js",
+        "1.2 Paste provided refactored code"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "Paint new hunt on wall",
+      "status": "pending",
+      "testing_criteria": "Code matches provided snippet 100%"
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify build and dependencies",
+      "subtasks_required": [
+        "2.1 Run compile_applet",
+        "2.2 Check for missing icons or classes"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "Poke stick to see if strong",
+      "status": "pending",
+      "testing_criteria": "Build succeeds"
+    },
+    {
+      "id": 3,
+      "description": "Sweep-Pebble: Final visual and logic check",
+      "subtasks_required": [
+        "3.1 Review SVG generation logic for parity",
+        "3.2 Confirm sidebar table rendering"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "Walk trail one last time",
+      "status": "pending",
+      "testing_criteria": "No broken UI elements"
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

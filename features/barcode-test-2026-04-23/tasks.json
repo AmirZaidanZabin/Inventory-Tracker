@@ -1,0 +1,90 @@
+{
+  "original_prompt": "Create a robust barcode scanner test automation framework mocking Html5Qrcode. Write internal tests for MobileStockView (debouncing, duplicates, missing hardware selection) and MobileAppointmentView (successful fulfillment, hardware mismatch) using the existing vanilla JS testing utility.",
+  "rephrased_goal": "Implement a vanilla JS hardware mock for Html5Qrcode that intercepts camera requests and allows manual scan injections. Write a comprehensive test suite in `src/tests/scanner.test.js` validating the barcode logic for MobileStockView and MobileAppointmentView, integrating it into the core test runner while handling async state and DOM cleanup.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Analyze test environment and views",
+      "subtasks_required": [
+        "1.1 Read src/lib/tester.js to understand assertions",
+        "1.2 Read src/tests/index.js to see integration points",
+        "1.3 Read src/views/view.mobile_stock.js for scanner logic",
+        "1.4 Read src/views/view.mobile_appointment.js for scanner logic"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "Look at hunting tools before throw",
+      "status": "pending",
+      "testing_criteria": "Understanding achieved."
+    },
+    {
+      "id": 2,
+      "description": "Do-Pebble: Implement Scanner Mock & Test Setup",
+      "subtasks_required": [
+        "2.1 Create src/tests/scanner.test.js",
+        "2.2 Define MockHtml5Qrcode class replacing window.Html5Qrcode",
+        "2.3 Add start(), stop(), and global simulateScan() to the mock",
+        "2.4 Add DOM container setup/teardown logic"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "Make fake animal to practice spear",
+      "status": "pending",
+      "testing_criteria": "Mock captures callbacks and executes simulateScan successfully."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Write MobileStockView Tests",
+      "subtasks_required": [
+        "3.1 Write Test A: Debounce & Duplicates (scan P-123 twice, assert length 1)",
+        "3.2 Write Test B: Invalid Hardware Assignment (prevent load without type)"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "Throw spear at fake animal logic 1",
+      "status": "pending",
+      "testing_criteria": "Tests pass correctly handling DOM and mock DB."
+    },
+    {
+      "id": 4,
+      "description": "Do-Pebble: Write MobileAppointmentView Tests",
+      "subtasks_required": [
+        "4.1 Write Test C: Successful Fulfillment (scan valid ID for catalog slot)",
+        "4.2 Write Test D: Hardware Mismatch (scan wrong ID, assert graceful rejection)"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "Throw spear at fake animal logic 2",
+      "status": "pending",
+      "testing_criteria": "Tests pass correctly asserting DOM state changes based on simulated scans."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Integrate into test runner",
+      "subtasks_required": [
+        "5.1 Import and execute runScannerTests inside src/tests/index.js"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "Put fake animal in main practice field",
+      "status": "pending",
+      "testing_criteria": "Tests run when suite executes."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": [
+        "Review all tests for leaks",
+        "Verify await/async delays handle Firebase lag",
+        "Verify mock restores properly"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "Clean up practice field",
+      "status": "pending",
+      "testing_criteria": "No cross-test pollution."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

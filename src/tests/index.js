@@ -3,6 +3,7 @@ import { firebase } from '../lib/firebase.js';
 import { runViewTests } from './views.test.js';
 import { runSystemTests } from './system.test.js';
 import { runAuthTests } from './auth.test.js';
+import { runScannerTests } from './scanner.test.js';
 
 export async function runTests() {
     const t = tester();
@@ -10,6 +11,9 @@ export async function runTests() {
 
     // View Tests
     await runViewTests(t);
+
+    // Hardware/Scanner Tests
+    await runScannerTests(t);
 
     // System Integration & Audit Tests
     await runSystemTests(t);

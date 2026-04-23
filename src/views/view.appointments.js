@@ -16,7 +16,30 @@ export function AppointmentsView() {
                     .hw-btn:hover { background: #f1f5f9; color: #0f172a; }
                     .hw-count { padding: 4px 16px; font-weight: 600; font-family: monospace; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; min-width: 40px; text-align: center; }
                 </style>
-                <div class="d-flex justify-content-end mb-4">
+                <div class="d-flex flex-wrap gap-3 align-items-end justify-content-between mb-4">
+                    <div class="d-flex flex-wrap gap-2 align-items-end flex-grow-1">
+                        <div style="min-width: 150px;">
+                            <label class="form-label small fw-bold text-muted mb-1">Filter by Date</label>
+                            <input type="date" id="filter-date" class="form-control form-control-sm">
+                        </div>
+                        <div style="min-width: 140px;">
+                            <label class="form-label small fw-bold text-muted mb-1">Status</label>
+                            <select id="filter-status" class="form-select form-select-sm">
+                                <option value="">None</option>
+                                <option value="scheduled">Scheduled</option>
+                                <option value="rescheduled">Rescheduled</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </div>
+                        <div style="min-width: 140px;">
+                            <label class="form-label small fw-bold text-muted mb-1">City</label>
+                            <input type="text" id="filter-city" class="form-control form-control-sm" placeholder="Search City...">
+                        </div>
+                        <div style="min-width: 140px;">
+                            <label class="form-label small fw-bold text-muted mb-1">PS/Tech ID</label>
+                            <input type="text" id="filter-tech" class="form-control form-control-sm" placeholder="Search Tech ID...">
+                        </div>
+                    </div>
                     <button id="open-add-apt" class="btn-pico btn-pico-primary auth-appointments:create hidden">
                         <i class="bi bi-calendar-plus me-2"></i>Schedule Appointment
                     </button>
@@ -25,7 +48,7 @@ export function AppointmentsView() {
                 <div class="card border-0 shadow-sm">
                     <div class="card-body p-0">
                         ${renderTable({
-                            headers: ['Job ID', 'Customer', 'Date', 'Time', 'Location', 'Tech', 'Status', 'Actions'],
+                            headers: ['Job ID', 'Customer', 'Date', 'Time', 'Location', 'Technician (PS ID)', 'Status', 'Actions'],
                             tbodyId: 'apt-list',
                             emptyMessage: 'Loading appointments...'
                         })}
@@ -35,11 +58,16 @@ export function AppointmentsView() {
         `
     });
 
-    view.onboard({ id: 'open-add-apt' }).onboard({ id: 'apt-list' });
+    view.onboard({ id: 'open-add-apt' }).onboard({ id: 'apt-list' })
+        .onboard({ id: 'filter-date' }).onboard({ id: 'filter-status' })
+        .onboard({ id: 'filter-city' }).onboard({ id: 'filter-tech' });
 
-    view.trigger('click', 'open-add-apt', async () => {
+    let userMap = {}; // Lookup for human-readable names
+
+    const openAppointmentModal = async (existingAptData = null) => {
+        const isUpdate = !!existingAptData;
         const modal = createModal({
-            title: 'Schedule Appointment & Availability',
+            title: isUpdate ? `Reschedule Appointment: ${existingAptData.appointment_id}` : 'Schedule Appointment & Availability',
             width: '1200px',
             body: `
                 <div class="row g-4">
@@ -47,48 +75,49 @@ export function AppointmentsView() {
                         <form id="add-apt-form" class="row g-3">
                             <div class="col-12">
                                 <label class="form-label small fw-bold">Customer Name</label>
-                                <input type="text" name="appointment_name" class="form-control" required>
+                                <input type="text" name="appointment_name" class="form-control" value="${existingAptData?.appointment_name || ''}" required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold">Date</label>
-                                <input type="date" name="schedule_date" id="schedule_date_input" class="form-control" required>
+                                <input type="date" name="schedule_date" id="schedule_date_input" class="form-control" value="${existingAptData?.schedule_date || ''}" required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold">Time Slot</label>
                                 <select name="appointment_time" class="form-select" required>
-                                    <option value="" disabled selected>Select from Grid...</option>
-                                    <option value="08:00">08:00 AM</option>
-                                    <option value="09:00">09:00 AM</option>
-                                    <option value="10:00">10:00 AM</option>
-                                    <option value="11:00">11:00 AM</option>
-                                    <option value="12:00">12:00 PM</option>
-                                    <option value="13:00">01:00 PM</option>
-                                    <option value="14:00">02:00 PM</option>
-                                    <option value="15:00">03:00 PM</option>
-                                    <option value="16:00">04:00 PM</option>
-                                    <option value="17:00">05:00 PM</option>
+                                    <option value="" disabled ${!isUpdate ? 'selected' : ''}>Select from Grid...</option>
+                                    <option value="08:00" ${existingAptData?.appointment_time === '08:00' ? 'selected' : ''}>08:00 AM</option>
+                                    <option value="09:00" ${existingAptData?.appointment_time === '09:00' ? 'selected' : ''}>09:00 AM</option>
+                                    <option value="10:00" ${existingAptData?.appointment_time === '10:00' ? 'selected' : ''}>10:00 AM</option>
+                                    <option value="11:00" ${existingAptData?.appointment_time === '11:00' ? 'selected' : ''}>11:00 AM</option>
+                                    <option value="12:00" ${existingAptData?.appointment_time === '12:00' ? 'selected' : ''}>12:00 PM</option>
+                                    <option value="13:00" ${existingAptData?.appointment_time === '13:00' ? 'selected' : ''}>01:00 PM</option>
+                                    <option value="14:00" ${existingAptData?.appointment_time === '14:00' ? 'selected' : ''}>02:00 PM</option>
+                                    <option value="15:00" ${existingAptData?.appointment_time === '15:00' ? 'selected' : ''}>03:00 PM</option>
+                                    <option value="16:00" ${existingAptData?.appointment_time === '16:00' ? 'selected' : ''}>04:00 PM</option>
+                                    <option value="17:00" ${existingAptData?.appointment_time === '17:00' ? 'selected' : ''}>05:00 PM</option>
                                 </select>
                             </div>
                             <div class="col-12">
                                 <label class="form-label small fw-bold">Location Address / Description</label>
-                                <input type="text" name="location_name" class="form-control" placeholder="Click map to auto-fill" required>
+                                <input type="text" name="location_name" class="form-control" placeholder="Click map to auto-fill" value="${existingAptData?.location_name || ''}" required>
                                 <div class="small text-muted mt-1" id="location-status"></div>
                             </div>
                             
-                            <input type="hidden" name="auto_van_id" id="auto_van_id">
+                            <input type="hidden" name="auto_van_id" id="auto_van_id" value="${existingAptData?.van_id || ''}">
                             <input type="hidden" id="raw_valid_techs" value="[]">
 
                             <div class="col-12">
                                 <label class="form-label small fw-bold">Service Location</label>
                                 <div id="apt-map" class="border" style="height: 200px; border-radius: 8px; z-index: 1;"></div>
-                                <input type="hidden" name="lat"><input type="hidden" name="lng">
+                                <input type="hidden" name="lat" value="${existingAptData?.metadata?.location?.lat || ''}">
+                                <input type="hidden" name="lng" value="${existingAptData?.metadata?.location?.lng || ''}">
                             </div>
 
                             <div class="col-12 mt-2" id="hardware-selection-container"></div>
                             <div class="col-12 mt-2" id="custom-fields-container"></div>
                             
                             <div class="col-12 mt-4">
-                                <button type="submit" class="btn-pico btn-pico-primary w-100">Book Appointment</button>
+                                <button type="submit" class="btn-pico btn-pico-primary w-100">${isUpdate ? 'Update Appointment' : 'Book Appointment'}</button>
                             </div>
                         </form>
                     </div>
@@ -133,37 +162,81 @@ export function AppointmentsView() {
         // Render Hardware Quantity UI
         const hwContainer = modal.element.querySelector('#hardware-selection-container');
         let currentTotalDuration = 0;
+        let selectedStartTime = '';
+        let selectedTechId = '';
+
+        const parseTime = (t) => {
+            if (!t) return 0;
+            const [h, m] = t.split(':').map(Number);
+            return h * 60 + m;
+        };
+
+        const formatTimeAMPM = (mins) => {
+            const h = Math.floor(mins / 60) % 24;
+            const m = mins % 60;
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`;
+        };
+
+        const updateBookingUI = () => {
+            const dateHeader = modal.element.querySelector('#daily-view-date');
+            const container = modal.element.querySelector('#daily-schedule-container');
+            const dateStr = modal.element.querySelector('[name="schedule_date"]')?.value;
+            
+            // 1. Clear previous highlights
+            if (container) {
+                container.querySelectorAll('.calendar-day').forEach(cell => {
+                    cell.style.background = cell.dataset.originalBg || cell.style.background;
+                    cell.classList.remove('booking-highlight');
+                    cell.style.border = '';
+                });
+            }
+
+            if (!selectedStartTime || !dateStr) return;
+
+            const startMins = parseTime(selectedStartTime);
+            const endMins = startMins + currentTotalDuration;
+            
+            // 2. Update Header
+            const startStr = formatTimeAMPM(startMins);
+            const endStr = formatTimeAMPM(endMins);
+            
+            // Check shift end boundary
+            const date = new Date(dateStr);
+            const tech = userDataArray.find(u => u.id === selectedTechId);
+            const sched = tech?.schedule?.[date.getDay()];
+            const shiftEndMins = sched ? parseTime(sched.end) : 1020; // 17:00 default
+            
+            const isExceeding = endMins > shiftEndMins;
+            const windowHtml = `<span class="ms-3 ${isExceeding ? 'text-danger fw-bold' : 'text-primary fw-bold'}">
+                Selected: ${startStr} - ${endStr} ${isExceeding ? '(Exceeds Shift!)' : ''}
+            </span>`;
+            
+            const baseDateText = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+            if (dateHeader) dateHeader.innerHTML = `${baseDateText} ${windowHtml}`;
+
+            // 3. Visual Grid Highlighting
+            if (container) {
+                container.querySelectorAll('.calendar-day').forEach(cell => {
+                    if (cell.dataset.tech === selectedTechId) {
+                        const cellMins = parseTime(cell.dataset.time);
+                        // Highlight if cell falls within the booking window
+                        // Note: Grid is in 1-hour chunks usually, but duration can be precise. 
+                        // We highlight cells that overlap with the window.
+                        if (cellMins >= startMins && cellMins < endMins) {
+                            if (!cell.dataset.originalBg) cell.dataset.originalBg = cell.style.background;
+                            cell.style.background = isExceeding ? 'rgba(239, 68, 68, 0.3)' : 'rgba(59, 130, 246, 0.4)';
+                            cell.classList.add('booking-highlight');
+                            if (cellMins === startMins) cell.style.border = '2px solid #3b82f6';
+                        }
+                    }
+                });
+            }
+        };
 
         if (hwContainer && allHardwareTypes.length > 0) {
-            let html = `<div class="col-12 mt-3 p-3 border rounded bg-white shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-                    <h6 class="text-dark mb-0 fw-bold"><i class="bi bi-box-seam me-2 text-primary"></i>Hardware Requirements</h6>
-                    <div id="total-duration-tracker" class="badge badge-pale-primary text-sm">Total: 0 min</div>
-                </div>
-                <div class="d-flex flex-column gap-2" id="hw-counters-list">`;
-            
-            allHardwareTypes.forEach(hw => {
-                const duration = parseInt(hw.duration_minutes || '30', 10);
-                html += `
-                    <div class="hw-counter-box d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="fw-bold text-dark text-sm">${hw.item_name}</div>
-                            <div class="text-xs text-muted">${hw.item_type} • ${duration} min</div>
-                        </div>
-                        <div class="hw-controls">
-                            <button type="button" class="hw-btn hw-dec" data-id="${hw.id}" data-duration="${duration}">-</button>
-                            <div class="hw-count" id="count-${hw.id}">0</div>
-                            <button type="button" class="hw-btn hw-inc" data-id="${hw.id}" data-duration="${duration}">+</button>
-                        </div>
-                    </div>
-                `;
-            });
-            html += `</div></div>`;
-            hwContainer.innerHTML = html;
-            
             const counters = {};
-            allHardwareTypes.forEach(h => counters[h.id] = 0);
-
+            
             const updateDuration = () => {
                 currentTotalDuration = 0;
                 allHardwareTypes.forEach(hw => {
@@ -174,7 +247,40 @@ export function AppointmentsView() {
                     tracker.textContent = `Total: ${currentTotalDuration} min`;
                     tracker.className = currentTotalDuration > 480 ? 'badge badge-pale-danger text-sm' : 'badge badge-pale-primary text-sm';
                 }
+                updateBookingUI(); // Update window and highlights
             };
+
+            let html = `<div class="col-12 mt-3 p-3 border rounded bg-white shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                    <h6 class="text-dark mb-0 fw-bold"><i class="bi bi-box-seam me-2 text-primary"></i>Hardware Requirements</h6>
+                    <div id="total-duration-tracker" class="badge badge-pale-primary text-sm">Total: 0 min</div>
+                </div>
+                <div class="d-flex flex-column gap-2" id="hw-counters-list">`;
+            
+            allHardwareTypes.forEach(hw => {
+                const duration = parseInt(hw.duration_minutes || '30', 10);
+                const existingReq = existingAptData?.metadata?.required_hardware?.find(rh => rh.catalog_id === hw.catalog_id);
+                const initialCount = existingReq ? existingReq.count : 0;
+                counters[hw.id] = initialCount;
+                
+                html += `
+                    <div class="hw-counter-box d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold text-dark text-sm">${hw.item_name}</div>
+                            <div class="text-xs text-muted">${hw.item_type} • ${duration} min</div>
+                        </div>
+                        <div class="hw-controls">
+                            <button type="button" class="hw-btn hw-dec" data-id="${hw.id}" data-duration="${duration}">-</button>
+                            <div class="hw-count" id="count-${hw.id}">${initialCount}</div>
+                            <button type="button" class="hw-btn hw-inc" data-id="${hw.id}" data-duration="${duration}">+</button>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div></div>`;
+            hwContainer.innerHTML = html;
+            
+            updateDuration(); // Initial calculate for hydration
 
             hwContainer.querySelectorAll('.hw-inc').forEach(btn => {
                 btn.onclick = () => {
@@ -212,7 +318,6 @@ export function AppointmentsView() {
             };
         }
 
-        let selectedTechId = '';
         let currentValidTechs = [];
         let currentValidVans = [];
 
@@ -249,8 +354,14 @@ export function AppointmentsView() {
             }
 
             if (validVans.length > 0) {
-                modal.element.querySelector('#auto_van_id').value = validVans[0].id;
-                modal.element.querySelector('#location-status').innerHTML = `<span class="badge badge-pale-success"><i class="bi bi-check-circle me-1"></i>Covered by ${validVans.length} VAN(s).</span>`;
+                const primaryVan = validVans[0];
+                modal.element.querySelector('#auto_van_id').value = primaryVan.id;
+                
+                const assignedUserId = primaryVan.assigned_users?.[0];
+                const assignedUser = userDataArray.find(u => u.user_id === assignedUserId);
+                const techName = assignedUser ? assignedUser.user_name : 'Unassigned';
+
+                modal.element.querySelector('#location-status').innerHTML = `<span class="badge badge-pale-success"><i class="bi bi-check-circle me-1"></i>Covered by ${primaryVan.id} (Assigned PS: ${techName})</span>`;
                 
                 let techIds = new Set();
                 validVans.forEach(v => {
@@ -419,11 +530,13 @@ export function AppointmentsView() {
                     const timeSelect = modal.element.querySelector('[name="appointment_time"]');
                     if(timeSelect) timeSelect.value = cell.dataset.time;
                     selectedTechId = cell.dataset.tech;
+                    selectedStartTime = cell.dataset.time;
                     
-                    container.querySelectorAll('.select-slot-btn').forEach(c => c.style.border = '');
-                    cell.style.border = '2px solid #3b82f6'; 
+                    updateBookingUI();
                 });
             });
+            // Auto-refresh highlights if it was already selected
+            if (selectedStartTime) updateBookingUI();
         };
 
         const dateInput = modal.element.querySelector('[name="schedule_date"]');
@@ -486,7 +599,6 @@ export function AppointmentsView() {
 
             const fd = new FormData(form);
             const data = Object.fromEntries(fd);
-            const id = 'APT-' + Math.random().toString(36).substr(2, 9).toUpperCase();
             
             const customData = {};
             for (const key in data) {
@@ -508,26 +620,35 @@ export function AppointmentsView() {
             const btn = modal.element.querySelector('button[type="submit"]');
             const ogBtn = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Booking...';
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${isUpdate ? 'Updating...' : 'Booking...'}`;
             
             try {
-                await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'appointments', id), {
-                    appointment_id: id,
+                const payload = {
                     ...data,
                     tech_id: selectedTechId,
                     van_id: data.auto_van_id,
-                    status: 'pending',
-                    created_at: firebase.db.serverTimestamp(),
+                    status: isUpdate ? 'rescheduled' : 'scheduled',
+                    updated_at: firebase.db.serverTimestamp(),
                     metadata: { 
-                        hardware: [], 
-                        location: { lat: data.lat, lng: data.lng },
+                        hardware: existingAptData?.metadata?.hardware || [], 
+                        location: { lat: parseFloat(data.lat), lng: parseFloat(data.lng) },
                         custom_data: customData,
                         required_hardware: requiredHardwarePayload,
                         duration_minutes: currentTotalDuration
                     }
-                });
+                };
 
-                firebase.logAction("Appointment Scheduled", `Job ${id} created`);
+                if (isUpdate) {
+                    await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', existingAptData.appointment_id), payload);
+                    firebase.logAction("Appointment Rescheduled", `Job ${existingAptData.appointment_id} updated via modular flow`);
+                } else {
+                    const newId = 'APT-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+                    payload.appointment_id = newId;
+                    payload.created_at = firebase.db.serverTimestamp();
+                    await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'appointments', newId), payload);
+                    firebase.logAction("Appointment Scheduled", `Job ${newId} created`);
+                }
+                
                 modal.hide();
             } catch (err) { 
                 alert(err.message); 
@@ -535,72 +656,144 @@ export function AppointmentsView() {
                 btn.innerHTML = ogBtn;
             }
         };
-    });
+
+        // If hydration (Reschedule)
+        if (isUpdate) {
+            // Wait for map and counters to be ready, then trigger logic
+            setTimeout(async () => {
+                if (existingAptData.metadata?.location) {
+                    const { lat, lng } = existingAptData.metadata.location;
+                    marker = L.marker([lat, lng]).addTo(map);
+                    map.setView([lat, lng], 15);
+                    updateTechOptions(lat, lng);
+                    updateDailyGrid(existingAptData.schedule_date);
+                }
+            }, 600);
+        }
+    };
+
+    view.trigger('click', 'open-add-apt', () => openAppointmentModal());
 
     view.on('init', () => {
         view.emit('loading:start');
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'appointments'), (snap) => {
+
+        // Fetch users once for the map
+        firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'users')).then(snap => {
+            snap.forEach(doc => {
+                const u = doc.data();
+                userMap[u.user_id] = u.user_name;
+            });
+            renderAptList();
+        });
+
+        const attachFilterListeners = () => {
+            ['filter-date', 'filter-status', 'filter-city', 'filter-tech'].forEach(id => {
+                view.$(id).oninput = () => renderAptList();
+            });
+        };
+
+        let allAptData = [];
+        const renderAptList = () => {
             const list = view.$('apt-list');
-            view.emit('loading:end');
             if (!list) return;
-            list.innerHTML = '';
             
-            if (snap && snap.forEach) {
-                snap.forEach(doc => {
-                    const apt = doc.data();
-                    if (apt.is_deleted) return;
-                    const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td><code class="data-mono fw-bold">${apt.appointment_id}</code></td>
-                            <td class="fw-bold">${apt.appointment_name}</td>
-                            <td>${apt.schedule_date}</td>
-                            <td>${apt.appointment_time || '-'}</td>
-                            <td class="text-truncate" style="max-width: 150px;" title="${apt.location_name}">${apt.location_name || '-'}</td>
-                            <td>${apt.tech_id || 'Unassigned'}</td>
-                            <td><span class="badge ${apt.status === 'pending' ? 'badge-pale-warning' : 'badge-pale-success'} text-capitalize">${apt.status}</span></td>
-                            <td>
-                                <button class="btn-pico btn-pico-outline table-action-btn view-apt me-1" data-id="${apt.appointment_id}" title="View Details">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                                <button class="btn-pico btn-pico-danger-outline table-action-btn delete-apt auth-appointments:delete hidden" data-id="${apt.appointment_id}" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </td>
-                        `;
-                        row.querySelector('.view-apt').addEventListener('click', () => {
-                            window.location.hash = `#appointment/${apt.appointment_id}`;
+            const filterDate = view.$('filter-date').value;
+            const filterStatus = view.$('filter-status').value;
+            const filterCity = view.$('filter-city').value.toLowerCase();
+            const filterTech = view.$('filter-tech').value.toLowerCase();
+
+            const filtered = allAptData.filter(apt => {
+                if(apt.is_deleted) return false;
+                if(filterDate && apt.schedule_date !== filterDate) return false;
+                if(filterStatus && apt.status !== filterStatus) return false;
+                if(filterCity && !(apt.location_name || '').toLowerCase().includes(filterCity)) return false;
+                if(filterTech) {
+                    const techId = (apt.tech_id || '').toLowerCase();
+                    const techName = (userMap[apt.tech_id] || '').toLowerCase();
+                    if(!techId.includes(filterTech) && !techName.includes(filterTech)) return false;
+                }
+                return true;
+            });
+
+            list.innerHTML = '';
+            filtered.forEach(apt => {
+                const row = document.createElement('tr');
+                
+                let statusClass = 'badge-pale-info';
+                if(apt.status === 'scheduled') statusClass = 'badge-pale-primary';
+                if(apt.status === 'rescheduled') statusClass = 'badge-pale-warning';
+                if(apt.status === 'completed') statusClass = 'badge-pale-success';
+
+                row.innerHTML = `
+                    <td><code class="data-mono fw-bold">${apt.appointment_id}</code></td>
+                    <td class="fw-bold">${apt.appointment_name}</td>
+                    <td>${apt.schedule_date}</td>
+                    <td>${apt.appointment_time || '-'}</td>
+                    <td class="text-truncate" style="max-width: 150px;" title="${apt.location_name}">${apt.location_name || '-'}</td>
+                    <td>${userMap[apt.tech_id] || apt.tech_id || 'Unassigned'}</td>
+                    <td><span class="badge ${statusClass} text-capitalize text-xs">${apt.status}</span></td>
+                    <td>
+                        <button class="btn-pico btn-pico-outline table-action-btn view-apt me-1" data-id="${apt.appointment_id}" title="View Details">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn-pico btn-pico-outline table-action-btn reschedule-apt me-1 auth-appointments:create hidden" data-id="${apt.appointment_id}" title="Reschedule">
+                            <i class="bi bi-calendar-range"></i>
+                        </button>
+                        <button class="btn-pico btn-pico-danger-outline table-action-btn delete-apt auth-appointments:delete hidden" data-id="${apt.appointment_id}" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                `;
+                
+                row.querySelector('.view-apt').onclick = () => {
+                    window.location.hash = `#appointment/${apt.appointment_id}`;
+                };
+
+                row.querySelector('.reschedule-apt').onclick = () => {
+                    openAppointmentModal(apt);
+                };
+
+                const deleteBtn = row.querySelector('.delete-apt');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        const deleteModal = createModal({
+                            title: 'Confirm Deletion',
+                            body: `
+                                <div class="text-center py-3">
+                                    <i class="bi bi-exclamation-triangle-fill text-danger mb-3" style="font-size: 3rem;"></i>
+                                    <h5 class="fw-bold">Delete Appointment?</h5>
+                                    <div class="d-flex justify-content-center gap-2 mt-4">
+                                        <button type="button" class="btn-pico btn-pico-outline cancel-btn">Cancel</button>
+                                        <button type="button" class="btn-pico btn-pico-danger-outline confirm-btn">Delete</button>
+                                    </div>
+                                </div>
+                            `
                         });
-                        const deleteBtn = row.querySelector('.delete-apt');
-                        if (deleteBtn) {
-                            deleteBtn.addEventListener('click', async (e) => {
-                                e.stopPropagation();
-                                const modal = createModal({
-                                    title: 'Confirm Deletion',
-                                    body: `
-                                        <div class="text-center py-3">
-                                            <i class="bi bi-exclamation-triangle-fill text-danger mb-3" style="font-size: 3rem;"></i>
-                                            <h5 class="fw-bold">Delete Appointment?</h5>
-                                            <div class="d-flex justify-content-center gap-2 mt-4">
-                                                <button type="button" class="btn-pico btn-pico-outline cancel-btn">Cancel</button>
-                                                <button type="button" class="btn-pico btn-pico-danger-outline confirm-btn">Delete</button>
-                                            </div>
-                                        </div>
-                                    `
-                                });
-                                modal.element.querySelector('.cancel-btn').onclick = () => modal.hide();
-                                modal.element.querySelector('.confirm-btn').onclick = async () => {
-                                    modal.hide();
-                                    try {
-                                        await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', apt.appointment_id), { is_deleted: true });
-                                    } catch (err) { console.error('Delete failed: ', err.message); }
-                                };
-                                modal.show();
-                            });
-                        }
-                        list.appendChild(row);
+                        deleteModal.element.querySelector('.cancel-btn').onclick = () => deleteModal.hide();
+                        deleteModal.element.querySelector('.confirm-btn').onclick = async () => {
+                            deleteModal.hide();
+                            try {
+                                await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', apt.appointment_id), { is_deleted: true });
+                            } catch (err) { console.error('Delete failed: ', err.message); }
+                        };
+                        deleteModal.show();
                     });
-            }
+                }
+
+                list.appendChild(row);
+            });
             document.dispatchEvent(new CustomEvent('apply-auth'));
+        };
+
+        attachFilterListeners();
+
+        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'appointments'), (snap) => {
+            view.emit('loading:end');
+            if (snap && snap.forEach) {
+                allAptData = snap.docs.map(d => d.data());
+                renderAptList();
+            }
         }));
     });
 

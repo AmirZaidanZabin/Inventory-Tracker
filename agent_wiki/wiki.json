@@ -14,7 +14,14 @@
     "Automation Rules Engine enhanced with real-time JSON validation and auto-pretty-printing for webhooks",
     "Live Postman-style JSON syntax highlighting integrated into the Automation Rules Engine using Prism.js and layered ghosting CSS",
     "JSON editor alignment shift resolved with strict box-model synchronization and scroll-coupled ghosting layers",
-    "Technician vacation management integrated with date-range picker and collision-aware scheduling logic in Appointments View"
+    "Technician vacation management integrated with date-range picker and collision-aware scheduling logic in Appointments View",
+    "Appointments module expanded with multi-parameter filter bars and a dedicated rescheduling workflow with action logging",
+    "Appointment Detail View enhanced with technician name resolution, calculated time windows, optimized map visibility (450px), and unified status badge styling",
+    "Appointments View refactored to modularize booking modal, enabling unified validation for both creation and rescheduling",
+    "Appointments Gantt View redesigned into a high-density, split-pane interface inspired by enterprise solutions (Salesforce FSL), featuring hourly markers, technician utilization stats, and location-based grouping",
+    "Appointments table now displays human-readable technician names via a pre-fetched userMap, with filters supporting name-based searching",
+    "Vans management UI restricted to 1:1 technician assignment using single-select dropdowns, while maintaining list-based backend compatibility",
+    "Appointment booking modal enhanced with dynamic coverage status explicitly showing both Van ID and assigned technician name"
   ],
   "tech_stack": {
     "backend": "Node.js (Express) + Firebase Admin",

@@ -1,0 +1,94 @@
+{
+  "original_prompt": "Redesign the AppointmentsGanttView to match Salesforce Field Service Lightning layout. Split-pane, granular timeline (days/hours), technician rows with roles/utilization, and refined toolbar.",
+  "rephrased_goal": "Transform current Gantt into a high-density, split-pane interface with hourly demarcations and resource utilization metrics.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Add Gantt CSS structures to main.css",
+      "subtasks_required": ["Define .gantt-layout, .gantt-sidebar, .gantt-canvas-container", "Add styles for hourly ticks and utilization bars"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "CSS builds without error."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify CSS addition",
+      "subtasks_required": ["Read main.css tail", "Confirm new classes present"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "CSS content matches input."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Refactor Gantt View Template",
+      "subtasks_required": ["Update stringComponent in view.gantt.js", "Implement flex-basis based layout for split pane", "Add toolbar elements for date range and scale"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "UI structure matches split-pane requirements."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify Template Structure",
+      "subtasks_required": ["View view.gantt.js", "Confirm panes and toolbar IDs exist"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Template IDs match controller logic."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Update SVG Logic for Hourly Demarcations",
+      "subtasks_required": ["Modify renderGantt to calculate hourly ticks", "Increase DAY_W to accommodate hours visually", "Draw vertical lines for 6AM, 12PM, 6PM"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "SVG generation includes hour marks."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify SVG Outputs",
+      "subtasks_required": ["Run compile and preview", "Check SVG header rendering"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Header shows Days and Hourly intervals."
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Implement Resource Rows with Utilization",
+      "subtasks_required": ["Calculate utilization percentage within renderGantt", "Format Technician ID/Name/Role/Util display", "Implement location grouping logic"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Resource rows show name, role, and utilization badge."
+    },
+    {
+      "id": 8,
+      "description": "Check-Pebble: Verify Data Mapping",
+      "subtasks_required": ["Check math for % utilization", "Confirm location grouping labels render"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Visual data matches backend counts."
+    },
+    {
+      "id": 9,
+      "description": "Do-Pebble: Implement Left-Pane Appointment List",
+      "subtasks_required": ["Create renderAptList helper for the sidebar", "Add search and filter listeners", "Handle appointment navigation from list"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Sidebar list populates and filters."
+    },
+    {
+      "id": 10,
+      "description": "FINAL: BIG BOSS SWEEP",
+      "subtasks_required": ["Review all logic", "Check responsiveness of split-pane", "Final compile"],
+      "owner": "Caveman",
+      "status": "pending",
+      "testing_criteria": "Whole project cave stable."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

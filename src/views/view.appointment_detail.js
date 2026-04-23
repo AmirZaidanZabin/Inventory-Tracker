@@ -16,15 +16,22 @@ export function AppointmentDetailView(appointmentId) {
                     .scanner-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; flex-direction: column; }
                     .scanner-header { padding: 1rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); color: #fff; }
                     #hw-reader { flex-grow: 1; width: 100%; }
+
+                    #apt-detail-map { height: 450px !important; }
                 </style>
                 
-                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center mb-4">
-                    <div>
-                        <h4 class="fw-bold mb-1">Job Execution</h4>
-                        <div class="text-muted font-monospace small">${appointmentId}</div>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <span id="det-status" class="badge bg-secondary d-flex align-items-center px-3">Loading</span>
+                <div class="mb-4">
+                    <button id="btn-back" class="btn-pico btn-pico-outline mb-3">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Appointments
+                    </button>
+                    <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
+                        <div>
+                            <h4 class="fw-bold mb-1">Job Execution</h4>
+                            <div class="text-muted font-monospace small">${appointmentId}</div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <span id="det-status" class="badge bg-secondary d-flex align-items-center px-3">Loading</span>
+                        </div>
                     </div>
                 </div>
 
@@ -34,7 +41,8 @@ export function AppointmentDetailView(appointmentId) {
                             <div class="card-body p-4">
                                 <h5 id="det-name" class="fw-bold mb-3">...</h5>
                                 <div class="d-flex flex-column gap-2 text-sm text-muted mb-4">
-                                    <div><i class="bi bi-calendar-event me-2 text-primary"></i><span id="det-time"></span></div>
+                                    <div><i class="bi bi-person-badge me-2 text-primary"></i><span id="det-tech-name">Loading...</span> <small class="text-xs">(<span id="det-tech-id">...</span>)</small></div>
+                                    <div><i class="bi bi-clock me-2 text-primary"></i><span id="det-time-range">...</span></div>
                                     <div><i class="bi bi-geo-alt me-2 text-primary"></i><span id="det-location"></span></div>
                                     <div><i class="bi bi-truck me-2 text-primary"></i><span id="det-van"></span></div>
                                 </div>
@@ -97,11 +105,16 @@ export function AppointmentDetailView(appointmentId) {
         `
     });
 
-    view.onboard({ id: 'det-name' }).onboard({ id: 'det-time' }).onboard({ id: 'det-location' })
+    view.onboard({ id: 'det-name' }).onboard({ id: 'det-tech-name' }).onboard({ id: 'det-tech-id' }).onboard({ id: 'det-time-range' }).onboard({ id: 'det-location' })
         .onboard({ id: 'det-van' }).onboard({ id: 'det-status' })
         .onboard({ id: 'required-slots-container' }).onboard({ id: 'van-inventory-container' })
         .onboard({ id: 'btn-complete-job' }).onboard({ id: 'completion-desc' }).onboard({ id: 'completion-panel' })
-        .onboard({ id: 'btn-open-scanner' }).onboard({ id: 'hw-scanner-modal' }).onboard({ id: 'btn-close-scanner' });
+        .onboard({ id: 'btn-open-scanner' }).onboard({ id: 'hw-scanner-modal' }).onboard({ id: 'btn-close-scanner' })
+        .onboard({ id: 'btn-back' });
+
+    view.trigger('click', 'btn-back', () => {
+        window.location.hash = '#appointments';
+    });
 
     let aptData = null;
     let hardwareSlots = []; // { index, catalog_id, item_name, assigned_id }
@@ -350,18 +363,41 @@ export function AppointmentDetailView(appointmentId) {
 
             // Hydrate UI Text
             if(view.$('det-name')) view.$('det-name').textContent = aptData.appointment_name;
-            if(view.$('det-time')) view.$('det-time').textContent = `${aptData.schedule_date} @ ${aptData.appointment_time || 'N/A'}`;
+            
+            if(view.$('det-tech-id')) view.$('det-tech-id').textContent = aptData.tech_id || '...';
+            
+            // Resolve Technician Name
+            const techDoc = await firebase.db.getDoc(firebase.db.doc(firebase.db.db, 'users', aptData.tech_id));
+            if(view.$('det-tech-name')) {
+                view.$('det-tech-name').textContent = techDoc.exists() ? techDoc.data().user_name : 'Unknown Technician';
+            }
+
+            // Calculate Time Window
+            if(view.$('det-time-range')) {
+                const startTimeStr = aptData.appointment_time || '00:00';
+                const duration = aptData.metadata?.duration_minutes || 60;
+                
+                const [sh, sm] = startTimeStr.split(':').map(Number);
+                const startDate = new Date();
+                startDate.setHours(sh, sm, 0);
+                
+                const endDate = new Date(startDate.getTime() + duration * 60000);
+                
+                const formatTime = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                view.$('det-time-range').textContent = `${aptData.schedule_date} | ${formatTime(startDate)} - ${formatTime(endDate)}`;
+            }
+
             if(view.$('det-location')) view.$('det-location').textContent = aptData.location_name || 'N/A';
             if(view.$('det-van')) view.$('det-van').textContent = aptData.van_id || 'No Van Assigned';
             
             const statusEl = view.$('det-status');
             if(statusEl) {
                 statusEl.textContent = aptData.status;
-                if (isCompleted) {
-                    statusEl.className = 'badge bg-success text-white px-3';
-                } else {
-                    statusEl.className = 'badge bg-warning text-dark px-3';
-                }
+                let badgeClass = 'badge-pale-info';
+                if (aptData.status === 'scheduled') badgeClass = 'badge-pale-primary';
+                if (aptData.status === 'rescheduled') badgeClass = 'badge-pale-warning';
+                if (aptData.status === 'completed') badgeClass = 'badge-pale-success';
+                statusEl.className = `badge ${badgeClass} text-uppercase px-3`;
             }
 
             if (isCompleted) {
