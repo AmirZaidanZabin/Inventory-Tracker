@@ -1,24 +1,7 @@
-import { firebase } from './lib/firebase.js';
+import { auth } from './lib/auth.js';
+import { db } from './lib/db/index.js';
 import { controller } from './lib/controller.js';
 import { runTests } from './tests/index.js';
-
-// Views
-import { DashboardView } from './views/view.dashboard.js';
-import { VansView } from './views/view.vans.js';
-import { ItemsView } from './views/view.items.js';
-import { AppointmentsView } from './views/view.appointments.js';
-import { UsersView } from './views/view.users.js';
-import { RolesView } from './views/view.roles.js';
-import { ReportingView } from './views/view.reporting.js';
-import { AppointmentDetailView } from './views/view.appointment_detail.js';
-import { CalendarView } from './views/view.calendar.js';
-import { StockView } from './views/view.stock.js';
-import { AppointmentsGanttView } from './views/view.gantt.js';
-import { TriggersView } from './views/view.triggers.js';
-import { FormsView } from './views/view.forms.js';
-import { ItemTypesView } from './views/view.item_types.js';
-import { MobileAppointmentView } from './views/view.mobile_appointment.js';
-import { MobileStockView } from './views/view.mobile_stock.js';
 
 const App = (() => {
     let state = {
@@ -142,7 +125,19 @@ const App = (() => {
         App.navigate(hash || 'dashboard');
     });
 
-    shell.trigger('click', 'login-btn', () => firebase.signIn());
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(err => {
+                console.error('SW registration failed: ', err);
+            });
+        });
+    }
+
+    window.addEventListener('online', async () => {
+        console.log('App is back online!');
+    });
+
+    shell.trigger('click', 'login-btn', () => auth.signIn());
     shell.trigger('click', 'toggle-password', () => {
         const passInput = shell.$('login-password');
         const icon = shell.$('toggle-password').querySelector('i');
@@ -179,7 +174,7 @@ const App = (() => {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in...';
             
-            await firebase.signInEmail(email, pass);
+            await auth.signInEmail(email, pass);
             console.log("Auth: Email login successful");
         } catch (e) {
             console.error("Auth: Email login failed", e);
@@ -223,7 +218,7 @@ const App = (() => {
         const email = shell.$('reset-email').value;
         if (!email) return alert("Please enter your email address.");
         try {
-            await firebase.resetPassword(email);
+            await auth.resetPassword(email);
             alert("Password reset link has been sent to your email!");
             shell.$('login-main-form').classList.remove('hidden');
             shell.$('forgot-password-form').classList.add('hidden');
@@ -233,16 +228,39 @@ const App = (() => {
     });
     shell.trigger('click', 'guest-btn', async () => {
         try {
-            await firebase.signInAnonymously();
+            await auth.signInAnonymously();
         } catch (e) {
             console.error("Anon Login failed", e);
         }
     });
-    shell.trigger('click', 'logout-btn', () => firebase.signOut());
+    shell.trigger('click', 'logout-btn', () => auth.signOut());
 
     return {
         init: () => {
-            firebase.onAuth(async (user) => {
+            if (window.location.hash.startsWith('#public_booking') || window.location.hash.startsWith('#track')) {
+                const overlay = document.getElementById('auth-overlay');
+                if (overlay) overlay.style.display = 'none';
+                const shellEl = document.getElementById('app-shell');
+                if (shellEl) shellEl.style.display = 'none';
+
+                if (window.location.hash.startsWith('#track')) {
+                    const trackingId = window.location.hash.split('/')[1];
+                    import('./views/view.public_tracking.js').then(module => {
+                        const trView = module.PublicTrackingView(trackingId);
+                        document.body.appendChild(trView.element());
+                        trView.emit('init');
+                    });
+                } else {
+                    import('./views/view.public_booking.js').then(module => {
+                        const pbView = module.PublicBookingView();
+                        document.body.appendChild(pbView.element());
+                        pbView.emit('init');
+                    });
+                }
+                return;
+            }
+
+            auth.onAuth(async (user) => {
                 if (user) {
                     state.user = user;
                     shell.$('auth-overlay').classList.add('hidden');
@@ -251,29 +269,28 @@ const App = (() => {
                     shell.$('user-avatar').src = user.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}`;
                     shell.$('user-name').textContent = user.displayName || (user.email ? user.email.split('@')[0] : 'Guest');
                     
-                    // Sync user to Firestore
-                    const userRef = firebase.db.doc(firebase.db.db, 'users', user.uid);
+                    // Sync user to database
                     let userDoc;
                     try {
-                        userDoc = await firebase.db.getDoc(userRef);
+                        userDoc = await db.findOne('users', user.uid);
                     } catch (e) {
                         console.error("Critical: Failed to get user doc", e);
                     }
                     
                     let roleId = 'viewer';
-                    if (userDoc && userDoc.exists()) {
-                        roleId = userDoc.data()?.role_id || 'viewer';
-                    } else if (userDoc && !userDoc.exists()) {
+                    if (userDoc) {
+                        roleId = userDoc.role_id || 'viewer';
+                    } else {
                         try {
-                            await firebase.db.setDoc(userRef, {
+                            await db.create('users', {
                                 user_id: user.uid,
                                 user_name: user.displayName,
                                 role_id: 'viewer',
-                                created_at: firebase.db.serverTimestamp(),
-                                updated_at: firebase.db.serverTimestamp(),
+                                created_at: db.serverTimestamp(),
+                                updated_at: db.serverTimestamp(),
                                 is_deleted: false,
                                 metadata: { email: user.email }
-                            });
+                            }, user.uid);
                         } catch (e) {
                             console.error("Critical: Failed to create user doc", e);
                         }
@@ -285,9 +302,9 @@ const App = (() => {
                     state.authorities = [];
                     if (roleId) {
                         try {
-                            const roleDoc = await firebase.db.getDoc(firebase.db.doc(firebase.db.db, 'roles', roleId));
-                            if (roleDoc.exists()) {
-                                state.authorities = roleDoc.data()?.authorities || [];
+                            const roleDoc = await db.findOne('roles', roleId);
+                            if (roleDoc) {
+                                state.authorities = roleDoc.authorities || [];
                             }
                         } catch (e) {
                             console.error("Failed to fetch role authorities for role:", roleId, e);
@@ -313,7 +330,7 @@ const App = (() => {
 
         navigate: (path) => {
             if (!state.user) return;
-            let [viewId, param] = path.split('/');
+            let [viewId, param] = (path || '').split('/');
             if (!viewId) viewId = state.activeView;
 
             // Guest/Viewer restriction: Only Calendar and Gantt
@@ -353,7 +370,7 @@ const App = (() => {
             const container = shell.$('view-container');
             container.classList.add('fade-out');
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 // Destroy previous view properly to stop listeners
                 if (state.currentView && typeof state.currentView.destroy === 'function') {
                     state.currentView.destroy();
@@ -364,23 +381,28 @@ const App = (() => {
 
                 // Load View
                 let view;
-                switch(viewId) {
-                    case 'dashboard': view = DashboardView(); break;
-                    case 'vans': view = VansView(); break;
-                    case 'items': view = ItemsView(); break;
-                    case 'appointments': view = AppointmentsView(); break;
-                    case 'appointment': view = AppointmentDetailView(param); break;
-                    case 'reporting': view = ReportingView(); break;
-                    case 'calendar': view = CalendarView(); break;
-                    case 'roles': view = RolesView(); break;
-                    case 'users': view = UsersView(); break;
-                    case 'stock': view = StockView(); break;
-                    case 'gantt': view = AppointmentsGanttView(); break;
-                    case 'triggers': view = TriggersView(); break;
-                    case 'forms': view = FormsView(); break;
-                    case 'item_types': view = ItemTypesView(); break;
-                    case 'mobile_appointment': view = MobileAppointmentView(param); break;
-                    case 'mobile_stock': view = MobileStockView(); break;
+                let module;
+                try {
+                    switch(viewId) {
+                        case 'dashboard': module = await import('./views/view.dashboard.js'); view = module.DashboardView(); break;
+                        case 'vans': module = await import('./views/view.vans.js'); view = module.VansView(); break;
+                        case 'items': module = await import('./views/view.items.js'); view = module.ItemsView(); break;
+                        case 'appointments': module = await import('./views/view.appointments.js'); view = module.AppointmentsView(); break;
+                        case 'appointment': module = await import('./views/view.appointment_detail.js'); view = module.AppointmentDetailView(param); break;
+                        case 'reporting': module = await import('./views/view.reporting.js'); view = module.ReportingView(); break;
+                        case 'calendar': module = await import('./views/view.calendar.js'); view = module.CalendarView(); break;
+                        case 'roles': module = await import('./views/view.roles.js'); view = module.RolesView(); break;
+                        case 'users': module = await import('./views/view.users.js'); view = module.UsersView(); break;
+                        case 'stock': module = await import('./views/view.stock.js'); view = module.StockView(); break;
+                        case 'gantt': module = await import('./views/view.gantt.js'); view = module.AppointmentsGanttView(); break;
+                        case 'triggers': module = await import('./views/view.triggers.js'); view = module.TriggersView(); break;
+                        case 'forms': module = await import('./views/view.forms.js'); view = module.FormsView(); break;
+                        case 'item_types': module = await import('./views/view.item_types.js'); view = module.ItemTypesView(); break;
+                        case 'mobile_appointment': module = await import('./views/view.mobile_appointment.js'); view = module.MobileAppointmentView(param); break;
+                        case 'mobile_stock': module = await import('./views/view.mobile_stock.js'); view = module.MobileStockView(); break;
+                    }
+                } catch (e) {
+                    console.error("Failed to load view module", e);
                 }
 
                 if (view) {

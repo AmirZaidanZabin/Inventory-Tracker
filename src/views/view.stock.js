@@ -1,5 +1,7 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { auth } from '../lib/auth.js';
+import { db } from '../lib/db/index.js';
+import { createModal } from '../lib/modal.js';
 
 export function StockView() {
     let localVans = [];
@@ -176,7 +178,7 @@ export function StockView() {
 
     // VERY Basic CSV Parser
     const parseCSV = (text) => {
-        const rows = text.split('\n').map(r => r.trim()).filter(r => r);
+        const rows = (text || '').split('\n').map(r => r.trim()).filter(r => r);
         if(rows.length === 0) return [];
         const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
         return rows.slice(1).map(row => {
@@ -241,7 +243,7 @@ ROUTER-789,catalog-router,available,Zain`;
             const invalid = data.find(i => !i.item_id);
             if (invalid) throw new Error("Every row must have an item_id.");
 
-            const res = await firebase.bulkStockTake({
+            const res = await db.bulkStockTake({
                  items: data,
                  van_id: vanId,
                  log_type: 'morning_load'
@@ -277,7 +279,7 @@ ROUTER-789,catalog-router,available,Zain`;
             
             if (data.length === 0) throw new Error("CSV is empty.");
 
-            const res = await firebase.bulkStockTake({
+            const res = await db.bulkStockTake({
                 items: data,
                 van_id: vanId,
                 log_type: 'evening_reconcile'
@@ -327,12 +329,11 @@ ROUTER-789,catalog-router,available,Zain`;
         view.emit('loading:start');
 
         // Fetch Vans for dropdowns
-        firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'vans')).then(snap => {
+        db.findMany('vans').then(vans => {
             const mVan = view.$('morning-van-select');
             const eVan = view.$('evening-van-select');
             let options = '<option value="" disabled selected>Select a VAN...</option>';
-            snap.forEach(doc => {
-                const v = doc.data();
+            vans.forEach(v => {
                 options += `<option value="${v.van_id}">${v.van_id} (${v.location_id})</option>`;
             });
             if(mVan) mVan.innerHTML = options;
@@ -340,35 +341,61 @@ ROUTER-789,catalog-router,available,Zain`;
         });
 
         // Subscribe to logs
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'stock_take_logs'), (snap) => {
+        view.unsub(db.subscribe('stock_take_logs', {}, (data) => {
             const histList = view.$('history-list');
             view.emit('loading:end');
             if (histList) histList.innerHTML = '';
             
-            if (snap.empty) {
+            if (!data || data.length === 0) {
                 histList.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted small">No audit history found.</td></tr>';
                 return;
             }
 
-            const docs = snap.docs.map(t => t.data()).sort((a,b) => {
-                const aTime = a.timestamp?.seconds || new Date(a.timestamp).getTime()/1000 || 0;
-                const bTime = b.timestamp?.seconds || new Date(b.timestamp).getTime()/1000 || 0;
+            const docs = data.sort((a,b) => {
+                let aTime = 0; let bTime = 0;
+                if (a.timestamp?.seconds) aTime = a.timestamp.seconds;
+                else if (typeof a.timestamp === 'string' && a.timestamp.includes('server')) aTime = Date.now()/1000;
+                else if (a.timestamp) aTime = new Date(a.timestamp).getTime()/1000;
+
+                if (b.timestamp?.seconds) bTime = b.timestamp.seconds;
+                else if (typeof b.timestamp === 'string' && b.timestamp.includes('server')) bTime = Date.now()/1000;
+                else if (b.timestamp) bTime = new Date(b.timestamp).getTime()/1000;
+                
                 return bTime - aTime;
             });
 
             docs.forEach(doc => {
                 const tr = document.createElement('tr');
                 let dateRaw = 'N/A';
-                if (doc.timestamp?.seconds) dateRaw = new Date(doc.timestamp.seconds * 1000).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'});
-                else if (doc.timestamp) dateRaw = new Date(doc.timestamp).toLocaleString();
+                if (doc.timestamp) {
+                    if (doc.timestamp.seconds !== undefined) {
+                        dateRaw = new Date(doc.timestamp.seconds * 1000).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'});
+                    } else if (typeof doc.timestamp === 'string' && doc.timestamp.includes('serverTimestamp')) {
+                        dateRaw = new Date().toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'}) + ' (Processing)';
+                    } else if (typeof doc.timestamp === 'number') {
+                        dateRaw = new Date(doc.timestamp).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'});
+                    } else {
+                        const parsed = new Date(doc.timestamp);
+                        if (!isNaN(parsed.getTime())) dateRaw = parsed.toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'});
+                    }
+                }
 
-                const missingCount = doc.discrepancies?.missing?.length || 0;
-                const extraCount = doc.discrepancies?.extra?.length || 0;
-                const discCount = missingCount + extraCount;
+                const missingArr = doc.discrepancies?.missing || [];
+                const extraArr = doc.discrepancies?.extra || [];
+                const discCount = missingArr.length + extraArr.length;
                 
                 const typeBadge = doc.log_type === 'morning_load' 
                     ? '<span class="badge badge-pale-primary"><i class="bi bi-box-arrow-in-right me-1"></i>Load</span>' 
                     : '<span class="badge badge-pale-warning"><i class="bi bi-shield-check me-1"></i>Audit</span>';
+
+                let discHtml = '-';
+                if (doc.log_type === 'evening_reconcile') {
+                    if (discCount > 0) {
+                        discHtml = `<button class="btn btn-sm badge badge-pale-danger btn-view-variance" data-log='${doc.log_id}'>${discCount} mismatch <i class="bi bi-box-arrow-up-right ms-1"></i></button>`;
+                    } else {
+                        discHtml = `<span class="badge badge-pale-success"><i class="bi bi-check-circle me-1"></i>Perfect</span>`;
+                    }
+                }
 
                 tr.innerHTML = `
                     <td>
@@ -379,8 +406,43 @@ ROUTER-789,catalog-router,available,Zain`;
                     <td>${typeBadge}</td>
                     <td class="small">${doc.user_email || doc.user_id}</td>
                     <td><span class="badge bg-light text-dark border">${doc.count}</span></td>
-                    <td>${doc.log_type === 'evening_reconcile' ? (discCount > 0 ? `<span class="badge badge-pale-danger">${discCount} mismatch</span>` : `<span class="badge badge-pale-success"><i class="bi bi-check-circle me-1"></i>Perfect</span>`) : '-'}</td>
+                    <td>${discHtml}</td>
                 `;
+                
+                if (discCount > 0) {
+                    const btn = tr.querySelector('.btn-view-variance');
+                    if (btn) {
+                        btn.addEventListener('click', () => {
+                            const modal = createModal({
+                                title: `Variance Report: ${doc.log_id}`,
+                                body: `
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <div class="card border-danger shadow-none">
+                                                <div class="card-header bg-pale-danger text-danger fw-bold border-0"><i class="bi bi-dash-circle me-2"></i>Missing (${missingArr.length})</div>
+                                                <ul class="list-group list-group-flush small" style="max-height: 300px; overflow-y: auto;">
+                                                    ${missingArr.length ? missingArr.map(m => `<li class="list-group-item"><code class="text-danger data-mono">${m}</code></li>`).join('') : '<li class="list-group-item text-muted">None</li>'}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card border-warning shadow-none">
+                                                <div class="card-header bg-pale-warning text-warning fw-bold border-0"><i class="bi bi-plus-circle me-2"></i>Extra (${extraArr.length})</div>
+                                                <ul class="list-group list-group-flush small" style="max-height: 300px; overflow-y: auto;">
+                                                    ${extraArr.length ? extraArr.map(e => `<li class="list-group-item"><code class="text-warning data-mono">${e}</code></li>`).join('') : '<li class="list-group-item text-muted">None</li>'}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `,
+                                footer: `<button class="btn-pico btn-pico-outline close-modal">Close</button>`,
+                                width: 'modal-lg'
+                            });
+                            modal.show();
+                        });
+                    }
+                }
+                
                 if (histList) histList.appendChild(tr);
             });
             

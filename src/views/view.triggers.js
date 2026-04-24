@@ -1,5 +1,5 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { db } from '../lib/db/index.js';
 import { createModal } from '../lib/modal.js';
 
 // --- Constants & System Mappings ---
@@ -91,11 +91,23 @@ function conditionRow(c, i) {
 }
 
 function triggerCard(t) {
-    const condSummary = (t.conditions || []).map((c, i) => {
-        const prefix = i === 0 ? '' : `<span class="badge bg-primary bg-opacity-10 text-primary mx-1">${c.logicalOp || 'AND'}</span>`;
-        const valStr = c.value ? `"<em>${c.value}</em>"` : '';
-        return `${prefix}<code>${c.field}</code> <span class="text-info">${c.operator}</span> ${valStr}`;
-    }).join('');
+    const isTime = t.trigger_type === 'time';
+    let condSummary = '';
+    let badgeHtml = '';
+
+    if (isTime) {
+        badgeHtml = `<span class="badge bg-light text-dark border"><i class="bi bi-clock me-1"></i>${t.cron_expression}</span>`;
+        condSummary = `<span class="badge bg-primary bg-opacity-10 text-primary mx-1">Cron Expression</span> <code>${t.cron_expression}</code>`;
+    } else {
+        badgeHtml = `<span class="badge bg-light text-dark border"><i class="bi bi-database me-1"></i>${t.collection}</span>`;
+        condSummary = (t.conditions || []).map((c, i) => {
+            const prefix = i === 0 ? '' : `<span class="badge bg-primary bg-opacity-10 text-primary mx-1">${c.logicalOp || 'AND'}</span>`;
+            const valStr = c.value ? `"<em>${c.value}</em>"` : '';
+            return `${prefix}<code>${c.field}</code> <span class="text-info">${c.operator}</span> ${valStr}`;
+        }).join('');
+    }
+
+    const actionUrl = t.action?.type === 'report' ? `Execute template: ${t.action?.report_id}` : t.action?.url || 'No URL configured';
 
     return `
         <div class="card border-secondary-subtle mb-2" id="trigger-card-${t.id}">
@@ -105,12 +117,12 @@ function triggerCard(t) {
                         <div class="d-flex align-items-center gap-2 mb-1">
                             <span class="fw-bold fs-6">${t.name}</span>
                             <span class="badge ${t.enabled ? 'bg-success' : 'bg-secondary'}">${t.enabled ? 'Active' : 'Off'}</span>
-                            <span class="badge bg-light text-dark border"><i class="bi bi-database me-1"></i>${t.collection}</span>
+                            ${badgeHtml}
                         </div>
                         <div class="text-muted small mt-2 bg-light p-2 rounded border">${condSummary}</div>
                         <div class="small mt-2 font-monospace text-muted">
-                            <span class="badge bg-dark border border-secondary-subtle me-1">${t.action?.method || 'POST'}</span>
-                            ${t.action?.url || 'No URL configured'}
+                            <span class="badge bg-dark border border-secondary-subtle me-1">${t.action?.type === 'report' ? 'RUN REPORT' : (t.action?.method || 'POST')}</span>
+                            ${actionUrl}
                         </div>
                     </div>
                     <div class="d-flex gap-1 flex-shrink-0">
@@ -170,19 +182,30 @@ export function TriggersView() {
                     </div>
 
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Automation Name</label>
-                            <input id="te-name" type="text" class="form-control" placeholder="e.g. Notify Technician on Assignment">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-bold">Trigger Type</label>
+                            <select id="te-trigger-type" class="form-select">
+                                <option value="data">Data Change</option>
+                                <option value="time">Time-Based (Cron)</option>
+                            </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-bold">Automation Name</label>
+                            <input id="te-name" type="text" class="form-control" placeholder="e.g. Weekly Report">
+                        </div>
+                        <div class="col-md-6" id="te-collection-container">
                             <label class="form-label small fw-bold">Listen to Collection</label>
                             <select id="te-collection" class="form-select">
                                 ${SYSTEM_TABLES.map(c => `<option value="${c}">${c}</option>`).join('')}
                             </select>
                         </div>
+                        <div class="col-md-6 hidden" id="te-cron-container">
+                            <label class="form-label small fw-bold">Cron Expression</label>
+                            <input id="te-cron" type="text" class="form-control" placeholder="e.g. 0 17 * * 5 (Fri 5PM)">
+                        </div>
                     </div>
 
-                    <div class="mt-4 p-3 bg-light rounded border">
+                    <div id="conditions-section" class="mt-4 p-3 bg-light rounded border">
                         <label class="form-label small fw-bold text-accent mb-3"><i class="bi bi-funnel me-1"></i>Execution Conditions</label>
                         <div id="conditions-container" class="mb-2"></div>
                         <button id="btn-add-condition" class="btn btn-sm btn-outline-primary border-dashed w-100">
@@ -192,15 +215,23 @@ export function TriggersView() {
 
                     <hr class="my-4">
                     
-                    <h6 class="fw-bold mb-3"><i class="bi bi-hdd-network text-accent me-2"></i>Webhook Action (HTTP Request)</h6>
+                    <h6 class="fw-bold mb-3" id="action-heading"><i class="bi bi-hdd-network text-accent me-2"></i>Action</h6>
                     <div class="row g-2 mb-3">
                         <div class="col-md-3">
+                            <select id="te-action-type" class="form-select mb-2">
+                                <option value="webhook">Webhook Request</option>
+                                <option value="report">Email Saved Report</option>
+                            </select>
                             <select id="te-method" class="form-select">
                                 ${HTTP_METHODS.map(m => `<option>${m}</option>`).join('')}
                             </select>
                         </div>
-                        <div class="col-md-9">
-                            <input id="te-url" type="url" class="form-control" placeholder="https://api.yourdomain.com/webhook">
+                        <div class="col-md-9" id="te-action-url-container">
+                            <input id="te-url" type="url" class="form-control mb-2" placeholder="https://api.yourdomain.com/webhook">
+                            <select id="te-report-id" class="form-select hidden">
+                                <option value="weekly_stats">weekly_stats</option>
+                                <option value="inventory_low">inventory_low</option>
+                            </select>
                         </div>
                     </div>
 
@@ -248,10 +279,13 @@ export function TriggersView() {
     ['trigger-list', 'trigger-editor-overlay', 'btn-new-trigger', 'btn-te-close',
      'te-name', 'te-collection', 'te-method', 'te-url', 'te-headers', 'te-payload',
      'btn-add-condition', 'conditions-container', 'btn-te-cancel', 'btn-te-save',
-     'headers-warn', 'payload-warn', 'te-headers-code', 'te-payload-code'
+     'headers-warn', 'payload-warn', 'te-headers-code', 'te-payload-code',
+     'te-trigger-type', 'te-collection-container', 'te-cron-container', 'te-cron', 'conditions-section',
+     'te-action-type', 'te-report-id', 'action-heading'
     ].forEach(id => view.onboard({ id }));
 
-    // Core Live Highlighting Function
+    // ... (Keep existing code)
+
     const syncJSONHighlight = (textareaId, codeId) => {
         const textarea = view.$(textareaId);
         const codeBlock = view.$(codeId);
@@ -330,7 +364,7 @@ export function TriggersView() {
 
             if(toggleBtn) toggleBtn.onclick = async () => {
                 try {
-                    await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'triggers', String(t.id)), { enabled: !t.enabled });
+                    await db.update('triggers', String(t.id), { enabled: !t.enabled });
                 } catch (e) { alert ("Update failed: " + e.message); }
             };
             if(editBtn) editBtn.onclick = () => openEditor(t);
@@ -349,7 +383,7 @@ export function TriggersView() {
                 modal.element.querySelector('.confirm-btn').onclick = async () => {
                     modal.hide();
                     try {
-                        await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'triggers', String(t.id)));
+                        await db.remove('triggers', String(t.id));
                     } catch (e) { alert("Delete failed: " + e.message); }
                 };
                 modal.show();
@@ -409,15 +443,22 @@ export function TriggersView() {
     const openEditor = (trigger = null) => {
         editingTriggerId = trigger ? trigger.id : null;
         
+        const type = trigger?.trigger_type || 'data';
+        view.$('te-trigger-type').value = type;
+
         const col = trigger?.collection || 'appointments';
         view.$('te-collection').value = col;
         currentFields = COLLECTION_FIELDS[col] || ['id', 'status', 'created_at'];
 
-        workingConditions = trigger ? JSON.parse(JSON.stringify(trigger.conditions)) : [{ logicalOp: 'AND', field: 'status', operator: 'changed to', value: '' }];
+        view.$('te-cron').value = trigger?.cron_expression || '';
+
+        workingConditions = trigger && trigger.conditions ? JSON.parse(JSON.stringify(trigger.conditions)) : [{ logicalOp: 'AND', field: 'status', operator: 'changed to', value: '' }];
         
         view.$('te-name').value       = trigger?.name || '';
+        view.$('te-action-type').value = trigger?.action?.type || 'webhook';
         view.$('te-method').value     = trigger?.action?.method || 'POST';
         view.$('te-url').value        = trigger?.action?.url    || '';
+        view.$('te-report-id').value  = trigger?.action?.report_id || 'weekly_stats';
         view.$('te-headers').value    = formatJSONString(trigger?.action?.headers || '{\n  "Content-Type": "application/json"\n}');
         view.$('te-payload').value    = formatJSONString(trigger?.action?.payload || '{\n  "event": "data_changed",\n  "record_id": "{{doc.id}}"\n}');
 
@@ -432,6 +473,10 @@ export function TriggersView() {
         renderConditions();
         view.$('trigger-editor-overlay').classList.remove('hidden');
         view.$('trigger-editor-overlay').classList.add('show');
+        
+        // Trigger UI layout refresh
+        view.$('te-trigger-type').dispatchEvent(new Event('change'));
+        view.$('te-action-type').dispatchEvent(new Event('change'));
     };
 
     const closeEditor = () => { 
@@ -450,6 +495,22 @@ export function TriggersView() {
         renderConditions();
     });
 
+    view.trigger('change', 'te-trigger-type', (e) => {
+        const isTime = e.target.value === 'time';
+        view.$('te-cron-container').classList.toggle('hidden', !isTime);
+        view.$('te-collection-container').classList.toggle('hidden', isTime);
+        view.$('conditions-section').classList.toggle('hidden', isTime);
+    });
+
+    view.trigger('change', 'te-action-type', (e) => {
+        const isReport = e.target.value === 'report';
+        view.$('te-method').classList.toggle('hidden', isReport);
+        view.$('te-url').classList.toggle('hidden', isReport);
+        view.$('te-report-id').classList.toggle('hidden', !isReport);
+        view.$('te-headers').parentElement.parentElement.classList.toggle('hidden', isReport);
+        view.$('te-payload').parentElement.parentElement.classList.toggle('hidden', isReport);
+    });
+
     view.trigger('click', 'btn-new-trigger',    () => openEditor());
     view.trigger('click', 'btn-add-condition',  () => { 
         workingConditions.push({ logicalOp: 'AND', field: currentFields[0], operator: 'equals', value: '' }); 
@@ -460,13 +521,24 @@ export function TriggersView() {
     
     view.trigger('click', 'btn-te-save', async () => {
         const name = view.$('te-name').value.trim();
-        const url  = view.$('te-url').value.trim();
+        const type = view.$('te-trigger-type').value;
+        const actionType = view.$('te-action-type').value;
+        const isReport = actionType === 'report';
+        
+        let url = view.$('te-url').value.trim();
+        const reportId = view.$('te-report-id').value;
+
         const headersStr = view.$('te-headers').value.trim();
         const payloadStr = view.$('te-payload').value.trim();
 
-        if (!name || !url) return alert('Automation Name and Webhook URL are strictly required.');
-        if (!validateJSON(headersStr) || !validateJSON(payloadStr)) {
-            return alert('Cannot save: The Headers or Payload contain invalid JSON. Please fix the formatting errors indicated in red.');
+        if (!name) return alert('Automation Name is required.');
+        if (actionType === 'webhook' && !url) return alert('Webhook URL is required.');
+        if (type === 'time' && !view.$('te-cron').value.trim()) return alert('Cron Expression is required.');
+
+        if (!isReport) {
+            if (!validateJSON(headersStr) || !validateJSON(payloadStr)) {
+                return alert('Cannot save: The Headers or Payload contain invalid JSON. Please fix the formatting errors indicated in red.');
+            }
         }
         
         const triggerId = editingTriggerId || 'TRG-' + Math.random().toString(36).substr(2, 9).toUpperCase();
@@ -474,17 +546,20 @@ export function TriggersView() {
         const triggerData = {
             id: triggerId,
             name, 
-            collection: view.$('te-collection').value,
+            trigger_type: type,
+            collection: type === 'data' ? view.$('te-collection').value : null,
+            cron_expression: type === 'time' ? view.$('te-cron').value.trim() : null,
             enabled: true, 
-            conditions: JSON.parse(JSON.stringify(workingConditions)),
+            conditions: type === 'data' ? JSON.parse(JSON.stringify(workingConditions)) : null,
             action: { 
-                type: 'webhook', 
-                method: view.$('te-method').value, 
-                url, 
-                headers: formatJSONString(headersStr), // Enforce clean formatting on save
-                payload: formatJSONString(payloadStr)  // Enforce clean formatting on save
+                type: actionType, 
+                method: isReport ? 'POST' : view.$('te-method').value, 
+                url: isReport ? '/api/reports/execute' : url, 
+                report_id: isReport ? reportId : null,
+                headers: isReport ? null : formatJSONString(headersStr),
+                payload: isReport ? null : formatJSONString(payloadStr)
             },
-            updated_at: firebase.db.serverTimestamp()
+            updated_at: db.serverTimestamp()
         };
 
         const btn = view.$('btn-te-save');
@@ -493,7 +568,7 @@ export function TriggersView() {
         btn.disabled = true;
 
         try {
-            await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'triggers', triggerId), triggerData);
+            await db.create('triggers', triggerData, triggerId);
             closeEditor();
         } catch(e) {
             alert('Failed to save trigger: ' + e.message);
@@ -507,13 +582,9 @@ export function TriggersView() {
         initJsonValidators(); // Attach event listeners for dynamic formatting
         view.emit('loading:start');
         
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'triggers'), (snap) => {
+        view.unsub(db.subscribe('triggers', {}, (data) => {
             view.emit('loading:end');
-            const arr = [];
-            if(snap && snap.forEach) {
-                snap.forEach(doc => { arr.push(doc.data()); });
-            }
-            internalState.triggers = arr;
+            internalState.triggers = data || [];
             renderTriggersList();
         }));
     });

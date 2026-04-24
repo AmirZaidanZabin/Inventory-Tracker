@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_DB_PROVIDER=${VITE_DB_PROVIDER:-rest}
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:3000}
+    ports:
+      - "8080:80"
+    restart: unless-stopped

@@ -1,5 +1,5 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { db as genericDb } from '../lib/db/index.js';
 import initSqlJs from 'sql.js';
 
 export function ReportingView() {
@@ -23,13 +23,21 @@ export function ReportingView() {
                                     </div>
                                 </div>
                                 <div class="d-flex flex-wrap gap-2 mb-3">
-                                    <button id="report-utilization" class="btn-pico btn-pico-outline btn-sm">
-                                        <i class="bi bi-people me-1"></i>Agent Utilization
-                                    </button>
-                                    <button id="report-stock" class="btn-pico btn-pico-outline btn-sm">
-                                        <i class="bi bi-box-seam me-1"></i>Stock Summary
-                                    </button>
-                                </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label small fw-bold">Pre-defined Queries</label>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button id="report-utilization" class="btn-pico btn-pico-outline btn-sm">
+                                <i class="bi bi-people me-1"></i>Agent Utilization
+                            </button>
+                            <button id="report-stock" class="btn-pico btn-pico-outline btn-sm">
+                                <i class="bi bi-box-seam me-1"></i>Stock Summary
+                            </button>
+                            <button id="report-variance" class="btn-pico btn-pico-outline btn-sm">
+                                <i class="bi bi-shield-exclamation me-1"></i>Stock Variances
+                            </button>
+                        </div>
+                    </div>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <button id="run-query" class="btn-pico btn-pico-primary" disabled>
                                         <i class="bi bi-play-fill"></i>Run Query
@@ -125,7 +133,7 @@ export function ReportingView() {
         `
     });
 
-    let db = null;
+    let sqliteDb = null;
     let lastResults = null;
 
     view.onboard({ id: 'sql-query' })
@@ -139,6 +147,7 @@ export function ReportingView() {
         .onboard({ id: 'schema-list' })
         .onboard({ id: 'report-utilization' })
         .onboard({ id: 'report-stock' })
+        .onboard({ id: 'report-variance' })
         .onboard({ id: 'save-report' })
         .onboard({ id: 'save-status' })
         .onboard({ id: 'refresh-reports' })
@@ -179,32 +188,32 @@ export function ReportingView() {
             const SQL = await initSqlJs({
                 locateFile: file => `https://unpkg.com/sql.js@1.14.1/dist/${file}`
             });
-            db = new SQL.Database();
+            sqliteDb = new SQL.Database();
             
             view.$('db-status').textContent = "Loading schemas...";
             
             // Fetch limit=1 for all tables to get schema
-            const snaps = await Promise.all(SYSTEM_TABLES.map(async (t) => {
+            const snapsData = await Promise.all(SYSTEM_TABLES.map(async (t) => {
                 try {
-                    return await firebase.db.getDocs(firebase.db.collection(firebase.db.db, t), { limit: 1 });
+                    return await genericDb.findMany(t, { limit: 1 });
                 } catch (e) {
                     console.warn(`Failed to fetch schema for ${t}:`, e.message);
-                    return { empty: true, docs: [] };
+                    return [];
                 }
             }));
             
-            snaps.forEach((snap, idx) => {
+            snapsData.forEach((data, idx) => {
                 const tableName = SYSTEM_TABLES[idx];
                 let cols = ['id', 'created_at', 'updated_at'];
-                if (snap && snap.docs && snap.docs.length > 0) {
-                    const data = snap.docs[0].data();
-                    cols = Object.keys(data).filter(k => k !== 'timestamp');
+                if (data && data.length > 0) {
+                    const firstDoc = data[0];
+                    cols = Object.keys(firstDoc).filter(k => k !== 'timestamp');
                     if(!cols.includes('id')) cols.unshift('id');
                 }
                 tableSchemas[tableName] = cols;
                 
                 // Create empty table
-                db.run(`CREATE TABLE ${tableName} (${cols.map(c => `"${c}" TEXT`).join(', ')});`);
+                sqliteDb.run(`CREATE TABLE ${tableName} (${cols.map(c => `"${c}" TEXT`).join(', ')});`);
             });
 
             // Render Schema Dropdown UI
@@ -235,7 +244,7 @@ export function ReportingView() {
     };
     
     const runQuery = async () => {
-        const query = view.$('sql-query').value;
+        const query = view.$('sql-query').value || '';
         view.$('query-error')?.classList.add('hidden');
         view.$('export-csv')?.classList.add('hidden');
         lastResults = null;
@@ -253,23 +262,21 @@ export function ReportingView() {
                 btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Fetching...`;
                 
                 // Fetch all data for used tables
-                const snaps = await Promise.all(usedTables.map(t => 
-                    firebase.db.getDocs(firebase.db.collection(firebase.db.db, t))
+                const tablesData = await Promise.all(usedTables.map(t => 
+                    genericDb.findMany(t)
                 ));
                 
                 // Clear existing data and insert new data
-                snaps.forEach((snap, idx) => {
+                tablesData.forEach((data, idx) => {
                     const t = usedTables[idx];
-                    db.run(`DELETE FROM ${t};`);
+                    sqliteDb.run(`DELETE FROM ${t};`);
                     
                     const cols = tableSchemas[t];
-                    if(snap && snap.docs && snap.docs.length > 0) {
+                    if(data && data.length > 0) {
                         const placeholders = cols.map(() => '?').join(', ');
-                        const stmt = db.prepare(`INSERT INTO ${t} (${cols.map(c=>`"${c}"`).join(', ')}) VALUES (${placeholders})`);
+                        const stmt = sqliteDb.prepare(`INSERT INTO ${t} (${cols.map(c=>`"${c}"`).join(', ')}) VALUES (${placeholders})`);
                         
-                        snap.docs.forEach(doc => {
-                            const d = doc.data();
-                            d.id = d.id || doc.id;
+                        data.forEach(d => {
                             const vals = cols.map(c => {
                                 let val = d[c];
                                 if (val !== null && val !== undefined && typeof val === 'object') {
@@ -286,7 +293,7 @@ export function ReportingView() {
             }
 
             btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Executing...`;
-            const res = db.exec(query);
+            const res = sqliteDb.exec(query);
             
             if (res.length === 0) {
                 view.$('results-head').innerHTML = '';
@@ -350,13 +357,13 @@ export function ReportingView() {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
             
-            await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'saved_reports', `report_${Date.now()}`), {
+            await genericDb.create('saved_reports', {
                 name,
                 query,
-                created_at: firebase.db.serverTimestamp()
+                created_at: genericDb.serverTimestamp()
             });
             
-            firebase.logAction("Report Saved", `Saved report: ${name}`);
+            genericDb.logAction("Report Saved", `Saved report: ${name}`);
             
             // Close modal
             view.$('save-modal').classList.add('hidden');
@@ -391,17 +398,16 @@ export function ReportingView() {
         refreshList = async () => {
             console.log("Reporting: Refreshing report list...");
             try {
-                const snap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'saved_reports'));
+                const reportsData = await genericDb.findMany('saved_reports');
                 listContainer.innerHTML = '';
                 
-                if (!snap || snap.empty) {
+                if (!reportsData || reportsData.length === 0) {
                     listContainer.innerHTML = '<div class="p-3 text-center text-muted">No saved reports found.</div>';
                     return;
                 }
 
-                snap.forEach(docSnap => {
-                    const data = docSnap.data();
-                    const reportId = docSnap.id;
+                reportsData.forEach(data => {
+                    const reportId = data.id;
                     const reportName = data.name || "Unnamed Report";
 
                     const item = document.createElement('div');
@@ -466,8 +472,8 @@ export function ReportingView() {
                             delBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
                             
                             console.log(`Reporting: Executing DELETE on /api/saved_reports/${reportId}`);
-                            const result = await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'saved_reports', reportId));
-                            console.log("Reporting: Delete complete", result);
+                            await genericDb.remove('saved_reports', reportId);
+                            console.log("Reporting: Delete complete");
                             
                             const status = view.$('save-status');
                             if (status) {
@@ -498,7 +504,7 @@ export function ReportingView() {
         refreshList();
         
         // Polling (10s sync)
-        const unsubscribe = firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'saved_reports'), () => {
+        const unsubscribe = genericDb.subscribe('saved_reports', {}, () => {
             console.log("Reporting: Remote update detected, refreshing...");
             refreshList();
         });
@@ -549,6 +555,24 @@ GROUP BY User, Load_Type, Day
 ORDER BY Day DESC;`;
         updateHighlighting();
         runQuery();
+    });
+
+    view.trigger('click', 'report-variance', () => {
+         view.$('sql-query').value = `SELECT 
+    target_van,
+    user_email as Auditor,
+    json_extract(discrepancies, '$.missing') as Missing_Items,
+    json_extract(discrepancies, '$.extra') as Extra_Items,
+    json_array_length(json_extract(discrepancies, '$.missing')) as Missing_Count,
+    json_array_length(json_extract(discrepancies, '$.extra')) as Extra_Count,
+    timestamp as Audit_Date
+FROM stock_take_logs
+WHERE log_type = 'evening_reconcile' 
+  AND (json_array_length(json_extract(discrepancies, '$.missing')) > 0 
+       OR json_array_length(json_extract(discrepancies, '$.extra')) > 0)
+ORDER BY timestamp DESC;`;
+         updateHighlighting();
+         runQuery();
     });
 
     view.on('init', () => {

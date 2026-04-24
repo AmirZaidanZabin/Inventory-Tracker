@@ -6,6 +6,7 @@
 
 import { calculateDistance, estimateDuration } from '../lib/travel-logic.js';
 import { firebase } from '../lib/firebase.js';
+import { db } from '../lib/db/index.js';
 
 export async function runSystemTests(t) {
     // --- 1. Unit Tests: travel-logic.js ---
@@ -25,30 +26,28 @@ export async function runSystemTests(t) {
     // --- 2. Integration Tests: Hardware Lifecycle ---
     await t.test('Integration: Hardware Status Transition', async () => {
         const testItemId = 'TEST-TERM-001';
-        const itemRef = firebase.db.doc(firebase.db.db, 'items', testItemId);
 
         // Setup: Available
-        await firebase.db.setDoc(itemRef, { 
+        await db.create('items', { 
             item_id: testItemId, 
             status: 'available', 
             is_available: true 
-        });
+        }, testItemId);
 
         // Action: Simulation completion update
-        await firebase.db.updateDoc(itemRef, { 
+        await db.update('items', testItemId, { 
             status: 'assigned', 
             is_available: false,
             current_location_id: 'TEST-APP-001'
         });
 
         // Verify
-        const snap = await firebase.db.getDoc(itemRef);
-        const data = snap.data();
+        const data = await db.findOne('items', testItemId);
         t.assert(data.status === 'assigned', 'Item status must be assigned');
         t.assert(data.is_available === false, 'is_available must be false');
         
         // Cleanup
-        await firebase.db.deleteDoc(itemRef);
+        await db.remove('items', testItemId);
     });
 
     // --- 3. Functional Tests: RBAC Mapping ---

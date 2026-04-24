@@ -109,3 +109,95 @@ export function isUserOnVacation(user, dateStr) {
         return targetTime >= start.getTime() && targetTime <= end.getTime();
     });
 }
+
+/**
+ * TSP Route Optimizer (Greedy Nearest Neighbor)
+ * @param {Array} appointments - List of appointments for a tech on a day
+ * @param {Object} techBase - Optional tech base {lat, lng} to start the day
+ * @param {String} startTime - 'HH:MM' string to start the first job, e.g. '08:00'
+ */
+export async function optimizeRoute(appointments, techBase = null, startTime = '08:00') {
+    if (!appointments || appointments.length === 0) return [];
+    if (appointments.length === 1) {
+        appointments[0].appointment_time = startTime;
+        return appointments;
+    }
+
+    let unvisited = [...appointments];
+    let optimized = [];
+    
+    // Find starting point (base, or first job chronologically if no base)
+    let currentCoord = techBase;
+    
+    if (!currentCoord && unvisited[0]?.metadata?.location?.lat) {
+        // No base provided? Start from the first appointment currently scheduled
+        unvisited.sort((a, b) => (a.appointment_time || '00:00').localeCompare(b.appointment_time || '00:00'));
+        currentCoord = {
+            lat: parseFloat(unvisited[0].metadata.location.lat),
+            lng: parseFloat(unvisited[0].metadata.location.lng)
+        };
+    } else if (!currentCoord) {
+        // Fallback to random job if no coords
+        currentCoord = { lat: 0, lng: 0 };
+    }
+
+    // Nearest neighbor algorithm
+    while (unvisited.length > 0) {
+        let nearestIdx = 0;
+        let minTime = Infinity;
+        
+        for (let i = 0; i < unvisited.length; i++) {
+            const apt = unvisited[i];
+            const loc = apt.metadata?.location;
+            if (loc && loc.lat && loc.lng) {
+                // Use synchronous haversine for speed in sorting
+                const dist = calculateDistance(currentCoord.lat, currentCoord.lng, parseFloat(loc.lat), parseFloat(loc.lng));
+                if (dist < minTime) {
+                    minTime = dist;
+                    nearestIdx = i;
+                }
+            } else {
+                // If it has no location, stick it at the end
+                if (minTime === Infinity) nearestIdx = i;
+            }
+        }
+        
+        const nextJob = unvisited.splice(nearestIdx, 1)[0];
+        optimized.push(nextJob);
+        
+        if (nextJob.metadata?.location?.lat) {
+            currentCoord = {
+                lat: parseFloat(nextJob.metadata.location.lat),
+                lng: parseFloat(nextJob.metadata.location.lng)
+            };
+        }
+    }
+    
+    // Reassign times sequentially
+    let startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1] || 0);
+    
+    for (let i = 0; i < optimized.length; i++) {
+        const h = Math.floor(startMinutes / 60).toString().padStart(2, '0');
+        const m = Math.floor(startMinutes % 60).toString().padStart(2, '0');
+        optimized[i].appointment_time = `${h}:${m}`;
+        
+        // Add duration + next travel time
+        const duration = optimized[i].metadata?.duration_minutes || parseInt(optimized[i].duration || '60', 10);
+        
+        if (i < optimized.length - 1) {
+            const thisLoc = optimized[i].metadata?.location;
+            const nextLoc = optimized[i+1].metadata?.location;
+            if (thisLoc?.lat && nextLoc?.lat) {
+                const travelMin = Math.round(calculateDistance(
+                    parseFloat(thisLoc.lat), parseFloat(thisLoc.lng), 
+                    parseFloat(nextLoc.lat), parseFloat(nextLoc.lng)
+                ) / 40 * 60) + DEFAULT_PREP_TIME; // Approx
+                startMinutes += duration + travelMin;
+            } else {
+                startMinutes += duration + DEFAULT_PREP_TIME;
+            }
+        }
+    }
+
+    return optimized;
+}

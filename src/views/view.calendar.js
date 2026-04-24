@@ -1,5 +1,6 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { auth } from '../lib/auth.js';
+import { db } from '../lib/db/index.js';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -363,7 +364,7 @@ export function CalendarView() {
                     if(aptToMove && aptToMove.schedule_date !== targetDateStr) {
                         aptToMove.schedule_date = targetDateStr; 
                         renderGrid();
-                        await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', taskId), { schedule_date: targetDateStr });
+                        await db.update('appointments', taskId, { schedule_date: targetDateStr });
                     }
                 } catch(err) {
                     alert('Update failed: ' + err.message);
@@ -375,26 +376,20 @@ export function CalendarView() {
     view.on('init', async () => {
         view.emit('loading:start');
         
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'appointments'), (snap) => {
-            allAppointments = [];
-            if (snap && snap.forEach) {
-                snap.forEach(doc => {
-                    allAppointments.push(doc.data());
-                });
-            }
+        view.unsub(db.subscribe('appointments', {}, (data) => {
+            allAppointments = data || [];
             const container = view.$('calendar-body');
             if (container) renderGrid();
         }));
 
         try {
-            const userSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'users'));
+            const users = await db.findMany('users');
             const filter = view.$('tech-filter');
-            const currentUser = firebase.auth?.currentUser;
+            const currentUser = auth.currentUser;
             
-            if (userSnap && userSnap.docs) {
-                userSnap.docs.forEach(d => {
-                    const u = d.data();
-                    const uid = u.user_id || d.id;
+            if (users) {
+                users.forEach(u => {
+                    const uid = u.user_id || u.id;
                     const opt = document.createElement('option');
                     opt.value = uid;
                     let label = u.user_name || 'Unknown';

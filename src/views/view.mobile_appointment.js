@@ -1,5 +1,6 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { db } from '../lib/db/index.js';
+import { calculateDistance } from '../lib/travel-logic.js';
 
 export function MobileAppointmentView(appointmentId) {
     const view = controller({
@@ -83,18 +84,22 @@ export function MobileAppointmentView(appointmentId) {
         container.innerHTML = '';
         
         hardwareSlots.forEach((slot, index) => {
+            const isOptional = slot.requires_scan === false;
             const div = document.createElement('div');
-            div.className = `hw-slot ${slot.assigned_id ? 'fulfilled' : ''}`;
+            div.className = `hw-slot ${slot.assigned_id ? 'fulfilled' : ''} ${isOptional && !slot.assigned_id ? 'opacity-75' : ''}`;
             div.innerHTML = `
                 <div>
-                    <div class="fw-bold text-sm" style="color: ${slot.assigned_id ? '#166534' : 'inherit'}">${slot.item_name}</div>
+                    <div class="fw-bold text-sm" style="color: ${slot.assigned_id ? '#166534' : 'inherit'}">
+                        ${slot.item_name} ${isOptional ? '<span class="text-xs fw-normal text-muted fst-italic ms-1">(Optional Scan)</span>' : ''}
+                    </div>
                     <div class="text-xs text-muted">${slot.catalog_id}</div>
                 </div>
                 <div class="text-end">
                     ${slot.assigned_id 
-                        ? `<span class="badge bg-success font-monospace">${slot.assigned_id}</span><br>
+                        ? `<span class="badge badge-pale-success font-monospace slot-status-badge">Fulfilled</span>
+                           <small class="text-xs text-muted d-block mt-1">${slot.assigned_id}</small>
                            ${!isCompleted ? `<button class="btn btn-link text-danger p-0 text-xs text-decoration-none mt-1 clear-slot" data-index="${index}">Remove</button>` : ''}` 
-                        : `<span class="badge bg-light text-dark">Awaiting Scan</span>`
+                        : `<span class="badge ${isOptional ? 'bg-light text-muted' : 'bg-light text-dark'}">Awaiting Scan</span>`
                     }
                 </div>
             `;
@@ -122,14 +127,13 @@ export function MobileAppointmentView(appointmentId) {
             }
 
             // Fetch item from database
-            const itemDoc = await firebase.db.getDoc(firebase.db.doc(firebase.db.db, 'items', decodedText));
-            if (!itemDoc.exists()) {
+            const item = await db.findOne('items', decodedText);
+            if (!item) {
                 alert(`Hardware ID "${decodedText}" not found in system inventory.`);
                 if (html5QrcodeScanner) html5QrcodeScanner.resume();
                 return;
             }
 
-            const item = itemDoc.data();
             const isAvail = item.status === 'available' || (!item.status && item.is_available);
             
             if (!isAvail) {
@@ -196,56 +200,77 @@ export function MobileAppointmentView(appointmentId) {
 
     view.trigger('click', 'complete-job', async () => {
         const completionDesc = view.$('completion-desc').value;
-        const incomplete = hardwareSlots.some(s => !s.assigned_id);
+        const incomplete = hardwareSlots.some(s => !s.assigned_id && s.requires_scan !== false);
 
         if (incomplete) return alert("You must scan and assign all required hardware before completing the job.");
 
         const btn = view.$('complete-job');
         const ogHtml = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+        btn.innerHTML = '<i class="bi bi-check2-circle me-2"></i>Completed';
         btn.disabled = true;
 
-        try {
-            // Batch update items as assigned to this appointment
-            const itemUpdates = [];
-            hardwareSlots.forEach(slot => {
-                itemUpdates.push(firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', slot.assigned_id), { 
+        // Optimistic State Update
+        isCompleted = true;
+        const statusEl = view.$('det-status');
+        if (statusEl) {
+            statusEl.textContent = 'completed';
+            statusEl.className = 'badge bg-success';
+        }
+        btn.style.display = 'none';
+        const scanBtn = view.$('btn-open-scanner');
+        if(scanBtn) scanBtn.style.display = 'none';
+        
+        renderHardwareSlots();
+
+        const itemUpdates = [];
+        hardwareSlots.forEach(slot => {
+            if (slot.assigned_id) {
+                itemUpdates.push(db.update('items', slot.assigned_id, { 
                     is_available: false, 
                     status: 'assigned', 
                     current_location_type: 'APPOINTMENT', 
                     current_location_id: appointmentId 
                 }));
-            });
-            
-            if(itemUpdates.length > 0) await Promise.all(itemUpdates);
+            }
+        });
+        
+        const deployedHw = hardwareSlots.map(s => ({ catalog_id: s.catalog_id, item_id: s.assigned_id || null }));
 
-            const deployedHw = hardwareSlots.map(s => ({ catalog_id: s.catalog_id, item_id: s.assigned_id }));
+        const aptUpdate = db.update('appointments', appointmentId, {
+            status: 'completed',
+            'metadata.hardware': deployedHw,
+            'metadata.completion_description': completionDesc,
+            'metadata.completed_at': db.serverTimestamp()
+        });
 
-            await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), {
-                status: 'completed',
-                'metadata.hardware': deployedHw,
-                'metadata.completion_description': completionDesc,
-                'metadata.completed_at': firebase.db.serverTimestamp()
-            });
-
-            firebase.logAction("Mobile Job Completed", `Appointment ${appointmentId} closed via mobile app.`);
-            alert("Job Completed Successfully!");
+        Promise.all([...itemUpdates, aptUpdate]).then(() => {
+            db.logAction("Mobile Job Completed", `Appointment ${appointmentId} closed via mobile app.`);
             window.location.hash = '#dashboard';
-            
-        } catch (err) {
+        }).catch(err => {
+            console.error(err);
             alert("Completion failed: " + err.message);
+            isCompleted = false;
             btn.innerHTML = ogHtml;
             btn.disabled = false;
-        }
+            btn.style.display = 'block';
+            if (statusEl) {
+                statusEl.textContent = 'scheduled';
+                statusEl.className = 'badge bg-warning text-dark';
+            }
+            if(scanBtn) scanBtn.style.display = 'block';
+            renderHardwareSlots();
+        });
     });
+
+    let geoWatchId = null;
+    let lastGeoPush = 0;
 
     view.on('init', () => {
         view.emit('loading:start');
         
-        view.unsub(firebase.db.subscribe(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), (snap) => {
+        view.unsub(db.subscribe('appointments', { id: appointmentId }, (apt) => {
+            if (!apt) return;
             view.emit('loading:end');
-            if (!snap.exists()) return;
-            const apt = snap.data();
             
             isCompleted = apt.status === 'completed';
 
@@ -264,12 +289,57 @@ export function MobileAppointmentView(appointmentId) {
                 else statusEl.className = 'badge bg-warning text-dark';
             }
 
+            // Start Geolocation if not completed
+            if (!isCompleted && navigator.geolocation) {
+                if (!geoWatchId) {
+                    geoWatchId = navigator.geolocation.watchPosition(async (pos) => {
+                        const { latitude, longitude } = pos.coords;
+                        const now = Date.now();
+                        
+                        let updates = {};
+                        let updateNeeded = false;
+                        
+                        // Push location every 15 seconds for tracking portal
+                        if (now - lastGeoPush > 15000) {
+                            updates['metadata.tech_location'] = { lat: latitude, lng: longitude, updated_at: now };
+                            updateNeeded = true;
+                            lastGeoPush = now;
+                        }
+                        
+                        // Geofenced Arrival Check (100 meters)
+                        if (apt.metadata?.location?.lat && apt.status !== 'in-progress' && apt.status !== 'completed') {
+                            const distKm = calculateDistance(latitude, longitude, parseFloat(apt.metadata.location.lat), parseFloat(apt.metadata.location.lng));
+                            if (distKm <= 0.1) {
+                                updates.status = 'in-progress';
+                                updateNeeded = true;
+                                
+                                if (statusEl) {
+                                    statusEl.textContent = 'in-progress';
+                                    statusEl.className = 'badge bg-primary text-white';
+                                }
+                            }
+                        }
+                        
+                        if (updateNeeded) {
+                            try {
+                                await db.update('appointments', appointmentId, updates);
+                            } catch (e) {
+                                console.warn("Geofence update failed:", e);
+                            }
+                        }
+                    }, (err) => console.warn(err), { enableHighAccuracy: true });
+                }
+            } else if (isCompleted && geoWatchId) {
+                navigator.geolocation.clearWatch(geoWatchId);
+                geoWatchId = null;
+            }
+
             // Build hardware slots if not done
             if (apt.metadata?.required_hardware && hardwareSlots.length === 0) {
                 const reqs = apt.metadata.required_hardware;
                 reqs.forEach(r => {
                     for(let i=0; i<r.count; i++) {
-                        hardwareSlots.push({ catalog_id: r.catalog_id, item_name: r.item_name, assigned_id: null });
+                        hardwareSlots.push({ catalog_id: r.catalog_id, item_name: r.item_name, requires_scan: r.requires_scan, assigned_id: null });
                     }
                 });
                 
@@ -283,6 +353,8 @@ export function MobileAppointmentView(appointmentId) {
                         if (slot) slot.assigned_id = shw.item_id;
                     });
                 }
+                renderHardwareSlots();
+            } else {
                 renderHardwareSlots();
             }
 
@@ -304,6 +376,9 @@ export function MobileAppointmentView(appointmentId) {
 
     view.destroy = () => {
         stopScanner();
+        if (geoWatchId) {
+            navigator.geolocation.clearWatch(geoWatchId);
+        }
     };
 
     return view;

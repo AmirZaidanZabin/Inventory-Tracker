@@ -1,9 +1,12 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { db } from '../lib/db/index.js';
 import { createModal } from '../lib/modal.js';
 import { renderTable } from '../lib/table.js';
 
 export function VansView() {
+    let currentPage = 1;
+    let vansUnsub = null;
+
     const view = controller({
         stringComponent: `
             <div class="vans-view">
@@ -18,7 +21,8 @@ export function VansView() {
                         ${renderTable({
                             headers: ['VAN ID', 'Location', 'Created', 'Actions'],
                             tbodyId: 'vans-list',
-                            emptyMessage: 'Loading fleet...'
+                            emptyMessage: 'Loading fleet...',
+                            pagination: true
                         })}
                     </div>
                 </div>
@@ -26,17 +30,16 @@ export function VansView() {
         `
     });
 
-    view.onboard({ id: 'open-add-van' }).onboard({ id: 'vans-list' });
+    view.onboard({ id: 'open-add-van' }).onboard({ id: 'vans-list' })
+        .onboard({ id: 'vans-list-prev-btn' }).onboard({ id: 'vans-list-next-btn' }).onboard({ id: 'vans-list-page-indicator' });
 
     view.trigger('click', 'open-add-van', async () => {
-        const [usersSnap, formsSnap] = await Promise.all([
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'users')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms'))
+        const [techs, formSchemasRaw] = await Promise.all([
+            db.findMany('users'),
+            db.findMany('forms')
         ]);
-        const techs = [];
-        usersSnap.forEach(u => techs.push(u.data()));
 
-        const formSchemas = (formsSnap?.docs || []).map(d => d.data()).filter(f => f.entities && f.entities.includes('vans'));
+        const formSchemas = (formSchemasRaw || []).filter(f => f.entities && f.entities.includes('vans'));
         let customFieldsHtml = '';
         if(formSchemas.length > 0) {
             formSchemas.forEach(schema => {
@@ -183,23 +186,22 @@ export function VansView() {
 
             try {
                 // Check if VAN already exists
-                const vanRef = firebase.db.doc(firebase.db.db, 'vans', data.van_id);
-                const vanDoc = await firebase.db.getDoc(vanRef);
+                const vanDoc = await db.findOne('vans', data.van_id);
 
-                if (vanDoc.exists()) {
+                if (vanDoc) {
                     return alert(`Error: VAN with ID "${data.van_id}" already exists.`);
                 }
 
-                await firebase.db.setDoc(vanRef, {
+                await db.create('vans', {
                     ...data,
                     custom_data: customData,
                     assigned_users,
-                    created_at: firebase.db.serverTimestamp(),
-                    updated_at: firebase.db.serverTimestamp(),
+                    created_at: db.serverTimestamp(),
+                    updated_at: db.serverTimestamp(),
                     is_deleted: false,
                     metadata: {}
-                });
-                firebase.logAction("VAN Created", `VAN ${data.van_id} added at ${data.location_id}`);
+                }, data.van_id);
+                db.logAction("VAN Created", `VAN ${data.van_id} added at ${data.location_id}`);
                 modal.hide();
             } catch (err) {
                 alert("Error adding VAN: " + err.message);
@@ -208,21 +210,44 @@ export function VansView() {
     });
 
     view.on('init', () => {
-        view.emit('loading:start');
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'vans'), (snap) => {
-            view.delete('vans-list');
-            const list = view.$('vans-list');
-            view.emit('loading:end');
-            if (!list) return;
+        const PAGE_LIMIT = 50;
 
-            if (snap && snap.forEach) {
-                snap.forEach(doc => {
-                    const van = doc.data();
+        view.trigger('click', 'vans-list-prev-btn', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                loadData();
+            }
+        });
+        
+        view.trigger('click', 'vans-list-next-btn', () => {
+            currentPage++;
+            loadData();
+        });
+
+        const loadData = () => {
+            if (vansUnsub) vansUnsub();
+            view.emit('loading:start');
+            vansUnsub = db.subscribe('vans', { limit: PAGE_LIMIT, page: currentPage }, (data) => {
+                view.delete('vans-list');
+                const list = view.$('vans-list');
+                view.emit('loading:end');
+                if (!list) return;
+
+                const indicator = view.$('vans-list-page-indicator');
+                const prevBtn = view.$('vans-list-prev-btn');
+                const nextBtn = view.$('vans-list-next-btn');
+                
+                if (indicator) indicator.textContent = `Page ${currentPage}`;
+                if (prevBtn) prevBtn.disabled = currentPage === 1;
+                if (nextBtn) nextBtn.disabled = !data || data.length < PAGE_LIMIT;
+
+                if (data) {
+                data.forEach(van => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td><code class="data-mono fw-bold">${van.van_id}</code></td>
                         <td>${van.location_id}</td>
-                        <td class="small text-muted">${van.created_at?.toDate().toLocaleDateString() || '...'}</td>
+                        <td class="small text-muted">${van.created_at ? (typeof van.created_at === 'object' && van.created_at.toDate ? van.created_at.toDate().toLocaleDateString() : new Date(van.created_at).toLocaleDateString()) : '...'}</td>
                         <td>
                             <button class="btn-pico btn-pico-outline table-action-btn edit-van me-1" data-id="${van.van_id}">
                                 <i class="bi bi-pencil"></i>
@@ -234,9 +259,7 @@ export function VansView() {
                     `;
                     
                     row.querySelector('.edit-van').addEventListener('click', async () => {
-                        const usersSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'users'));
-                        const techs = [];
-                        usersSnap.forEach(u => techs.push(u.data()));
+                        const techs = await db.findMany('users');
 
                         const vanAssigned = van.assigned_users?.[0] || '';
                         const techOptions = techs.map(t => `
@@ -280,8 +303,8 @@ export function VansView() {
                     modal.show();
 
                     // Render Custom Fields for Edit
-                    const editFormsSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms'));
-                    const editFormSchemas = (editFormsSnap?.docs || []).map(d => d.data()).filter(f => f.entities && f.entities.includes('vans'));
+                    const editFormSchemasRaw = await db.findMany('forms');
+                    const editFormSchemas = (editFormSchemasRaw || []).filter(f => f.entities && f.entities.includes('vans'));
                     const editCfContainer = modal.element.querySelector('#edit-custom-fields-container');
                     if (editCfContainer && editFormSchemas.length > 0) {
                         let cfHtml = '';
@@ -391,14 +414,14 @@ export function VansView() {
                                 });
                             });
 
-                            await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'vans', van.van_id), {
+                            await db.update('vans', van.van_id, {
                                 location_id: fd.get('location_id'),
                                 coverage_area: fd.get('coverage_area'),
                                 assigned_users,
                                 custom_data: customData,
-                                updated_at: firebase.db.serverTimestamp()
+                                updated_at: db.serverTimestamp()
                             });
-                            firebase.logAction("VAN Updated", `VAN ${van.van_id} updated with location ${fd.get('location_id')}`);
+                            db.logAction("VAN Updated", `VAN ${van.van_id} updated with location ${fd.get('location_id')}`);
                             modal.hide();
                         } catch (err) { alert(err.message); }
                     };
@@ -420,8 +443,8 @@ export function VansView() {
                     modal.element.querySelector('.confirm-btn').onclick = async () => {
                         modal.hide();
                         try {
-                            await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'vans', van.van_id));
-                            firebase.logAction("VAN Deleted", `VAN ${van.van_id} removed`);
+                            await db.remove('vans', van.van_id);
+                            db.logAction("VAN Deleted", `VAN ${van.van_id} removed`);
                         } catch (err) {
                             alert("Delete failed: " + err.message);
                         }
@@ -432,7 +455,11 @@ export function VansView() {
                 list.appendChild(row);
             });
             }
-        }));
+        });
+        };
+        
+        loadData();
+        view.unsub(() => { if (vansUnsub) vansUnsub(); });
     });
 
     return view;

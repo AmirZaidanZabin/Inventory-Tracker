@@ -1,5 +1,5 @@
 {
   "name": "Inventory Tracker",
-  "description": "Inventory management tool for Pico pay terminals, tracking VAN stock, serial numbers, and SIM cards with Zendesk integration.",
+  "description": "Enterprise-grade Field Service & Inventory Management platform for tracking hardware lifecycles, technician van stock, and real-time customer tracking links.",
   "requestFramePermissions": []
 }

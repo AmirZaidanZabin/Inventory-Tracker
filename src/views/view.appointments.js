@@ -1,10 +1,14 @@
-import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { controller, debounce } from '../lib/controller.js';
+import { db } from '../lib/db/index.js';
+
 import { createModal } from '../lib/modal.js';
 import { renderTable } from '../lib/table.js';
 import { calculateDistance, estimateDuration, findAdjacentAppointments, isUserOnVacation } from '../lib/travel-logic.js';
 
 export function AppointmentsView() {
+    let currentPage = 1;
+    let aptsUnsub = null;
+
     const view = controller({
         stringComponent: `
             <div class="appointments-view">
@@ -50,7 +54,8 @@ export function AppointmentsView() {
                         ${renderTable({
                             headers: ['Job ID', 'Customer', 'Date', 'Time', 'Location', 'Technician (PS ID)', 'Status', 'Actions'],
                             tbodyId: 'apt-list',
-                            emptyMessage: 'Loading appointments...'
+                            emptyMessage: 'Loading appointments...',
+                            pagination: true
                         })}
                     </div>
                 </div>
@@ -60,7 +65,8 @@ export function AppointmentsView() {
 
     view.onboard({ id: 'open-add-apt' }).onboard({ id: 'apt-list' })
         .onboard({ id: 'filter-date' }).onboard({ id: 'filter-status' })
-        .onboard({ id: 'filter-city' }).onboard({ id: 'filter-tech' });
+        .onboard({ id: 'filter-city' }).onboard({ id: 'filter-tech' })
+        .onboard({ id: 'apt-list-prev-btn' }).onboard({ id: 'apt-list-next-btn' }).onboard({ id: 'apt-list-page-indicator' });
 
     let userMap = {}; // Lookup for human-readable names
 
@@ -146,18 +152,12 @@ export function AppointmentsView() {
 
         modal.show();
 
-        const [vans, users, rawApts, rawItemCatalog] = await Promise.all([
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'vans')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'users')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'appointments')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'))
+        const [vanDataArray, userDataArray, allAppointments, allHardwareTypes] = await Promise.all([
+            db.findMany('vans'),
+            db.findMany('users'),
+            db.findMany('appointments'),
+            db.findMany('item_catalog')
         ]);
-        
-        let allAppointments = rawApts.docs.map(d => d.data());
-        let allHardwareTypes = rawItemCatalog.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        const userDataArray = users.docs.map(u => ({ id: u.id, ...u.data() }));
-        const vanDataArray = vans.docs.map(v => ({ id: v.id, ...v.data() }));
 
         // Render Hardware Quantity UI
         const hwContainer = modal.element.querySelector('#hardware-selection-container');
@@ -310,6 +310,7 @@ export function AppointmentsView() {
                         payload.push({
                             catalog_id: hw.catalog_id || hw.id,
                             item_name: hw.item_name,
+                            requires_scan: hw.requires_scan !== false,
                             count: counters[hw.id]
                         });
                     }
@@ -412,13 +413,43 @@ export function AppointmentsView() {
                 return `${hInt % 12 || 12}:${m} ${ampm}`;
             }
 
-            const travelMetrics = new Map(); 
-            await Promise.all(currentValidTechs.map(async (t) => {
-                const adj = findAdjacentAppointments(t.id, dateStr, '12:00', dailyApts, t.metadata?.base_location);
-                let prevTravel = 0;
-                if (adj.prev) prevTravel = await estimateDuration(parseFloat(lat), parseFloat(lng), adj.prev.lat, adj.prev.lng);
-                travelMetrics.set(t.id, { prevTravel, adj });
-            }));
+            const worker = new Worker(new URL('../workers/travel.worker.js', import.meta.url));
+            const metricsProm = new Promise((resolve) => {
+                const id = Date.now();
+                worker.postMessage({
+                    id,
+                    type: 'CALCULATE_GRID',
+                    payload: {
+                        techs: currentValidTechs.map(t => ({ id: t.user_id || t.id, metadata: t.metadata })),
+                        dateStr,
+                        lat,
+                        lng,
+                        dailyApts: dailyApts.map(a => ({
+                            tech_id: a.tech_id,
+                            schedule_date: a.schedule_date,
+                            appointment_time: a.appointment_time,
+                            metadata: a.metadata,
+                            appointment_id: a.appointment_id,
+                            is_deleted: a.is_deleted
+                        }))
+                    }
+                });
+
+                worker.onmessage = (e) => {
+                    if (e.data.id === id) {
+                        const travelMetrics = new Map();
+                        if (e.data.success && e.data.result) {
+                            e.data.result.forEach(r => {
+                                travelMetrics.set(r.techId, { prevTravel: r.prevTravel, adj: r.adj });
+                            });
+                        }
+                        worker.terminate();
+                        resolve(travelMetrics);
+                    }
+                };
+            });
+
+            const travelMetrics = await metricsProm;
 
             const gridHtml = `
                 <div class="calendar-grid bg-white" style="display: grid; grid-template-columns: 80px 1fr; gap: 0;">
@@ -435,8 +466,8 @@ export function AppointmentsView() {
 
                         currentValidTechs.forEach(t => {
                             const sched = t.schedule?.[dDay];
-                            let startHour = sched ? parseInt(sched.start.split(':')[0], 10) : 9;
-                            let endHour = sched ? parseInt(sched.end.split(':')[0], 10) : 17;
+                            let startHour = sched ? parseInt((sched.start || '09:00').split(':')[0], 10) : 9;
+                            let endHour = sched ? parseInt((sched.end || '17:00').split(':')[0], 10) : 17;
 
                             const onVacation = isUserOnVacation(t, dateStr);
 
@@ -459,7 +490,7 @@ export function AppointmentsView() {
                                     
                                     let travelBlocked = false;
                                     if (prevApt) {
-                                        const [ph, pm] = prevApt.appointment_time.split(':').map(Number);
+                                        const [ph, pm] = (prevApt.appointment_time || '00:00').split(':').map(Number);
                                         const prevEnd = (ph * 60 + pm) + (prevApt.metadata?.duration_minutes || 60);
                                         if (cellTotal < prevEnd + metric.prevTravel) travelBlocked = true;
                                     }
@@ -480,15 +511,15 @@ export function AppointmentsView() {
                             // Check if all techs in this shift are on vacation
                             const anyShiftMemberNotOnVacation = currentValidTechs.some(t => {
                                 const sched = t.schedule?.[dDay];
-                                let startHour = sched ? parseInt(sched.start.split(':')[0], 10) : 9;
-                                let endHour = sched ? parseInt(sched.end.split(':')[0], 10) : 17;
+                                let startHour = sched ? parseInt((sched.start || '09:00').split(':')[0], 10) : 9;
+                                let endHour = sched ? parseInt((sched.end || '17:00').split(':')[0], 10) : 17;
                                 return cellH >= startHour && cellH < endHour;
                             });
                             
                             const allOnVacation = anyShiftMemberNotOnVacation && currentValidTechs.every(t => {
                                 const sched = t.schedule?.[dDay];
-                                let startHour = sched ? parseInt(sched.start.split(':')[0], 10) : 9;
-                                let endHour = sched ? parseInt(sched.end.split(':')[0], 10) : 17;
+                                let startHour = sched ? parseInt((sched.start || '09:00').split(':')[0], 10) : 9;
+                                let endHour = sched ? parseInt((sched.end || '17:00').split(':')[0], 10) : 17;
                                 if (cellH >= startHour && cellH < endHour) {
                                     return isUserOnVacation(t, dateStr);
                                 }
@@ -610,10 +641,11 @@ export function AppointmentsView() {
 
             const tech = userDataArray.find(u => u.id === selectedTechId);
             const schedule = tech?.schedule?.[new Date(data.schedule_date).getDay()] || { start: '09:00', end: '17:00' };
-            const shiftEndTotal = parseInt(schedule.end.split(':')[0], 10) * 60 + parseInt(schedule.end.split(':')[1], 10);
-            const startTotal = parseInt(data.appointment_time.split(':')[0], 10) * 60 + parseInt(data.appointment_time.split(':')[1], 10);
+            const shiftEndTotal = parseInt((schedule.end || '17:00').split(':')[0], 10) * 60 + parseInt((schedule.end || '17:00').split(':')[1], 10);
+            const startTotal = parseInt((data.appointment_time || '00:00').split(':')[0], 10) * 60 + parseInt((data.appointment_time || '00:00').split(':')[1], 10);
+            const endTotal = startTotal + currentTotalDuration;
 
-            if (startTotal + currentTotalDuration > shiftEndTotal) {
+            if (endTotal > shiftEndTotal) {
                 return alert(`Duration (${currentTotalDuration}m) exceeds shift end (${schedule.end}).`);
             }
             
@@ -623,12 +655,34 @@ export function AppointmentsView() {
             btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${isUpdate ? 'Updating...' : 'Booking...'}`;
             
             try {
+                // Strict Pre-flight Concurrency Check
+                const freshAppointments = await db.findMany('appointments');
+                
+                const hasCollision = freshAppointments.some(appt => {
+                    // Ignore self in update mode
+                    if (isUpdate && appt.appointment_id === existingAptData.appointment_id) return false;
+                    if (appt.schedule_date !== data.schedule_date || appt.tech_id !== selectedTechId) return false;
+                    if (appt.status === 'completed' || appt.is_deleted) return false;
+
+                    const existStart = parseInt((appt.appointment_time || '00:00').split(':')[0], 10) * 60 + parseInt((appt.appointment_time || '00:00').split(':')[1], 10);
+                    const existDuration = appt.metadata?.duration_minutes || parseInt(appt.duration || '60', 10);
+                    const existEnd = existStart + existDuration;
+
+                    return (startTotal < existEnd) && (endTotal > existStart);
+                });
+
+                if (hasCollision) {
+                    btn.disabled = false;
+                    btn.innerHTML = ogBtn;
+                    return alert("CONCURRENCY ERROR: That slot was just booked by another dispatcher. Please select a different time or technician.");
+                }
+
                 const payload = {
                     ...data,
                     tech_id: selectedTechId,
                     van_id: data.auto_van_id,
                     status: isUpdate ? 'rescheduled' : 'scheduled',
-                    updated_at: firebase.db.serverTimestamp(),
+                    updated_at: db.serverTimestamp(),
                     metadata: { 
                         hardware: existingAptData?.metadata?.hardware || [], 
                         location: { lat: parseFloat(data.lat), lng: parseFloat(data.lng) },
@@ -639,14 +693,14 @@ export function AppointmentsView() {
                 };
 
                 if (isUpdate) {
-                    await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', existingAptData.appointment_id), payload);
-                    firebase.logAction("Appointment Rescheduled", `Job ${existingAptData.appointment_id} updated via modular flow`);
+                    await db.update('appointments', existingAptData.appointment_id, payload);
+                    db.logAction("Appointment Rescheduled", `Job ${existingAptData.appointment_id} updated via modular flow`);
                 } else {
                     const newId = 'APT-' + Math.random().toString(36).substr(2, 9).toUpperCase();
                     payload.appointment_id = newId;
-                    payload.created_at = firebase.db.serverTimestamp();
-                    await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'appointments', newId), payload);
-                    firebase.logAction("Appointment Scheduled", `Job ${newId} created`);
+                    payload.created_at = db.serverTimestamp();
+                    await db.create('appointments', payload, newId);
+                    db.logAction("Appointment Scheduled", `Job ${newId} created`);
                 }
                 
                 modal.hide();
@@ -678,17 +732,17 @@ export function AppointmentsView() {
         view.emit('loading:start');
 
         // Fetch users once for the map
-        firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'users')).then(snap => {
-            snap.forEach(doc => {
-                const u = doc.data();
+        db.findMany('users').then(users => {
+            users.forEach(u => {
                 userMap[u.user_id] = u.user_name;
             });
             renderAptList();
         });
 
         const attachFilterListeners = () => {
+            const renderDebounced = debounce(() => renderAptList(), 300);
             ['filter-date', 'filter-status', 'filter-city', 'filter-tech'].forEach(id => {
-                view.$(id).oninput = () => renderAptList();
+                view.$(id).oninput = renderDebounced;
             });
         };
 
@@ -699,8 +753,8 @@ export function AppointmentsView() {
             
             const filterDate = view.$('filter-date').value;
             const filterStatus = view.$('filter-status').value;
-            const filterCity = view.$('filter-city').value.toLowerCase();
-            const filterTech = view.$('filter-tech').value.toLowerCase();
+            const filterCity = (view.$('filter-city').value || '').toLowerCase();
+            const filterTech = (view.$('filter-tech').value || '').toLowerCase();
 
             const filtered = allAptData.filter(apt => {
                 if(apt.is_deleted) return false;
@@ -774,7 +828,7 @@ export function AppointmentsView() {
                         deleteModal.element.querySelector('.confirm-btn').onclick = async () => {
                             deleteModal.hide();
                             try {
-                                await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', apt.appointment_id), { is_deleted: true });
+                                await db.update('appointments', apt.appointment_id, { is_deleted: true });
                             } catch (err) { console.error('Delete failed: ', err.message); }
                         };
                         deleteModal.show();
@@ -788,13 +842,43 @@ export function AppointmentsView() {
 
         attachFilterListeners();
 
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'appointments'), (snap) => {
-            view.emit('loading:end');
-            if (snap && snap.forEach) {
-                allAptData = snap.docs.map(d => d.data());
-                renderAptList();
+        const PAGE_LIMIT = 50;
+
+        view.trigger('click', 'apt-list-prev-btn', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                loadData();
             }
-        }));
+        });
+        
+        view.trigger('click', 'apt-list-next-btn', () => {
+            currentPage++;
+            loadData();
+        });
+
+        const loadData = () => {
+            if (aptsUnsub) aptsUnsub();
+            view.emit('loading:start');
+            aptsUnsub = db.subscribe('appointments', { limit: PAGE_LIMIT, page: currentPage }, (data) => {
+                view.emit('loading:end');
+                
+                const indicator = view.$('apt-list-page-indicator');
+                const prevBtn = view.$('apt-list-prev-btn');
+                const nextBtn = view.$('apt-list-next-btn');
+                
+                if (indicator) indicator.textContent = `Page ${currentPage}`;
+                if (prevBtn) prevBtn.disabled = currentPage === 1;
+                if (nextBtn) nextBtn.disabled = !data || data.length < PAGE_LIMIT;
+
+                if (data) {
+                    allAptData = data;
+                    renderAptList();
+                }
+            });
+        };
+        
+        loadData();
+        view.unsub(() => { if (aptsUnsub) aptsUnsub(); });
     });
 
     return view;

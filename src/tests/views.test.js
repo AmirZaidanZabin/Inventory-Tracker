@@ -8,26 +8,51 @@ import { ReportingView } from '../views/view.reporting.js';
 
 export async function runViewTests(t) {
     const views = [
-        { name: 'DashboardView', fn: DashboardView },
-        { name: 'VansView', fn: VansView },
-        { name: 'ItemsView', fn: ItemsView },
-        { name: 'AppointmentsView', fn: AppointmentsView },
-        { name: 'UsersView', fn: UsersView },
-        { name: 'RolesView', fn: RolesView },
-        { name: 'ReportingView', fn: ReportingView }
+        { name: 'DashboardView', fn: DashboardView, selector: '.dashboard-view' },
+        { name: 'VansView', fn: VansView, selector: '.vans-view' },
+        { name: 'ItemsView', fn: ItemsView, selector: '.items-view' },
+        { name: 'AppointmentsView', fn: AppointmentsView, selector: '.appointments-view' },
+        { name: 'UsersView', fn: UsersView, selector: '.users-view' },
+        { name: 'RolesView', fn: RolesView, selector: '.roles-view' },
+        { name: 'ReportingView', fn: ReportingView, selector: '.reporting-view' }
     ];
 
+    const testContainer = document.createElement('div');
+    testContainer.id = 'test-container';
+    testContainer.style.display = 'none';
+    document.body.appendChild(testContainer);
+
     for (const viewDef of views) {
-        await t.test(`View: ${viewDef.name} should initialize correctly`, () => {
+        await t.test(`View: ${viewDef.name} should mount and render data`, async () => {
+            testContainer.innerHTML = '';
             const view = viewDef.fn();
-            t.assert(view && typeof view.element === 'function', `${viewDef.name} should have an element method`);
-            const el = view.element();
-            t.assert(el instanceof HTMLElement || el instanceof DocumentFragment, `${viewDef.name}.element() should return a valid DOM node`);
             
-            // Check if it has the expected root class (convention)
-            const className = viewDef.name.replace('View', '').toLowerCase() + '-view';
-            const root = el instanceof DocumentFragment ? el.firstElementChild : el;
-            t.assert(root.classList.contains(className), `${viewDef.name} root element should have class .${className}`);
+            // Mount
+            testContainer.appendChild(view.element());
+            
+            // Promise to wait for loading to end (app logic often emits this)
+            const loaded = new Promise(resolve => {
+                view.on('loading:end', resolve);
+                // Fallback timeout in case no data fetches
+                setTimeout(resolve, 1500);
+            });
+
+            view.trigger('init');
+            await loaded;
+
+            // Wait a bit for DOM to settle
+            await new Promise(r => setTimeout(r, 100));
+
+            const root = testContainer.querySelector(viewDef.selector);
+            t.assert(root, `${viewDef.name} element with selector ${viewDef.selector} should be in DOM`);
+            
+            // Assert presence of some standard bits (headers or cards)
+            const hasContent = root.querySelector('h1, h2, h3, h4, h5, h6, table, .card');
+            t.assert(hasContent, `${viewDef.name} should render at least one header, table, or card`);
+
+            view.destroy();
         });
     }
+
+    document.body.removeChild(testContainer);
 }

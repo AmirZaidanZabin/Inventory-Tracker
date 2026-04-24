@@ -1,5 +1,5 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { db } from '../lib/db/index.js';
 
 export function AppointmentDetailView(appointmentId) {
     const view = controller({
@@ -18,6 +18,13 @@ export function AppointmentDetailView(appointmentId) {
                     #hw-reader { flex-grow: 1; width: 100%; }
 
                     #apt-detail-map { height: 450px !important; }
+
+                    .btn-tracking-active { animation: pulse-primary 2s infinite; border-color: var(--primary-color); }
+                    @keyframes pulse-primary {
+                        0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); }
+                        70% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
+                        100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+                    }
                 </style>
                 
                 <div class="mb-4">
@@ -29,7 +36,13 @@ export function AppointmentDetailView(appointmentId) {
                             <h4 class="fw-bold mb-1">Job Execution</h4>
                             <div class="text-muted font-monospace small">${appointmentId}</div>
                         </div>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 text-primary">
+                            <button id="btn-copy-track" class="btn-pico btn-pico-outline text-sm" title="Share public tracking link">
+                                <i class="bi bi-share me-1"></i>Link
+                            </button>
+                            <button id="btn-track-tech" class="btn-pico btn-pico-outline text-sm">
+                                <i class="bi bi-geo me-1"></i>Track Technician
+                            </button>
                             <span id="det-status" class="badge bg-secondary d-flex align-items-center px-3">Loading</span>
                         </div>
                     </div>
@@ -110,7 +123,7 @@ export function AppointmentDetailView(appointmentId) {
         .onboard({ id: 'required-slots-container' }).onboard({ id: 'van-inventory-container' })
         .onboard({ id: 'btn-complete-job' }).onboard({ id: 'completion-desc' }).onboard({ id: 'completion-panel' })
         .onboard({ id: 'btn-open-scanner' }).onboard({ id: 'hw-scanner-modal' }).onboard({ id: 'btn-close-scanner' })
-        .onboard({ id: 'btn-back' });
+        .onboard({ id: 'btn-back' }).onboard({ id: 'btn-track-tech' });
 
     view.trigger('click', 'btn-back', () => {
         window.location.hash = '#appointments';
@@ -121,7 +134,110 @@ export function AppointmentDetailView(appointmentId) {
     let availableVanInventory = []; // { item_id, catalog_id }
     let isCompleted = false;
     let map = null;
+    let techMarker = null; // Leaflet marker for technician
+    let trackingInterval = null;
     let html5QrcodeScanner = null;
+
+    view.trigger('click', 'btn-copy-track', () => {
+        const url = `${window.location.origin}/#track/${appointmentId}`;
+        navigator.clipboard.writeText(url).then(() => {
+            alert("Tracking link copied to clipboard!\n" + url);
+        });
+    });
+
+    // --- Tracking Simulation ---
+
+    const toggleTracking = () => {
+        const btn = view.$('btn-track-tech');
+        if (trackingInterval) {
+            // Stop Tracking
+            clearInterval(trackingInterval);
+            trackingInterval = null;
+            btn.classList.remove('btn-tracking-active', 'text-primary');
+            btn.innerHTML = '<i class="bi bi-geo me-1"></i>Track Technician';
+            if (techMarker) {
+                techMarker.remove();
+                techMarker = null;
+            }
+            // Clear location from DB
+            db.update('appointments', appointmentId, {
+                'metadata.tech_location': null
+            }).catch(console.error);
+            return;
+        }
+
+        // Start Tracking
+        if (!aptData || !aptData.metadata?.location) {
+            console.warn("Tracking failed: missing location", aptData);
+            return alert("Cannot track: Appointment location missing.");
+        }
+        if (!aptData.tech_id) {
+            console.warn("Tracking failed: missing tech_id", aptData);
+            return alert("Cannot track: No technician assigned.");
+        }
+
+        const dest = aptData.metadata.location;
+        // Mock start location: 0.01 deg offset from destination
+        let currentPos = { lat: dest.lat - 0.01, lng: dest.lng - 0.01 };
+        const step = 0.0005; // movement per poll
+
+        btn.classList.add('btn-tracking-active', 'active', 'text-primary');
+        btn.innerHTML = '<i class="bi bi-broadcast me-1"></i>Tracking Active...';
+
+        // Add Marker
+        if (map) {
+            const vanIcon = L.divIcon({
+                html: '<i class="bi bi-truck-flatbed text-primary fs-3 shadow-sm bg-white rounded-circle p-1 border"></i>',
+                className: 'custom-div-icon',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            techMarker = L.marker([currentPos.lat, currentPos.lng], { icon: vanIcon }).addTo(map);
+            techMarker.bindPopup(`<b>Technician en route</b><br>ETA: ~5 mins`).openPopup();
+            map.panTo([currentPos.lat, currentPos.lng]);
+        }
+
+        const updateRemoteLocation = (pos) => {
+            db.update('appointments', appointmentId, {
+                'metadata.tech_location': pos
+            }).catch(e => console.warn("GPS sync failed:", e));
+        };
+
+        // Initial sync
+        updateRemoteLocation(currentPos);
+
+        trackingInterval = setInterval(() => {
+            // Interpolate
+            const dLat = dest.lat - currentPos.lat;
+            const dLng = dest.lng - currentPos.lng;
+            const dist = Math.sqrt(dLat*dLat + dLng*dLng);
+
+            if (dist < step) {
+                currentPos = { ...dest };
+                clearInterval(trackingInterval);
+                trackingInterval = null;
+                btn.classList.remove('btn-tracking-active');
+                btn.innerHTML = '<i class="bi bi-check-circle-fill text-success me-1"></i>Arrived';
+                if (techMarker) techMarker.setPopupContent("<b>Technician Arrived</b>").openPopup();
+            } else {
+                currentPos.lat += (dLat / dist) * step;
+                currentPos.lng += (dLng / dist) * step;
+            }
+
+            if (techMarker) {
+                techMarker.setLatLng([currentPos.lat, currentPos.lng]);
+                // Keep technician on screen if tracking is active
+                if (map.getBounds().contains(techMarker.getLatLng()) === false) {
+                    map.panTo(techMarker.getLatLng());
+                }
+            }
+
+            // Sync to DB
+            updateRemoteLocation(currentPos);
+        }, 5000); // 5s to avoid hitting DB too hard
+    };
+
+    view.trigger('click', 'btn-track-tech', toggleTracking);
 
     // --- Drag and Drop & Rendering Logic ---
 
@@ -132,6 +248,7 @@ export function AppointmentDetailView(appointmentId) {
 
         // Render Drop Zones (Slots)
         slotsCont.innerHTML = hardwareSlots.map((slot, idx) => {
+            const isOptional = slot.requires_scan === false;
             if (slot.assigned_id) {
                 return `
                     <div class="req-slot fulfilled">
@@ -144,9 +261,11 @@ export function AppointmentDetailView(appointmentId) {
                 `;
             } else {
                 return `
-                    <div class="req-slot drop-zone" data-catalog="${slot.catalog_id}" data-idx="${idx}">
+                    <div class="req-slot drop-zone ${isOptional ? 'opacity-75' : ''}" data-catalog="${slot.catalog_id}" data-idx="${idx}">
                         <div>
-                            <div class="fw-bold text-dark text-sm">${slot.item_name}</div>
+                            <div class="fw-bold text-dark text-sm">
+                                ${slot.item_name} ${isOptional ? '<span class="text-xs fw-normal text-muted fst-italic ms-1">(Optional)</span>' : ''}
+                            </div>
                             <div class="text-xs text-muted">Needs: ${slot.catalog_id}</div>
                         </div>
                         <div class="text-muted"><i class="bi bi-box-arrow-in-down fs-4"></i></div>
@@ -308,57 +427,83 @@ export function AppointmentDetailView(appointmentId) {
     // --- Completion Logic ---
 
     view.trigger('click', 'btn-complete-job', async () => {
-        const incomplete = hardwareSlots.some(s => !s.assigned_id);
+        const incomplete = hardwareSlots.some(s => !s.assigned_id && s.requires_scan !== false);
         if (incomplete) return alert("You must fill all hardware slots before completing the job.");
 
         const btn = view.$('btn-complete-job');
         const ogHtml = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Completing...';
+        btn.innerHTML = '<i class="bi bi-check2-circle me-2"></i>Completed';
         btn.disabled = true;
 
-        try {
-            // Update items to APPOINTMENT location
-            const itemUpdates = hardwareSlots.map(slot => {
-                return firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', slot.assigned_id), { 
+        // Optimistic State Update
+        isCompleted = true;
+        if (aptData) aptData.status = 'completed';
+        renderAll();
+
+        const itemUpdates = [];
+        hardwareSlots.forEach(slot => {
+            if (slot.assigned_id) {
+                itemUpdates.push(db.update('items', slot.assigned_id, { 
                     is_available: false, 
                     status: 'assigned', 
                     current_location_type: 'APPOINTMENT', 
                     current_location_id: appointmentId 
-                });
-            });
-            if(itemUpdates.length > 0) await Promise.all(itemUpdates);
+                }));
+            }
+        });
 
-            const deployedHw = hardwareSlots.map(s => ({ catalog_id: s.catalog_id, item_id: s.assigned_id }));
-            const completionDesc = view.$('completion-desc').value;
+        const deployedHw = hardwareSlots.map(s => ({ catalog_id: s.catalog_id, item_id: s.assigned_id || null }));
+        const completionDesc = view.$('completion-desc').value;
 
-            await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), {
-                status: 'completed',
-                'metadata.hardware': deployedHw,
-                'metadata.completion_description': completionDesc,
-                'metadata.completed_at': firebase.db.serverTimestamp()
-            });
-
-            firebase.logAction("Job Completed", `Appointment ${appointmentId} closed.`);
-            alert("Job Completed Successfully!");
-            // The view will auto-update via the snapshot listener
-            
-        } catch (err) {
-            alert("Completion failed: " + err.message);
-        } finally {
+        const aptUpdate = db.update('appointments', appointmentId, {
+            status: 'completed',
+            'metadata.hardware': deployedHw,
+            'metadata.completion_description': completionDesc,
+            'metadata.completed_at': db.serverTimestamp()
+        });
+        
+        Promise.all([...itemUpdates, aptUpdate]).then(() => {
+            db.logAction("Job Completed", `Appointment ${appointmentId} closed.`);
+        }).catch(err => {
+            console.error(err);
+            isCompleted = false;
+            if (aptData) aptData.status = 'scheduled'; // fallback
+            renderAll();
+            alert("Failed to complete job. Reversed state.");
             btn.innerHTML = ogHtml;
             btn.disabled = false;
-        }
+        });
     });
+
+    const renderAll = () => {
+        renderHardwareUI();
+        // Update summary bits if aptData is ready
+        if (aptData) {
+            const statusEl = view.$('det-status');
+            if(statusEl) {
+                statusEl.textContent = aptData.status;
+                let badgeClass = 'badge-pale-info';
+                if (aptData.status === 'scheduled') badgeClass = 'badge-pale-primary';
+                if (aptData.status === 'rescheduled') badgeClass = 'badge-pale-warning';
+                if (aptData.status === 'completed') badgeClass = 'badge-pale-success';
+                statusEl.className = `badge ${badgeClass} text-uppercase px-3`;
+            }
+            if (isCompleted) {
+                if(view.$('completion-panel')) view.$('completion-panel').style.display = 'none';
+                if(view.$('btn-open-scanner')) view.$('btn-open-scanner').style.display = 'none';
+            }
+        }
+    };
 
     // --- Initialization ---
 
     view.on('init', () => {
         view.emit('loading:start');
         
-        view.unsub(firebase.db.subscribe(firebase.db.doc(firebase.db.db, 'appointments', appointmentId), async (snap) => {
+        view.unsub(db.subscribe('appointments', { id: appointmentId }, async (data) => {
+            if (!data) return;
+            aptData = data;
             view.emit('loading:end');
-            if (!snap.exists()) return;
-            aptData = snap.data();
             isCompleted = aptData.status === 'completed';
 
             // Hydrate UI Text
@@ -367,9 +512,9 @@ export function AppointmentDetailView(appointmentId) {
             if(view.$('det-tech-id')) view.$('det-tech-id').textContent = aptData.tech_id || '...';
             
             // Resolve Technician Name
-            const techDoc = await firebase.db.getDoc(firebase.db.doc(firebase.db.db, 'users', aptData.tech_id));
+            const techData = await db.findOne('users', aptData.tech_id);
             if(view.$('det-tech-name')) {
-                view.$('det-tech-name').textContent = techDoc.exists() ? techDoc.data().user_name : 'Unknown Technician';
+                view.$('det-tech-name').textContent = techData ? techData.user_name : 'Unknown Technician';
             }
 
             // Calculate Time Window
@@ -426,7 +571,7 @@ export function AppointmentDetailView(appointmentId) {
             if (aptData.metadata?.required_hardware) {
                 aptData.metadata.required_hardware.forEach(req => {
                     for(let i=0; i<req.count; i++) {
-                        hardwareSlots.push({ catalog_id: req.catalog_id, item_name: req.item_name, assigned_id: null });
+                        hardwareSlots.push({ catalog_id: req.catalog_id, item_name: req.item_name, requires_scan: req.requires_scan, assigned_id: null });
                     }
                 });
             }
@@ -440,10 +585,9 @@ export function AppointmentDetailView(appointmentId) {
                 renderHardwareUI();
             } else if (!isCompleted && aptData.van_id) {
                 // Fetch van inventory
-                const itemsSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'items'));
+                const items = await db.findMany('items');
                 availableVanInventory = [];
-                itemsSnap.forEach(doc => {
-                    const item = doc.data();
+                items.forEach(item => {
                     const isAvail = item.status === 'available' || (!item.status && item.is_available);
                     if (isAvail && item.current_location_type === 'VAN' && item.current_location_id === aptData.van_id) {
                         availableVanInventory.push({ item_id: item.item_id, catalog_id: item.catalog_id });
@@ -460,6 +604,7 @@ export function AppointmentDetailView(appointmentId) {
 
     view.destroy = () => {
         stopScanner();
+        if(trackingInterval) clearInterval(trackingInterval);
         if(map) map.remove();
     };
 

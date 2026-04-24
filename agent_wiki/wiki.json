@@ -1,42 +1,31 @@
 {
   "general_facts": [
-    "fire hot",
-    "mammoth big",
-    "stock reconciliation backbone of logistics",
-    "morning load moves items to VAN via bulk api",
-    "evening audit checks physical vs system count for specific VAN server-side",
-    "inventory uses generic (item_id, catalog_id) schema",
-    "product_types entity deprecated; unified under item_catalog (Hardware Types)",
-    "booking system uses hardware quantity counters with dynamic travel/duration calculation",
-    "maps modernized with CartoDB Voyager tiles and Leaflet Control Geocoder for global search",
-    "mobile field operations added with camera-based barcode scanning (html5-qrcode) for job completion and stock audit",
-    "AppointmentDetailView refactored into a hybrid interface with responsive drag-and-drop and integrated barcode scanning",
-    "Automation Rules Engine enhanced with real-time JSON validation and auto-pretty-printing for webhooks",
-    "Live Postman-style JSON syntax highlighting integrated into the Automation Rules Engine using Prism.js and layered ghosting CSS",
-    "JSON editor alignment shift resolved with strict box-model synchronization and scroll-coupled ghosting layers",
-    "Technician vacation management integrated with date-range picker and collision-aware scheduling logic in Appointments View",
-    "Appointments module expanded with multi-parameter filter bars and a dedicated rescheduling workflow with action logging",
-    "Appointment Detail View enhanced with technician name resolution, calculated time windows, optimized map visibility (450px), and unified status badge styling",
-    "Appointments View refactored to modularize booking modal, enabling unified validation for both creation and rescheduling",
-    "Appointments Gantt View redesigned into a high-density, split-pane interface inspired by enterprise solutions (Salesforce FSL), featuring hourly markers, technician utilization stats, and location-based grouping",
-    "Appointments table now displays human-readable technician names via a pre-fetched userMap, with filters supporting name-based searching",
-    "Vans management UI restricted to 1:1 technician assignment using single-select dropdowns, while maintaining list-based backend compatibility",
-    "Appointment booking modal enhanced with dynamic coverage status explicitly showing both Van ID and assigned technician name"
+    "Application is a hardware inventory management system",
+    "Uses vanilla JS with a custom 'controller' library for the frontend",
+    "Uses Express for the backend",
+    "Primary database is currently Firebase Realtime Database (RTDB) via server.js"
   ],
   "tech_stack": {
-    "backend": "Node.js (Express) + Firebase Admin",
-    "frontend": "Vanilla JS, Pico CSS, controller.js",
-    "database": "Firebase RTDB (Normalized)"
+    "frontend": "Vanilla JS, Vite, Tailwind CSS",
+    "backend": "Express, Firebase Admin SDK",
+    "database": "Firebase RTDB (pluggable via adapters)",
+    "devops": "Docker, Nginx (optimized for SPA)"
   },
   "FAQ": {
-    "Stock": [
+    "Architecture": [
       {
-        "Q": "where stock go in morning?",
-        "A": "into VAN"
+        "Q": "How are views structured?",
+        "A": "Views are functional components returning an element and using a custom 'controller' for state/events."
       },
       {
-        "Q": "what evening audit do?",
-        "A": "compare physical CSV to system items in VAN"
+        "Q": "How does data fetching work?",
+        "A": "Frontend uses src/lib/db/index.js which routes requests via adapters. Default is RestAdapter pointing to local server, configurable via VITE_DB_PROVIDER."
+      }
+    ],
+    "Deployment": [
+      {
+        "Q": "How is the app containerized?",
+        "A": "Multi-stage Docker build: Node.js builder stage compiles assets, Nginx stage serves statics with SPA support."
       }
     ]
   }

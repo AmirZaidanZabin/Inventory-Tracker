@@ -35,7 +35,9 @@ export function createModal({ title, body, footer, id, width }) {
         }, 300);
     };
 
-    element.querySelector('.close-modal').addEventListener('click', () => hide());
+    const closeBtns = element.querySelectorAll('.close-modal');
+    closeBtns.forEach(btn => btn.addEventListener('click', () => hide()));
+
     element.addEventListener('click', (e) => {
         if (e.target === element) hide();
     });

@@ -1,6 +1,7 @@
 // src/views/view.gantt.js
-import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { controller, debounce } from '../lib/controller.js';
+import { db } from '../lib/db/index.js';
+import { optimizeRoute } from '../lib/travel-logic.js';
 
 function toDate(str) {
     if (!str) return null;
@@ -141,21 +142,19 @@ export function AppointmentsGanttView() {
     let windowMaxDate = null;
 
     const fetchGanttData = async () => {
-        const [apptsSnap, usersSnap, vansSnap] = await Promise.all([
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'appointments')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'users')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'vans'))
+        const [apptsData, usersData, vansData] = await Promise.all([
+            db.findMany('appointments'),
+            db.findMany('users'),
+            db.findMany('vans')
         ]);
 
-        appointments = apptsSnap.docs
-            .map(d => ({ id: d.id, ...d.data() }))
+        appointments = (apptsData || [])
             .filter(a => !a.is_deleted);
 
-        technicians = usersSnap.docs
-            .map(d => ({ id: d.id, ...d.data() }))
+        technicians = (usersData || [])
             .filter(u => u.role_id === 'technician' || appointments.some(a => a.tech_id === u.user_id));
 
-        vans = vansSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        vans = (vansData || []);
         
         // Build map: tech_id -> Van Name
         vanMap = {};
@@ -173,7 +172,7 @@ export function AppointmentsGanttView() {
         const search = view.$('apt-search')?.value.toLowerCase() || '';
         
         let filtered = appointments.filter(a => 
-            (a.appointment_name.toLowerCase().includes(search) || a.appointment_id.toLowerCase().includes(search))
+            ((a.appointment_name || '').toLowerCase().includes(search) || (a.appointment_id || '').toLowerCase().includes(search))
         );
 
         tbody.innerHTML = filtered.slice(0, 75).map(a => {
@@ -185,7 +184,7 @@ export function AppointmentsGanttView() {
 
             return `
                 <tr class="gantt-apt-row" data-id="${a.appointment_id}">
-                    <td class="ps-3 fw-bold text-primary" style="font-size: 0.75rem;">${a.appointment_id.split('-')[1] || a.appointment_id}</td>
+                    <td class="ps-3 fw-bold text-primary" style="font-size: 0.75rem;">${(a.appointment_id || '').split('-')[1] || a.appointment_id}</td>
                     <td class="fw-bold text-dark text-truncate" style="max-width: 100px; font-size: 0.75rem;" title="${displayText}">${displayText}</td>
                     <td><span class="badge ${badgeClass}">${a.status || 'Draft'}</span></td>
                     <td class="text-muted" style="font-size: 0.7rem;">${new Date(a.schedule_date).toLocaleDateString('en-US', {month:'numeric', day:'numeric'})}</td>
@@ -208,31 +207,27 @@ export function AppointmentsGanttView() {
         
         const totalDays = Math.ceil((windowMaxDate - windowMinDate) / 86400000) + 1;
         
-        // Granular Scaling Math
         let scaleW = DAY_W;
         if (currentScale === 'weekly') scaleW = DAY_W / 4;
-        else if (currentScale === 'hourly') scaleW = 1440; // 60px per hour
+        else if (currentScale === 'hourly') scaleW = 1440; 
         
         const gridW = totalDays * scaleW;
         const currentHourW = scaleW / 24;
         
-        // Auto-scroll centering
         todayX = Math.round((today - windowMinDate) / 86400000) * scaleW;
         if (currentScale === 'hourly') {
             const now = new Date();
             todayX += now.getHours() * currentHourW;
         }
         
-        // Update Header Date Range Text
         const rangeText = `${windowMinDate.toLocaleDateString('en-US', {weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'})} - ${windowMaxDate.toLocaleDateString('en-US', {weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'})}`;
         view.$('gantt-date-range').textContent = rangeText;
 
         const visibleTechs = technicians.filter(t => 
             !hiddenTechs.has(t.user_id) && 
-            t.user_name.toLowerCase().includes(resourceSearch)
+            (t.user_name || '').toLowerCase().includes(resourceSearch)
         );
         
-        // Group by Van ID
         const groups = {};
         visibleTechs.forEach(t => {
             const van = vanMap[t.user_id] || 'Unassigned';
@@ -240,11 +235,31 @@ export function AppointmentsGanttView() {
             groups[van].push(t);
         });
 
-        const html = `
+        const flatItems = [];
+        let runningY = 0;
+        Object.entries(groups).forEach(([van, techs]) => {
+            const groupAppts = appointments.filter(a => techs.some(t => t.user_id === a.tech_id) && a.schedule_date >= toYMD(windowMinDate) && a.schedule_date <= toYMD(windowMaxDate));
+            const totalGroupMins = groupAppts.reduce((sum, a) => sum + (a.metadata?.duration_minutes || 60), 0);
+            const groupUtil = totalGroupMins > 0 ? Math.min(100, Math.round((totalGroupMins / (techs.length * 480)) * 100)) : 0;
+            
+            flatItems.push({ type: 'group', van, totalGroupMins, groupUtil, y: runningY, h: 32 });
+            runningY += 32;
+            
+            techs.forEach(t => {
+                const techAppts = appointments.filter(a => a.tech_id === t.user_id && a.schedule_date >= toYMD(windowMinDate) && a.schedule_date <= toYMD(windowMaxDate));
+                const totalMins = techAppts.reduce((sum, a) => sum + (a.metadata?.duration_minutes || 60), 0);
+                const utilPercent = Math.min(100, Math.round((totalMins / 480) * 100));
+                flatItems.push({ type: 'tech', t, techAppts, totalMins, utilPercent, y: runningY, h: ROW_H });
+                runningY += ROW_H;
+            });
+        });
+
+        const totalGridHeight = runningY;
+
+        const headerHtml = `
             <div style="min-width:${LABEL_W + gridW}px; background: #fff;">
                 <div style="display:flex; position:sticky; top:0; z-index:20; background:white; border-bottom: 1px solid #cbd5e1;">
-                    <div class="border-end flex-shrink-0 bg-light" style="width:${LABEL_W}px; height:50px; position:sticky; left:0; z-index:21;">
-                        </div>
+                    <div class="border-end flex-shrink-0 bg-light" style="width:${LABEL_W}px; height:50px; position:sticky; left:0; z-index:21;"></div>
                     <div style="width:${gridW}px; position:relative; height:50px; background: #fff;">
                         <svg width="${gridW}" height="50" style="position: absolute; top:0;">
                             ${Array.from({length: totalDays}).map((_, i) => {
@@ -286,110 +301,163 @@ export function AppointmentsGanttView() {
                         </svg>
                     </div>
                 </div>
-
-                <div class="bg-white">
-                    ${Object.entries(groups).map(([van, techs]) => {
-                        const groupAppts = appointments.filter(a => techs.some(t => t.user_id === a.tech_id) && a.schedule_date >= toYMD(windowMinDate) && a.schedule_date <= toYMD(windowMaxDate));
-                        const totalGroupMins = groupAppts.reduce((sum, a) => sum + (a.metadata?.duration_minutes || 60), 0);
-                        const groupUtil = totalGroupMins > 0 ? Math.min(100, Math.round((totalGroupMins / (techs.length * 480)) * 100)) : 0;
-
-                        return `
-                            <div class="d-flex border-bottom bg-light text-muted fw-bold" style="height: 32px; font-size: 0.7rem; align-items:center;">
-                                <div class="px-3 flex-shrink-0 border-end" style="width:${LABEL_W}px; position:sticky; left:0; z-index:15; background: #f8fafc;">
-                                    <i class="bi bi-truck text-primary me-2"></i>${van}
-                                </div>
-                                <div class="ms-2 badge badge-pale-info py-1 px-2" style="font-size: 0.65rem;">
-                                    Group Load: <span class="fw-bold ms-1" style="color: ${groupUtil > 80 ? '#dc2626' : '#16a34a'};">${(totalGroupMins/60).toFixed(1)}h</span>
-                                </div>
-                            </div>
-                            
-                            ${techs.map(t => {
-                                const techAppts = appointments.filter(a => a.tech_id === t.user_id && a.schedule_date >= toYMD(windowMinDate) && a.schedule_date <= toYMD(windowMaxDate));
-                                const totalMins = techAppts.reduce((sum, a) => sum + (a.metadata?.duration_minutes || 60), 0);
-                                const utilPercent = Math.min(100, Math.round((totalMins / 480) * 100));
-                                
-                                return `
-                                    <div class="d-flex border-bottom tech-row" style="height:${ROW_H}px;">
-                                        <div class="gantt-resource-cell flex-shrink-0 d-flex align-items-center px-2 bg-white border-end" style="width:${LABEL_W}px; position:sticky; left:0; z-index:10;">
-                                            <div class="user-avatar-small me-2 flex-shrink-0" style="width:32px; height:32px; border-radius:50%; background:#dbeafe; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                                                <img src="https://api.dicebear.com/7.x/initials/svg?seed=${t.user_name}&backgroundColor=0284c7&textColor=ffffff" width="32" height="32">
-                                            </div>
-                                            <div class="flex-grow-1 min-w-0 lh-sm">
-                                                <div class="fw-semibold text-dark text-truncate" style="font-size: 0.8rem;">${t.user_name}</div>
-                                                <div class="text-muted text-truncate" style="font-size: 0.65rem;">${t.role_id === 'technician' ? 'Field Specialist' : t.role_id}</div>
-                                            </div>
-                                            <div class="text-end d-flex align-items-center gap-1 border border-secondary-subtle rounded-3 px-2 py-1 text-muted bg-light bg-opacity-10" style="font-size: 0.65rem;">
-                                                <div class="rounded-circle" style="width: 8px; height: 8px; background: ${utilPercent > 80 ? '#ef4444' : '#10b981'};"></div>
-                                                <span class="fw-bold text-dark">${(totalMins/60).toFixed(1)}h</span>
-                                            </div>
-                                        </div>
-                                        
-                                        <div style="width:${gridW}px; height:${ROW_H}px; position:relative; background-image: repeating-linear-gradient(90deg, transparent, transparent ${currentScale==='daily' ? currentHourW * 6 : currentScale==='hourly' ? currentHourW : scaleW}px, #f1f5f9 ${currentScale==='daily' ? currentHourW * 6 : currentScale==='hourly' ? currentHourW : scaleW}px, #f1f5f9 ${currentScale==='daily' ? (currentHourW * 6) + 1 : currentScale==='hourly' ? currentHourW + 1 : scaleW + 1}px);">
-                                            <svg width="${gridW}" height="${ROW_H}" style="position: absolute; top:0; left:0;">
-                                                ${Array.from({length: totalDays}).map((_, i) => `<line x1="${i * scaleW}" y1="0" x2="${i * scaleW}" y2="${ROW_H}" stroke="#cbd5e1" stroke-width="1"/>`).join('')}
-                                                <line x1="${todayX}" y1="0" x2="${todayX}" y2="${ROW_H}" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2,2" opacity="0.5"/>
-                                                
-                                                ${techAppts.map(a => {
-                                                    const startD = toDate(a.schedule_date) || today;
-                                                    const [h, m] = (a.appointment_time || '08:00').split(':').map(Number);
-                                                    const finalX = (Math.round((startD - windowMinDate) / 86400000) * scaleW) + ((h + m/60) * currentHourW);
-                                                    const width = Math.max(16, (a.metadata?.duration_minutes || 60) / 60 * currentHourW);
-                                                    
-                                                    // Map status to colors (Salesforce FSL inspired)
-                                                    let taskColor = '#fde047'; // Default Yellow (Draft/Warning)
-                                                    let edgeColor = '#1e3a8a'; // Dark Blue edge
-                                                    
-                                                    if (a.status === 'completed') {
-                                                        taskColor = '#dcfce7'; // Light Green
-                                                        edgeColor = '#15803d'; // Dark Green
-                                                    } else if (a.status === 'scheduled' || a.status === 'assigned' || a.status === 'in-progress') {
-                                                        taskColor = '#dbeafe'; // Light Blue
-                                                        edgeColor = '#1d4ed8'; // Blue
-                                                    } else if (a.status === 'rescheduled') {
-                                                        taskColor = '#ffedd5'; // Light Orange
-                                                        edgeColor = '#c2410c'; // Orange
-                                                    }
-
-                                                    const displayText = a.appointment_name || a.location_name || (a.appointment_id.split('-')[1] || '...');
-
-                                                    return `
-                                                        <g class="gantt-task-bar" data-appt="${a.appointment_id}">
-                                                            <rect x="${finalX}" y="10" width="${width}" height="${ROW_H - 20}" fill="${taskColor}" rx="2" />
-                                                            <rect x="${finalX}" y="10" width="4" height="${ROW_H - 20}" fill="${edgeColor}" rx="1" />
-                                                            <rect x="${finalX + width - 4}" y="10" width="4" height="${ROW_H - 20}" fill="${edgeColor}" rx="1" />
-                                                            ${width > 45 ? `<text x="${finalX + 8}" y="${ROW_H/2 + 3}" font-size="9" fill="${edgeColor}" font-weight="700">${displayText}</text>` : ''}
-                                                        </g>
-                                                    `;
-                                                }).join('')}
-                                            </svg>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        `;
-                    }).join('')}
+                <div id="virtual-container" class="bg-white position-relative" style="height: ${totalGridHeight}px; width: 100%;">
                 </div>
             </div>
         `;
 
-        view.$('gantt-inner').innerHTML = html;
-        
-        const searchInput = view.$('resource-search');
-        if (searchInput) searchInput.oninput = () => renderGantt();
+        view.$('gantt-inner').innerHTML = headerHtml;
+
+        const renderVirtualRows = () => {
+            const scroller = view.$('gantt-scroller');
+            if (!scroller) return;
+            const container = view.$('gantt-inner').querySelector('#virtual-container');
+            if (!container) return;
+
+            const scrollTop = scroller.scrollTop;
+            const clientHeight = scroller.clientHeight;
+            const buffer = 200; // preload buffer
+
+            const visibleItems = flatItems.filter(item => 
+                (item.y + item.h >= scrollTop - buffer) && 
+                (item.y <= scrollTop + clientHeight + buffer)
+            );
+
+            container.innerHTML = visibleItems.map(item => {
+                if (item.type === 'group') {
+                    return `
+                        <div class="d-flex bg-light text-muted fw-bold position-absolute w-100" style="height: 32px; font-size: 0.7rem; align-items:center; top: ${item.y}px;">
+                            <div class="px-3 border-bottom flex-shrink-0 border-end" style="width:${LABEL_W}px; height: 100%; display: flex; align-items: center; position:sticky; left:0; z-index:15; background: #f8fafc;">
+                                <i class="bi bi-truck text-primary me-2"></i>${item.van}
+                            </div>
+                            <div class="ms-2 badge badge-pale-info py-1 px-2 border-bottom flex-grow-1 text-start" style="font-size: 0.65rem; height: 100%; display: flex; align-items: center;">
+                                Group Load: <span class="fw-bold ms-1" style="color: ${item.groupUtil > 80 ? '#dc2626' : '#16a34a'};">${(item.totalGroupMins/60).toFixed(1)}h</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const { t, techAppts, totalMins, utilPercent } = item;
+                    return `
+                        <div class="d-flex tech-row position-absolute w-100 border-bottom" style="height:${ROW_H}px; top: ${item.y}px;">
+                            <div class="gantt-resource-cell flex-shrink-0 d-flex align-items-center px-2 bg-white border-end" style="width:${LABEL_W}px; position:sticky; left:0; z-index:10;">
+                                <div class="user-avatar-small me-2 flex-shrink-0" style="width:32px; height:32px; border-radius:50%; background:#dbeafe; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                                    <img src="https://api.dicebear.com/7.x/initials/svg?seed=${t.user_name}&backgroundColor=0284c7&textColor=ffffff" width="32" height="32">
+                                </div>
+                                <div class="flex-grow-1 min-w-0 lh-sm">
+                                    <div class="fw-semibold text-dark text-truncate" style="font-size: 0.8rem;">${t.user_name}</div>
+                                    <div class="text-muted text-truncate" style="font-size: 0.65rem;">${t.role_id === 'technician' ? 'Field Specialist' : t.role_id}</div>
+                                </div>
+                                <div class="text-end d-flex align-items-center gap-1 border border-secondary-subtle rounded-3 px-2 py-1 text-muted bg-light bg-opacity-10" style="font-size: 0.65rem;">
+                                    <div class="rounded-circle" style="width: 8px; height: 8px; background: ${utilPercent > 80 ? '#ef4444' : '#10b981'};"></div>
+                                    <span class="fw-bold text-dark">${(totalMins/60).toFixed(1)}h</span>
+                                    <button class="btn btn-link p-0 text-primary ms-1 btn-optimize-tech" data-tech="${t.user_id}" title="Optimize Today's Route">
+                                        <i class="bi bi-lightning-charge-fill"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div style="width:${gridW}px; height:${ROW_H}px; position:relative; background-image: repeating-linear-gradient(90deg, transparent, transparent ${currentScale==='daily' ? currentHourW * 6 : currentScale==='hourly' ? currentHourW : scaleW}px, #f1f5f9 ${currentScale==='daily' ? currentHourW * 6 : currentScale==='hourly' ? currentHourW : scaleW}px, #f1f5f9 ${currentScale==='daily' ? (currentHourW * 6) + 1 : currentScale==='hourly' ? currentHourW + 1 : scaleW + 1}px);">
+                                <svg width="${gridW}" height="${ROW_H}" style="position: absolute; top:0; left:0;">
+                                    ${Array.from({length: totalDays}).map((_, i) => `<line x1="${i * scaleW}" y1="0" x2="${i * scaleW}" y2="${ROW_H}" stroke="#cbd5e1" stroke-width="1"/>`).join('')}
+                                    <line x1="${todayX}" y1="0" x2="${todayX}" y2="${ROW_H}" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2,2" opacity="0.5"/>
+                                    
+                                    ${techAppts.map(a => {
+                                        const startD = toDate(a.schedule_date) || today;
+                                        const [h, m] = (a.appointment_time || '08:00').split(':').map(Number);
+                                        const finalX = (Math.round((startD - windowMinDate) / 86400000) * scaleW) + ((h + m/60) * currentHourW);
+                                        const width = Math.max(16, (a.metadata?.duration_minutes || 60) / 60 * currentHourW);
+                                        
+                                        let taskColor = '#fde047'; 
+                                        let edgeColor = '#1e3a8a'; 
+                                        
+                                        if (a.status === 'completed') {
+                                            taskColor = '#dcfce7'; 
+                                            edgeColor = '#15803d'; 
+                                        } else if (a.status === 'scheduled' || a.status === 'assigned' || a.status === 'in-progress') {
+                                            taskColor = '#dbeafe'; 
+                                            edgeColor = '#1d4ed8'; 
+                                        } else if (a.status === 'rescheduled') {
+                                            taskColor = '#ffedd5'; 
+                                            edgeColor = '#c2410c'; 
+                                        }
+
+                                        const displayText = a.appointment_name || a.location_name || ((a.appointment_id || '').split('-')[1] || '...');
+
+                                        return `
+                                            <g class="gantt-task-bar" data-appt="${a.appointment_id}">
+                                                <rect x="${finalX}" y="10" width="${width}" height="${ROW_H - 20}" fill="${taskColor}" rx="2" />
+                                                <rect x="${finalX}" y="10" width="4" height="${ROW_H - 20}" fill="${edgeColor}" rx="1" />
+                                                <rect x="${finalX + width - 4}" y="10" width="4" height="${ROW_H - 20}" fill="${edgeColor}" rx="1" />
+                                                ${width > 45 ? `<text x="${finalX + 8}" y="${ROW_H/2 + 3}" font-size="9" fill="${edgeColor}" font-weight="700">${displayText}</text>` : ''}
+                                            </g>
+                                        `;
+                                    }).join('')}
+                                </svg>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        };
+
+        renderVirtualRows();
+
+        const scroller = view.$('gantt-scroller');
+        if (scroller) {
+            scroller.onscroll = () => {
+                requestAnimationFrame(renderVirtualRows);
+            };
+        }
     };
+
+    const searchInput = view.$('resource-search');
+    if (searchInput) searchInput.oninput = debounce(() => renderGantt(), 300);
 
     view.trigger('change', 'gantt-scale', (e) => {
         currentScale = e.target.value;
         renderGantt();
     });
 
-    view.trigger('input', 'apt-search', () => renderAptList());
+    view.trigger('input', 'apt-search', debounce(() => renderAptList(), 300));
 
     view.trigger('click', 'gantt-prev', () => { view.$('gantt-scroller').scrollLeft -= SCROLL_STEP; });
     view.trigger('click', 'gantt-next', () => { view.$('gantt-scroller').scrollLeft += SCROLL_STEP; });
     view.trigger('click', 'gantt-today', () => { view.$('gantt-scroller').scrollLeft = todayX - LABEL_W; }); // Center near today
 
-    view.trigger('click', 'gantt-scroller', (e) => {
+    view.trigger('click', 'gantt-scroller', async (e) => {
+        const btnOpt = e.target.closest('.btn-optimize-tech');
+        if (btnOpt) {
+            e.stopPropagation();
+            const techId = btnOpt.dataset.tech;
+            const todayStr = toYMD(new Date());
+            
+            // Get today's appts for this tech
+            const techAppts = appointments.filter(a => a.tech_id === techId && a.schedule_date === todayStr && !a.is_deleted);
+            
+            if (techAppts.length < 2) {
+                return alert("Not enough appointments today to optimize.");
+            }
+            
+            btnOpt.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+            
+            try {
+                const optimized = await optimizeRoute(techAppts);
+                
+                // Save back
+                for (const apt of optimized) {
+                    await db.update('appointments', apt.appointment_id, 
+                        { appointment_time: apt.appointment_time }
+                    );
+                }
+                
+                alert(`Optimized ${optimized.length} appointments for today!`);
+                await fetchGanttData();
+            } catch (err) {
+                alert("Failed to optimize: " + err.message);
+            }
+            return;
+        }
+
         const apptEl = e.target.closest('[data-appt]');
         if(apptEl) {
             window.location.hash = `appointment/${apptEl.dataset.appt}`;

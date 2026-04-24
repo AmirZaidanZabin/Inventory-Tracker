@@ -1,7 +1,0 @@
-{
-  "id": 1,
-  "description": "Verifying loading logic in view.appointments.js and checking availability grid",
-  "input": "src/views/view.appointments.js",
-  "expected_output": "Properly placed loading indicators and identifies if availability grid needs change.",
-  "status": "done"
-}

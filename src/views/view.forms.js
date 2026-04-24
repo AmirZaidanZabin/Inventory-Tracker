@@ -1,5 +1,5 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { db } from '../lib/db/index.js';
 import { createModal } from '../lib/modal.js';
 
 const FIELD_TYPES = [
@@ -216,9 +216,9 @@ export function FormsView() {
                 modal.element.querySelector('.confirm-btn').onclick = async () => {
                     modal.hide();
                     try {
-                        await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'forms', f.id));
-                        // No logAction available directly in FormsView, might need to check if it exists in controller or firebase
-                        // firebase.logAction("Form Deleted", `Form ${f.name} removed`);
+                        await db.remove('forms', f.id);
+                        // No logAction available directly in FormsView, might need to check if it exists in controller
+                        // db.logAction("Form Deleted", `Form ${f.name} removed`);
                     } catch (e) {
                         alert("Delete failed: " + e.message);
                     }
@@ -233,7 +233,7 @@ export function FormsView() {
         if (!listEl) return;
         
         listEl.querySelectorAll('.bf-name').forEach(el => el.addEventListener('input', e => { 
-            let clean = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+            let clean = (e.target.value || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
             e.target.value = clean;
             builderFields[+e.target.dataset.fi].name = clean; 
         }));
@@ -252,7 +252,7 @@ export function FormsView() {
         }));
         
         listEl.querySelectorAll('.bf-options').forEach(el => el.addEventListener('input', e => {
-            builderFields[+e.target.dataset.fi].options = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+            builderFields[+e.target.dataset.fi].options = (e.target.value || '').split(',').map(s => s.trim()).filter(Boolean);
         }));
 
         listEl.querySelectorAll('.bf-pattern').forEach(el => el.addEventListener('input', e => {
@@ -350,7 +350,7 @@ export function FormsView() {
         btn.disabled = true;
         
         try {
-            await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'forms', fid), formObj);
+            await db.create('forms', formObj, fid);
             closeBuilder();
         } catch(e) {
             alert('Failed to save form config: ' + e.message);
@@ -362,14 +362,8 @@ export function FormsView() {
 
     view.on('init', () => {
         view.emit('loading:start');
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'forms'), (snap) => {
-            const arr = [];
-            if(snap && snap.forEach) {
-                snap.forEach(doc => {
-                    arr.push({ id: doc.id, ...doc.data() });
-                });
-            }
-            state.forms = arr;
+        view.unsub(db.subscribe('forms', {}, (data) => {
+            state.forms = data || [];
             view.emit('loading:end');
             renderFormsList();
         }));

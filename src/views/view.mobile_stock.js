@@ -1,5 +1,6 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { auth } from '../lib/auth.js';
+import { db } from '../lib/db/index.js';
 
 export function MobileStockView() {
     const view = controller({
@@ -44,7 +45,7 @@ export function MobileStockView() {
                     </div>
 
                     <h6 class="fw-bold mb-2">Scanned Items</h6>
-                    <div id="scanned-list-container" class="mb-4 d-flex flex-column gap-2">
+                    <div id="scanned-items-list" class="mb-4 d-flex flex-column gap-2">
                         <div class="text-center text-muted small py-4 bg-light rounded border border-dashed">
                             No items scanned yet.
                         </div>
@@ -71,7 +72,7 @@ export function MobileStockView() {
     });
 
     view.onboard({ id: 'stock-type' }).onboard({ id: 'stock-van' })
-        .onboard({ id: 'btn-start-scanning' }).onboard({ id: 'scanned-list-container' })
+        .onboard({ id: 'btn-start-scanning' }).onboard({ id: 'scanned-items-list' })
         .onboard({ id: 'btn-submit-stock' }).onboard({ id: 'scan-count-badge' })
         .onboard({ id: 'stock-scanner-modal' }).onboard({ id: 'btn-close-scanner' })
         .onboard({ id: 'live-scan-count' });
@@ -84,7 +85,7 @@ export function MobileStockView() {
     let lastScanTime = 0;
 
     const renderScannedList = () => {
-        const container = view.$('scanned-list-container');
+        const container = view.$('scanned-items-list');
         view.$('scan-count-badge').textContent = `${scannedItems.length} Scanned`;
         view.$('live-scan-count').textContent = `${scannedItems.length} Items Scanned`;
 
@@ -184,13 +185,14 @@ export function MobileStockView() {
         const vanId = view.$('stock-van').value;
         const logType = view.$('stock-type').value;
 
-        if(!vanId) return alert('Please select a target VAN.');
         if(scannedItems.length === 0) return alert('You must scan at least one item.');
 
         if (logType === 'morning_load') {
             const incomplete = scannedItems.some(i => !i.catalog_id);
             if (incomplete) return alert('For a Morning Load, you must select the Hardware Type for EVERY scanned item.');
         }
+
+        if(!vanId) return alert('Please select a target VAN.');
 
         const btn = view.$('btn-submit-stock');
         const ogHtml = btn.innerHTML;
@@ -203,30 +205,30 @@ export function MobileStockView() {
                 const batchPromises = [];
                 const inventoryIds = [];
                 scannedItems.forEach(item => {
-                    batchPromises.push(firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'items', item.item_id), {
+                    batchPromises.push(db.create('items', {
                         item_id: item.item_id,
                         catalog_id: item.catalog_id,
                         current_location_type: 'VAN',
                         current_location_id: vanId,
                         is_available: true,
                         status: 'available',
-                        updated_at: firebase.db.serverTimestamp()
-                    }));
+                        updated_at: db.serverTimestamp()
+                    }, item.item_id));
                     inventoryIds.push(item.item_id);
                 });
                 await Promise.all(batchPromises);
 
                 const logId = 'ST-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-                await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'stock_take_logs', logId), {
+                await db.create('stock_take_logs', {
                     log_id: logId,
                     log_type: 'morning_load',
                     target_van: vanId,
-                    user_id: firebase.auth.currentUser?.uid || 'Unknown',
-                    user_email: firebase.auth.currentUser?.email || 'Unknown',
-                    timestamp: firebase.db.serverTimestamp(),
+                    user_id: auth.currentUser?.uid || 'Unknown',
+                    user_email: auth.currentUser?.email || 'Unknown',
+                    timestamp: db.serverTimestamp(),
                     scanned_items: inventoryIds,
                     count: inventoryIds.length
-                });
+                }, logId);
 
                 alert(`Success! ${inventoryIds.length} items loaded into ${vanId}.`);
                 scannedItems = [];
@@ -235,11 +237,10 @@ export function MobileStockView() {
             } else {
                 // Evening Reconcile Logic
                 const uploadedIds = new Set(scannedItems.map(i => i.item_id));
-                const itemsRes = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'items'));
+                const itemsList = await db.findMany('items');
                 const systemIds = new Set();
                 
-                itemsRes.docs.forEach(doc => {
-                    const item = doc.data();
+                (itemsList || []).forEach(item => {
                     const isAvail = item.status === 'available' || (!item.status && item.is_available);
                     const isInVan = item.current_location_type === 'VAN' && item.current_location_id === vanId;
                     if (isAvail && isInVan) systemIds.add(item.item_id);
@@ -249,17 +250,17 @@ export function MobileStockView() {
                 const extra = [...uploadedIds].filter(x => !systemIds.has(x));
 
                 const logId = 'ST-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-                await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'stock_take_logs', logId), {
+                await db.create('stock_take_logs', {
                     log_id: logId,
                     log_type: 'evening_reconcile',
                     target_van: vanId,
-                    user_id: firebase.auth.currentUser?.uid || 'Unknown',
-                    user_email: firebase.auth.currentUser?.email || 'Unknown',
-                    timestamp: firebase.db.serverTimestamp(),
+                    user_id: auth.currentUser?.uid || 'Unknown',
+                    user_email: auth.currentUser?.email || 'Unknown',
+                    timestamp: db.serverTimestamp(),
                     scanned_items: [...uploadedIds],
                     count: uploadedIds.size,
                     discrepancies: { missing, extra }
-                });
+                }, logId);
 
                 alert(`Audit complete!\nMissing: ${missing.length}\nExtra: ${extra.length}\nReport saved to history.`);
                 scannedItems = [];
@@ -278,22 +279,21 @@ export function MobileStockView() {
         view.emit('loading:start');
         
         try {
-            const [vansSnap, catalogSnap] = await Promise.all([
-                firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'vans')),
-                firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'))
+            const [vans, catalog] = await Promise.all([
+                db.findMany('vans'),
+                db.findMany('item_catalog')
             ]);
 
             const vanSelect = view.$('stock-van');
             if (vanSelect) {
                 let options = '<option value="" disabled selected>Select a VAN...</option>';
-                vansSnap.forEach(doc => {
-                    const v = doc.data();
+                (vans || []).forEach(v => {
                     options += `<option value="${v.van_id}">${v.van_id} (${v.location_id})</option>`;
                 });
                 vanSelect.innerHTML = options;
             }
 
-            catalogSnap.forEach(doc => hardwareCatalog.push({ id: doc.id, ...doc.data() }));
+            (catalog || []).forEach(item => hardwareCatalog.push(item));
 
         } catch (e) {
             console.error("Failed to initialize mobile stock view data:", e);

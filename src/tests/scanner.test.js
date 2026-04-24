@@ -1,4 +1,5 @@
 import { firebase } from '../lib/firebase.js';
+import { db } from '../lib/db/index.js';
 import { MobileStockView } from '../views/view.mobile_stock.js';
 import { MobileAppointmentView } from '../views/view.mobile_appointment.js';
 
@@ -111,13 +112,14 @@ export async function runScannerTests(t) {
 
             // Open scanner & inject
             view.$('btn-start-scanning').click();
-            await wait(50);
+            await wait(200);
             MockHtml5Qrcode.simulateScan('P-456');
-            await wait(50);
+            await wait(500);
 
             // Submit without choosing DB item via select
             lastAlertMessage = null;
             view.$('btn-submit-stock').click();
+            await wait(200);
             
             t.assert(lastAlertMessage && lastAlertMessage.includes('Hardware Type'), 'Submission should be blocked with an alert if hardware type is not selected for Morning Load.');
         });
@@ -129,18 +131,18 @@ export async function runScannerTests(t) {
             const invalidItemId = 'TEST-INVALID-ITEM-' + Date.now();
 
             await Promise.all([
-                firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'appointments', testAptId), {
+                db.create('appointments', {
                     status: 'scheduled',
                     metadata: { required_hardware: [{ catalog_id: 'catalog-pico-device', count: 1, item_name: 'Test Device' }] }
-                }),
-                firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'items', validItemId), {
+                }, testAptId),
+                db.create('items', {
                     catalog_id: 'catalog-pico-device',
                     status: 'available'
-                }),
-                firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'items', invalidItemId), {
+                }, validItemId),
+                db.create('items', {
                     catalog_id: 'catalog-router',
                     status: 'available'
-                })
+                }, invalidItemId)
             ]);
 
             const view = MobileAppointmentView(testAptId);
@@ -148,23 +150,31 @@ export async function runScannerTests(t) {
             container.appendChild(view.element());
             
             // Wait for subscription to pull appointment data
+            const loaded = new Promise(resolve => {
+                view.on('loading:end', resolve);
+                setTimeout(resolve, 5000);
+            });
             view.trigger('init');
-            await wait(1000); 
+            await loaded;
+            await wait(1000);
 
-            view.$('btn-open-scanner').click();
-            await wait(50); // wait for start()
+            const scanBtn = view.$('btn-open-scanner');
+            t.assert(scanBtn && !scanBtn.disabled, 'Scanner button should be enabled');
+
+            scanBtn.click();
+            await wait(500); // wait for start()
 
             // 1. D: Hardware Mismatch
             lastAlertMessage = null;
             MockHtml5Qrcode.simulateScan(invalidItemId);
-            await wait(300); // DB getDoc takes a moment
+            await wait(1500); // DB getDoc takes a moment
             
-            t.assert(lastAlertMessage && lastAlertMessage.includes('No open requirement'), 'Graceful rejection for unmatched hardware ID');
-            t.assert(window._activeMockScanner.isPaused === false, 'Scanner should resume after a failed validation');
+            t.assert(lastAlertMessage && lastAlertMessage.includes('No open requirement'), 'Graceful rejection for unmatched hardware ID. Actual alert: ' + lastAlertMessage);
+            t.assert(window._activeMockScanner && window._activeMockScanner.isPaused === false, 'Scanner should resume after a failed validation');
 
             // 2. C: Successful Fulfillment
             MockHtml5Qrcode.simulateScan(validItemId);
-            await wait(300);
+            await wait(1500);
 
             const badge = container.querySelector('.slot-status-badge');
             t.assert(badge && badge.textContent === 'Fulfilled', 'Hardware slot should transition to Fulfilled state');
@@ -172,9 +182,9 @@ export async function runScannerTests(t) {
 
             // Cleanup DB
             await Promise.all([
-                firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'appointments', testAptId)),
-                firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'items', validItemId)),
-                firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'items', invalidItemId))
+                db.remove('appointments', testAptId),
+                db.remove('items', validItemId),
+                db.remove('items', invalidItemId)
             ]);
         });
 

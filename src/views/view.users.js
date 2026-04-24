@@ -1,5 +1,6 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { auth } from '../lib/auth.js';
+import { db } from '../lib/db/index.js';
 import { createModal } from '../lib/modal.js';
 import { renderTable } from '../lib/table.js';
 
@@ -54,13 +55,13 @@ export function UsersView() {
     view.onboard({ id: 'open-add-user' }).onboard({ id: 'users-list' });
 
     const openUserModal = async (user = null) => {
-        const [rolesSnap, formsSnap] = await Promise.all([
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'roles')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms'))
+        const [rolesItems, formSchemasRaw] = await Promise.all([
+            db.findMany('roles'),
+            db.findMany('forms')
         ]);
         
-        const roles = rolesSnap.docs.map(d => ({ id: d.id, name: d.data().role_name }));
-        const formSchemas = (formsSnap?.docs || []).map(d => d.data()).filter(f => f.entities && f.entities.includes('users'));
+        const roles = (rolesItems || []).map(d => ({ id: d.id, name: d.role_name }));
+        const formSchemas = (formSchemasRaw || []).filter(f => f.entities && f.entities.includes('users'));
 
         let customFieldsHtml = '';
         if(formSchemas.length > 0) {
@@ -187,7 +188,7 @@ export function UsersView() {
                 user_name: fd.get('user_name'),
                 role_id: fd.get('role_id'),
                 custom_data: customData,
-                updated_at: firebase.db.serverTimestamp(),
+                updated_at: db.serverTimestamp(),
                 metadata: {
                     ...(user?.metadata || {}),
                     vacation: Array.from(modal.element.querySelectorAll('#vacation-list > div')).map(div => ({
@@ -199,23 +200,23 @@ export function UsersView() {
 
             try {
                 if (user) {
-                    await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'users', user.user_id), data);
-                    firebase.logAction("User Updated", `User ${data.user_name} updated`);
+                    await db.update('users', user.user_id, data);
+                    db.logAction("User Updated", `User ${data.user_name} updated`);
                 } else {
                     const email = fd.get('email');
                     // We generate a dummy ID for users added manually (they sync on first login anyway)
                     const tempId = `manual_${Math.random().toString(36).substr(2, 9)}`;
-                    await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'users', tempId), {
+                    await db.create('users', {
                         ...data,
                         user_id: tempId,
-                        created_at: firebase.db.serverTimestamp(),
+                        created_at: db.serverTimestamp(),
                         is_deleted: false,
                         metadata: { 
                             ...data.metadata,
                             email 
                         }
-                    });
-                    firebase.logAction("User Created", `User ${data.user_name} added manually`);
+                    }, tempId);
+                    db.logAction("User Created", `User ${data.user_name} added manually`);
                 }
                 modal.hide();
             } catch (err) { alert(err.message); }
@@ -225,19 +226,19 @@ export function UsersView() {
     view.trigger('click', 'open-add-user', () => openUserModal());
 
     view.on('init', () => {
-        const currentUser = firebase.auth.currentUser;
+        const currentUser = auth.currentUser;
         const isAdmin = currentUser && (
             currentUser.email === 'amir.zaidan.zabin@gmail.com' || 
             currentUser.email === 'amirzaidanzabin@gmail.com'
         );
 
         view.emit('loading:start');
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'users'), (snap) => {
+        view.unsub(db.subscribe('users', {}, (data) => {
             view.delete('users-list');
             view.emit('loading:end');
             
-            snap.forEach(doc => {
-                const user = doc.data();
+            if (data) {
+            data.forEach(user => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>
@@ -245,7 +246,7 @@ export function UsersView() {
                         <div class="small text-muted">${user.metadata?.email || ''}</div>
                     </td>
                     <td><span class="badge badge-pale-primary">${user.role_id}</span></td>
-                    <td class="small text-muted">${user.created_at?.toDate().toLocaleDateString() || '...'}</td>
+                    <td class="small text-muted">${user.created_at && typeof user.created_at.toDate === 'function' ? user.created_at.toDate().toLocaleDateString() : (user.created_at ? new Date(user.created_at).toLocaleDateString() : '...')}</td>
                     <td>
                         <button class="btn-pico btn-pico-outline table-action-btn edit-user me-1" title="Edit">
                             <i class="bi bi-pencil"></i>
@@ -331,8 +332,8 @@ export function UsersView() {
                         });
                         
                         try {
-                            await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'users', user.user_id), { schedule: newSchedule });
-                            firebase.logAction("Schedule Updated", `Set working hours for ${user.user_name}`);
+                            await db.update('users', user.user_id, { schedule: newSchedule });
+                            db.logAction("Schedule Updated", `Set working hours for ${user.user_name}`);
                             modal.hide();
                         } catch (err) { alert(err.message); }
                     };
@@ -369,7 +370,7 @@ export function UsersView() {
 
                     modal.element.querySelector('#btn-send-reset-email').onclick = async () => {
                         try {
-                            await firebase.resetPassword(email);
+                            await auth.resetPassword(email);
                             alert("Reset email sent successfully to " + email);
                             modal.hide();
                         } catch (e) { alert(e.message); }
@@ -389,8 +390,8 @@ export function UsersView() {
                             btn.disabled = true;
                             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Updating...';
                             
-                            await firebase.changeUserPassword(uid, newPassword);
-                            firebase.logAction("Password Override", `Admin changed password for ${user.user_name}`);
+                            await auth.changeUserPassword(uid, newPassword);
+                            db.logAction("Password Override", `Admin changed password for ${user.user_name}`);
                             alert("Password updated successfully.");
                             modal.hide();
                         } catch (err) { 
@@ -417,8 +418,8 @@ export function UsersView() {
                         modal.hide();
                         try {
                             const uid = user.user_id || user.id;
-                            await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'users', uid));
-                            firebase.logAction("User Deleted", `User ${user.user_name} removed`);
+                            await db.remove('users', uid);
+                            db.logAction("User Deleted", `User ${user.user_name} removed`);
                         } catch (err) {
                             alert("Delete failed: " + err.message);
                         }
@@ -429,9 +430,10 @@ export function UsersView() {
                 const list = view.$('users-list');
                 if (list) list.appendChild(row);
             });
-            view.message('rendered');
-        }));
-    });
+        }
+        view.message('rendered');
+    }));
+});
 
     return view;
 }

@@ -1,10 +1,14 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { db } from '../lib/db/index.js';
 import { createModal } from '../lib/modal.js';
 import { CustomSelect } from '../lib/custom-select.js';
 import { renderTable } from '../lib/table.js';
+import { idb } from '../lib/idb.js';
 
 export function ItemsView() {
+    let currentPage = 1;
+    let itemsUnsub = null;
+
     const view = controller({
         stringComponent: `
             <div class="items-view">
@@ -26,7 +30,8 @@ export function ItemsView() {
                         ${renderTable({
                             headers: ['Type', 'Serial / ID', 'Provider', 'Assigned To', 'Location', 'Status', 'Actions'],
                             tbodyId: 'items-list',
-                            emptyMessage: 'Loading hardware inventory...'
+                            emptyMessage: 'Loading hardware inventory...',
+                            pagination: true
                         })}
                     </div>
                 </div>
@@ -36,7 +41,10 @@ export function ItemsView() {
 
     view.onboard({ id: 'open-add-item' }).onboard({ id: 'items-list' })
         .onboard({ id: 'trigger-bulk-upload' }).onboard({ id: 'bulk-upload-csv' })
-        .onboard({ id: 'download-csv-template' });
+        .onboard({ id: 'download-csv-template' })
+        .onboard({ id: 'items-list-prev-btn' })
+        .onboard({ id: 'items-list-next-btn' })
+        .onboard({ id: 'items-list-page-indicator' });
 
     view.trigger('click', 'download-csv-template', () => {
         const csvContent = "data:text/csv;charset=utf-8,catalog_id,item_id,van_id\ncatalog-pico-device,P-1234,VAN-001\ncatalog-sim-card,SIM-9876,VAN-001\ncatalog-pico-device,P-5555,";
@@ -59,7 +67,7 @@ export function ItemsView() {
         const reader = new FileReader();
         reader.onload = async (ev) => {
             const text = ev.target.result;
-            const rows = text.split('\n').map(r => r.trim()).filter(r => r);
+            const rows = (text || '').split('\n').map(r => r.trim()).filter(r => r);
             if (rows.length < 2) return alert("File too short or missing headers.");
             
             // Assume format: catalog_id,item_id,van_id
@@ -78,13 +86,12 @@ export function ItemsView() {
                     status: 'available',
                     is_available: true,
                     is_deleted: false,
-                    created_at: firebase.db.serverTimestamp(),
-                    updated_at: firebase.db.serverTimestamp()
+                    created_at: db.serverTimestamp(),
+                    updated_at: db.serverTimestamp()
                 };
                 if (!data.item_id) continue;
                 
-                const ref = firebase.db.doc(firebase.db.db, 'items', data.item_id);
-                promises.push(firebase.db.setDoc(ref, data));
+                promises.push(db.create('items', data, data.item_id));
             }
             
             try {
@@ -100,18 +107,13 @@ export function ItemsView() {
 
     view.trigger('click', 'open-add-item', async () => {
         // Fetch Vans for selection
-        const [vansSnap, formsSnap, catalogSnap] = await Promise.all([
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'vans')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms')),
-            firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'))
+        const [vans, formSchemasRaw, catalogs] = await Promise.all([
+            db.findMany('vans'),
+            db.findMany('forms'),
+            db.findMany('item_catalog')
         ]);
-        const vans = [];
-        vansSnap.forEach(doc => vans.push(doc.data()));
 
-        const catalogs = [];
-        catalogSnap.forEach(doc => catalogs.push(doc.data()));
-
-        const formSchemas = (formsSnap?.docs || []).map(d => d.data()).filter(f => f.entities && f.entities.includes('items'));
+        const formSchemas = (formSchemasRaw || []).filter(f => f.entities && f.entities.includes('items'));
         let customFieldsHtml = '';
         if(formSchemas.length > 0) {
             formSchemas.forEach(schema => {
@@ -208,14 +210,13 @@ export function ItemsView() {
 
             try {
                 // Check if item already exists
-                const itemRef = firebase.db.doc(firebase.db.db, 'items', data.item_id);
-                const itemDoc = await firebase.db.getDoc(itemRef);
+                const itemDoc = await db.findOne('items', data.item_id);
                 
-                if (itemDoc.exists()) {
+                if (itemDoc) {
                     return alert(`Error: Hardware with ID "${data.item_id}" is already registered.`);
                 }
 
-                await firebase.db.setDoc(itemRef, {
+                await db.create('items', {
                     item_id: data.item_id,
                     catalog_id: catalog_id,
                     current_location_type: data.van_id ? 'VAN' : 'WAREHOUSE',
@@ -223,10 +224,10 @@ export function ItemsView() {
                     is_available: true,
                     status: 'available',
                     metadata: { custom_fields: customData },
-                    created_at: firebase.db.serverTimestamp(),
-                    updated_at: firebase.db.serverTimestamp()
-                });
-                firebase.logAction("Item Registered", `Item ${data.item_id} added ${data.van_id ? `to ${data.van_id}` : ''}`);
+                    created_at: db.serverTimestamp(),
+                    updated_at: db.serverTimestamp()
+                }, data.item_id);
+                db.logAction("Item Registered", `Item ${data.item_id} added ${data.van_id ? `to ${data.van_id}` : ''}`);
                 modal.hide();
             } catch (err) {
                 alert("Error: " + err.message);
@@ -235,23 +236,62 @@ export function ItemsView() {
     });
 
     view.on('init', () => {
-        view.emit('loading:start');
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'items'), async (snap) => {
-            view.delete('items-list');
-            const list = view.$('items-list');
-            view.emit('loading:end');
-            if (!list) return;
+        const PAGE_LIMIT = 50;
+        
+        view.trigger('click', 'items-list-prev-btn', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                loadData();
+            }
+        });
+        
+        view.trigger('click', 'items-list-next-btn', () => {
+            currentPage++;
+            loadData();
+        });
 
-            const catalogSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'item_catalog'));
-            const catalogMap = {};
-            catalogSnap.forEach(doc => {
-                const c = doc.data();
-                catalogMap[c.catalog_id || c.id] = c;
-            });
+        const loadData = () => {
+            if (itemsUnsub) itemsUnsub();
+            view.emit('loading:start');
+            
+            itemsUnsub = db.subscribe('items', { limit: PAGE_LIMIT, page: currentPage }, async (data) => {
+                view.delete('items-list');
+                const list = view.$('items-list');
+                view.emit('loading:end');
+                if (!list) return;
+                
+                const indicator = view.$('items-list-page-indicator');
+                const prevBtn = view.$('items-list-prev-btn');
+                const nextBtn = view.$('items-list-next-btn');
+                
+                if (indicator) indicator.textContent = `Page ${currentPage}`;
+                if (prevBtn) prevBtn.disabled = currentPage === 1;
+                if (nextBtn) nextBtn.disabled = !data || data.length < PAGE_LIMIT;
 
-            if (snap && snap.forEach) {
-                snap.forEach(doc => {
-                    const item = doc.data();
+                let catalogMap = await idb.get('catalogMap');
+                if (!catalogMap) {
+                    const catalogItems = await db.findMany('item_catalog');
+                    catalogMap = {};
+                    if(catalogItems) {
+                        catalogItems.forEach(c => {
+                            catalogMap[c.catalog_id || c.id] = c;
+                        });
+                    }
+                    await idb.set('catalogMap', JSON.parse(JSON.stringify(catalogMap)));
+                } else {
+                    db.findMany('item_catalog').then(catalogItems => {
+                        const bgMap = {};
+                        if(catalogItems) {
+                            catalogItems.forEach(c => {
+                                bgMap[c.catalog_id || c.id] = c;
+                            });
+                        }
+                        idb.set('catalogMap', JSON.parse(JSON.stringify(bgMap)));
+                    }).catch(console.error);
+                }
+
+            if (data) {
+                data.forEach(item => {
                     const row = document.createElement('tr');
                     
                     const catalog = catalogMap[item.catalog_id] || { item_type: 'Unknown', provider: 'Unknown' };
@@ -281,9 +321,7 @@ export function ItemsView() {
                     `;
                     
                     row.querySelector('.edit-item').addEventListener('click', async () => {
-                        const vansSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'vans'));
-                        const vans = [];
-                        vansSnap.forEach(doc => vans.push(doc.data()));
+                        const vans = await db.findMany('vans');
 
                         const itemStatus = item.status || (item.is_available ? 'available' : 'assigned');
 
@@ -325,8 +363,8 @@ export function ItemsView() {
                     modal.show();
 
                     // Render Custom Fields for Edit
-                    const editFormsSnap = await firebase.db.getDocs(firebase.db.collection(firebase.db.db, 'forms'));
-                    const editFormSchemas = (editFormsSnap?.docs || []).map(d => d.data()).filter(f => f.entities && f.entities.includes('items'));
+                    const editFormSchemasRaw = await db.findMany('forms');
+                    const editFormSchemas = (editFormSchemasRaw || []).filter(f => f.entities && f.entities.includes('items'));
                     const editCfContainer = modal.element.querySelector('#edit-custom-fields-container');
                     if (editCfContainer && editFormSchemas.length > 0) {
                         let cfHtml = '';
@@ -384,15 +422,15 @@ export function ItemsView() {
                         });
 
                         try {
-                            await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'items', item.item_id), {
+                            await db.update('items', item.item_id, {
                                 current_location_type: van_id ? 'VAN' : 'WAREHOUSE',
                                 current_location_id: van_id || '',
                                 status: statusVal,
                                 is_available: statusVal === 'available',
                                 'metadata.custom_fields': customData,
-                                updated_at: firebase.db.serverTimestamp()
+                                updated_at: db.serverTimestamp()
                             });
-                            firebase.logAction("Item Updated", `${catalog.item_type} ${item.item_id} updated to ${statusVal}`);
+                            db.logAction("Item Updated", `${catalog.item_type} ${item.item_id} updated to ${statusVal}`);
                             modal.hide();
                         } catch (err) { alert(err.message); }
                     };
@@ -414,8 +452,8 @@ export function ItemsView() {
                     modal.element.querySelector('.confirm-btn').onclick = async () => {
                         modal.hide();
                         try {
-                            await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'items', item.item_id));
-                            firebase.logAction("Item Removed", `${catalog.item_type} ${item.item_id} deleted`);
+                            await db.remove('items', item.item_id);
+                            db.logAction("Item Removed", `${catalog.item_type} ${item.item_id} deleted`);
                         } catch (err) {
                             alert("Delete failed: " + err.message);
                         }
@@ -426,7 +464,11 @@ export function ItemsView() {
                 list.appendChild(row);
             });
             }
-        }));
+        });
+        };
+        
+        loadData();
+        view.unsub(() => { if (itemsUnsub) itemsUnsub(); });
     });
 
     return view;

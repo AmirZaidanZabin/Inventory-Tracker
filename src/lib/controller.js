@@ -2,6 +2,14 @@
  * Core Controller Framework
  * Handles DOM mapping, event triggers, pub/sub messaging, and caching.
  */
+export const debounce = (func, wait = 300) => {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+};
+
 export function controller({ stringComponent, domComponent }) {
     let component
     if (domComponent) component = domComponent

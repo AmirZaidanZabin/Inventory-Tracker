@@ -1,0 +1,14 @@
+node_modules
+dist
+build
+.git
+.env
+.env.local
+.env.*
+docker-compose.yml
+Dockerfile
+README.md
+agent_wiki
+features
+subtasks
+checkpoints.jsonl

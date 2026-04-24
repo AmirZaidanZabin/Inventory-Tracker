@@ -1,5 +1,5 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { db } from '../lib/db/index.js';
 import { createModal } from '../lib/modal.js';
 import { PREDEFINED_AUTHORITIES } from '../constants.js';
 import { renderTable } from '../lib/table.js';
@@ -73,16 +73,16 @@ export function RolesView() {
             const fd = new FormData(form);
             const name = fd.get('role_name');
             const auths = Array.from(modal.element.querySelectorAll('.auth-checkbox:checked')).map(cb => cb.value);
-            const id = name.toLowerCase().replace(/\s+/g, '_');
+            const id = (name || '').toLowerCase().replace(/\s+/g, '_');
 
             try {
-                await firebase.db.setDoc(firebase.db.doc(firebase.db.db, 'roles', id), {
+                await db.create('roles', {
                     role_id: id,
                     role_name: name,
                     authorities: auths,
-                    updated_at: firebase.db.serverTimestamp()
-                });
-                firebase.logAction("Role Created", `Role ${name} saved with ${auths.length} authorities`);
+                    updated_at: db.serverTimestamp()
+                }, id);
+                db.logAction("Role Created", `Role ${name} saved with ${auths.length} authorities`);
                 modal.hide();
             } catch (err) { alert(err.message); }
         };
@@ -90,15 +90,15 @@ export function RolesView() {
 
     view.on('init', () => {
         view.emit('loading:start');
-        view.unsub(firebase.db.subscribe(firebase.db.collection(firebase.db.db, 'roles'), (snap) => {
+        view.unsub(db.subscribe('roles', {}, (data) => {
             view.delete('roles-list');
             const list = view.$('roles-list');
             view.emit('loading:end');
             if (!list) return;
 
-            snap.forEach(doc => {
-                const role = doc.data();
-                const row = document.createElement('tr');
+            if (data) {
+                data.forEach(role => {
+                    const row = document.createElement('tr');
                 row.innerHTML = `
                     <td><span class="fw-bold">${role.role_name}</span></td>
                     <td>
@@ -141,11 +141,11 @@ export function RolesView() {
                         e.preventDefault();
                         const auths = Array.from(modal.element.querySelectorAll('.auth-checkbox:checked')).map(cb => cb.value);
                         try {
-                            await firebase.db.updateDoc(firebase.db.doc(firebase.db.db, 'roles', role.role_id), {
+                            await db.update('roles', role.role_id, {
                                 authorities: auths,
-                                updated_at: firebase.db.serverTimestamp()
+                                updated_at: db.serverTimestamp()
                             });
-                            firebase.logAction("Role Updated", `Role ${role.role_name} updated with ${auths.length} authorities`);
+                            db.logAction("Role Updated", `Role ${role.role_name} updated with ${auths.length} authorities`);
                             modal.hide();
                         } catch (err) { alert(err.message); }
                     };
@@ -167,8 +167,8 @@ export function RolesView() {
                     modal.element.querySelector('.confirm-btn').onclick = async () => {
                         modal.hide();
                         try {
-                            await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'roles', role.role_id));
-                            firebase.logAction("Role Deleted", `Role ${role.role_name} removed`);
+                            await db.remove('roles', role.role_id);
+                            db.logAction("Role Deleted", `Role ${role.role_name} removed`);
                         } catch (err) {
                             alert("Delete failed: " + err.message);
                         }
@@ -177,8 +177,9 @@ export function RolesView() {
                 });
                 list.appendChild(row);
             });
-        }));
-    });
+        }
+    }));
+});
 
     return view;
 }

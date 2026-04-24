@@ -1,5 +1,5 @@
 import { controller } from '../lib/controller.js';
-import { firebase } from '../lib/firebase.js';
+import { db } from '../lib/db/index.js';
 import { renderTable } from '../lib/table.js';
 
 export function ItemTypesView() {
@@ -91,9 +91,17 @@ export function ItemTypesView() {
                         <label class="form-label small fw-bold">Display Name</label>
                         <input type="text" class="form-control" name="item_name" value="${pt ? (pt.item_name || pt.name || '') : ''}" placeholder="e.g. Pico Device V2" required>
                     </div>
-                    <div class="col-12">
+                    <div class="col-12 col-md-6">
                         <label class="form-label small fw-bold">Provider / Manufacturer</label>
                         <input type="text" class="form-control" name="provider" value="${pt ? (pt.provider || '') : ''}" placeholder="e.g. Verizon">
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" name="requires_scan" id="requiresScanCheck" ${pt && pt.requires_scan === false ? '' : 'checked'}>
+                            <label class="form-check-label fw-bold small" for="requiresScanCheck">
+                                Required to be scanned on completion
+                            </label>
+                        </div>
                     </div>
                 </div>
                 
@@ -167,7 +175,8 @@ export function ItemTypesView() {
                 item_name: fd.get('item_name'),
                 duration_minutes: parseInt(fd.get('duration_minutes') || '0', 10),
                 provider: fd.get('provider'),
-                custom_fields: cfs.map(c => ({...c, key: c.label.toLowerCase().replace(/[^a-z0-9]/g, '_')}))
+                requires_scan: fd.get('requires_scan') === 'on',
+                custom_fields: cfs.map(c => ({...c, key: (c.label || '').toLowerCase().replace(/[^a-z0-9]/g, '_')}))
             };
 
             const btn = form.querySelector('button[type="submit"]');
@@ -176,10 +185,9 @@ export function ItemTypesView() {
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
 
             try {
-                const docRef = firebase.db.doc(firebase.db.db, 'item_catalog', data.id);
                 if(!pt) { 
-                    const snap = await firebase.db.getDoc(docRef);
-                    if(snap.exists()) {
+                    const snap = await db.findOne('item_catalog', data.id);
+                    if(snap) {
                         alert("Hardware Type with this ID already exists.");
                         btn.disabled = false;
                         btn.innerHTML = ogHtml;
@@ -187,8 +195,8 @@ export function ItemTypesView() {
                     }
                 }
                 
-                await firebase.db.setDoc(docRef, data);
-                firebase.logAction(`Hardware Catalog ${pt ? 'Updated' : 'Created'}`, data.id);
+                await db.create('item_catalog', data, data.id);
+                db.logAction(`Hardware Catalog ${pt ? 'Updated' : 'Created'}`, data.id);
                 activeModal.hide();
             } catch(err) {
                 alert("Error: " + err.message);
@@ -205,21 +213,19 @@ export function ItemTypesView() {
     });
 
     view.on('init', () => {
-        const q = firebase.db.collection(firebase.db.db, 'item_catalog');
         view.emit('loading:start');
-        view.unsub(firebase.db.subscribe(q, (snap) => {
+        view.unsub(db.subscribe('item_catalog', {}, (data) => {
             const list = view.$('item-types-list');
             view.emit('loading:end');
             if(!list) return;
             
-            if(snap.empty) {
+            if(!data || data.length === 0) {
                 list.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted small">No hardware types configured.</td></tr>';
                 return;
             }
 
             list.innerHTML = '';
-            snap.forEach(doc => {
-                const pt = doc.data();
+            data.forEach(pt => {
                 const tr = document.createElement('tr');
                 
                 const cfBadges = (pt.custom_fields || []).map(cf => `<span class="badge bg-light text-dark border me-1">${cf.label}</span>`).join('');
@@ -262,8 +268,9 @@ export function ItemTypesView() {
                         this.disabled = true;
                         this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
                         try {
-                            await firebase.db.deleteDoc(firebase.db.doc(firebase.db.db, 'item_catalog', pt.id));
-                            firebase.logAction("Hardware Type Deleted", pt.id);
+                            const ptId = pt.id || pt.catalog_id;
+                            await db.remove('item_catalog', ptId);
+                            db.logAction("Hardware Type Deleted", ptId);
                             confirmModal.hide();
                         } catch(e) {
                             alert("Error deleting: " + e.message);
