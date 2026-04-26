@@ -44,6 +44,9 @@ export function AppointmentsView() {
                             <label class="form-label small fw-bold text-muted mb-1">PS/Tech ID</label>
                             <input type="text" id="filter-tech" class="form-control form-control-sm" placeholder="Search Tech ID...">
                         </div>
+                        <button id="bulk-delete-apt" class="btn-pico btn-pico-danger-outline auth-appointments:delete hidden" style="display:none; height: 31px;">
+                            <i class="bi bi-trash"></i> Delete Selected (<span id="bulk-delete-count">0</span>)
+                        </button>
                     </div>
                     <button id="open-add-apt" class="btn-pico btn-pico-primary auth-appointments:create hidden">
                         <i class="bi bi-calendar-plus me-2"></i>Schedule Appointment
@@ -53,7 +56,7 @@ export function AppointmentsView() {
                 <div class="card border-0 shadow-sm">
                     <div class="card-body p-0">
                         ${renderTable({
-                            headers: ['Job ID', 'Customer', 'Date', 'Time', 'Location', 'Technician (PS ID)', 'Status', 'Actions'],
+                            headers: ['<input type="checkbox" id="apt-select-all" class="form-check-input">', 'Job ID', 'Customer', 'Date', 'Time', 'Location', 'Technician (PS ID)', 'Status', 'Actions'],
                             tbodyId: 'apt-list',
                             emptyMessage: 'Loading appointments...',
                             pagination: true
@@ -766,6 +769,8 @@ export function AppointmentsView() {
         };
 
         let allAptData = [];
+        let selectedAptIds = new Set();
+        
         const renderAptList = () => {
             const list = view.$('apt-list');
             if (!list) return;
@@ -804,6 +809,7 @@ export function AppointmentsView() {
                 }
 
                 row.innerHTML = `
+                    <td style="width: 40px;"><input type="checkbox" class="form-check-input apt-record-cb" data-id="${apt.appointment_id}"></td>
                     <td><code class="data-mono fw-bold">${apt.appointment_id}</code></td>
                     <td class="fw-bold">${apt.appointment_name}</td>
                     <td>${apt.schedule_date}</td>
@@ -853,7 +859,8 @@ export function AppointmentsView() {
                         deleteModal.element.querySelector('.confirm-btn').onclick = async () => {
                             deleteModal.hide();
                             try {
-                                await db.update('appointments', apt.appointment_id, { is_deleted: true, updated_at: db.serverTimestamp() });
+                                await db.remove('appointments', apt.appointment_id);
+                                selectedAptIds.delete(apt.appointment_id);
                             } catch (err) { console.error('Delete failed: ', err.message); }
                         };
                         deleteModal.show();
@@ -862,10 +869,88 @@ export function AppointmentsView() {
 
                 list.appendChild(row);
             });
+
+            const updateBulkDeleteUI = () => {
+                const bulkBtn = view.$('bulk-delete-apt');
+                const cnt = view.$('bulk-delete-count');
+                if(bulkBtn && cnt) {
+                    if(selectedAptIds.size > 0) {
+                        bulkBtn.style.display = 'inline-flex';
+                        cnt.textContent = selectedAptIds.size;
+                    } else {
+                        bulkBtn.style.display = 'none';
+                    }
+                }
+                const sa = view.$('apt-select-all');
+                if(sa) {
+                    const totalVisible = filtered.length;
+                    sa.checked = totalVisible > 0 && [...list.querySelectorAll('.apt-record-cb')].every(cb => cb.checked);
+                }
+            };
+
+            list.querySelectorAll('.apt-record-cb').forEach(cb => {
+                cb.checked = selectedAptIds.has(cb.dataset.id);
+                cb.addEventListener('change', (e) => {
+                    if(e.target.checked) selectedAptIds.add(cb.dataset.id);
+                    else selectedAptIds.delete(cb.dataset.id);
+                    updateBulkDeleteUI();
+                });
+            });
+
+            const sa = view.$('apt-select-all');
+            if (sa) {
+                sa.checked = false; 
+                sa.onclick = (e) => {
+                    const isChecked = e.target.checked;
+                    list.querySelectorAll('.apt-record-cb').forEach(cb => {
+                        cb.checked = isChecked;
+                        if(isChecked) selectedAptIds.add(cb.dataset.id);
+                        else selectedAptIds.delete(cb.dataset.id);
+                    });
+                    updateBulkDeleteUI();
+                };
+            }
+            updateBulkDeleteUI();
+
             document.dispatchEvent(new CustomEvent('apply-auth'));
         };
 
         attachFilterListeners();
+
+        view.trigger('click', 'bulk-delete-apt', async () => {
+            if(selectedAptIds.size === 0) return;
+            const deleteModal = createModal({
+                title: 'Confirm Bulk Deletion',
+                body: `
+                    <div class="text-center py-3">
+                        <i class="bi bi-exclamation-triangle-fill text-danger mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="fw-bold">Delete ${selectedAptIds.size} Appointments?</h5>
+                        <p class="text-muted">This action cannot be undone.</p>
+                        <div class="d-flex justify-content-center gap-2 mt-4">
+                            <button type="button" class="btn-pico btn-pico-outline cancel-btn">Cancel</button>
+                            <button type="button" class="btn-pico btn-pico-danger-outline confirm-btn">Delete All</button>
+                        </div>
+                    </div>
+                `
+            });
+            deleteModal.element.querySelector('.cancel-btn').onclick = () => deleteModal.hide();
+            deleteModal.element.querySelector('.confirm-btn').onclick = async () => {
+                deleteModal.hide();
+                view.emit('loading:start');
+                try {
+                    const ids = Array.from(selectedAptIds);
+                    await Promise.all(ids.map(id => db.remove('appointments', id)));
+                    selectedAptIds.clear();
+                } catch (err) {
+                    console.error('Bulk delete failed: ', err.message);
+                } finally {
+                    view.emit('loading:end');
+                    // Data will refresh from subscription. Forcing render just in case:
+                    renderAptList();
+                }
+            };
+            deleteModal.show();
+        });
 
         const PAGE_LIMIT = 50;
 

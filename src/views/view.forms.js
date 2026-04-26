@@ -200,10 +200,10 @@ export function FormsView() {
                             <div class="flex-grow-1 min-w-0">
                                 <div class="d-flex align-items-center gap-2 mb-1">
                                     <span class="fw-bold fs-6">${f.name}</span>
-                                    ${f.entities?.length ? `<span class="badge bg-pale-primary text-primary border">${f.entities.map(id => ENTITIES.find(e=>e.id===id)?.name||id).join(', ')}</span>` : '<span class="badge bg-pale-secondary border">No entities</span>'}
+                                    ${(Array.isArray(f.entities) ? f.entities : (f.entities ? Object.values(f.entities) : [])).length ? `<span class="badge bg-pale-primary text-primary border">${(Array.isArray(f.entities) ? f.entities : Object.values(f.entities)).map(id => ENTITIES.find(e=>e.id===id)?.name||id).join(', ')}</span>` : '<span class="badge bg-pale-secondary border">No entities</span>'}
                                 </div>
                                 <div class="text-muted small mt-2 bg-light p-2 rounded border d-flex flex-wrap gap-2">
-                                     ${(f.fields||[]).map(field => `
+                                     ${(Array.isArray(f.fields) ? f.fields : (f.fields ? Object.values(f.fields) : [])).map(field => `
                                          <span class="badge bg-white border text-dark fw-normal" style="font-size: 0.75rem;">
                                              ${field.label} <span class="text-muted fw-light ms-1">(${fieldTypeLabel(field.type)})</span>
                                              ${field.required ? '<i class="bi bi-asterisk text-danger ms-1" style="font-size:0.5rem;vertical-align:middle;"></i>' : ''}
@@ -337,11 +337,15 @@ export function FormsView() {
         if (formId) {
             const f = state.forms.find(x => x.id === formId);
             if (nameEl) nameEl.value = f.name;
-            builderFields = f.fields.map(field => ({ ...field, currency: field.currency || 'SAR', options: [...(field.options||[])] }));
-            f.entities?.forEach(entId => {
-                const cb = document.getElementById(`bpr-${entId}`);
-                if (cb) cb.checked = true;
-            });
+            const safeFields = Array.isArray(f.fields) ? f.fields : (f.fields ? Object.values(f.fields) : []);
+            builderFields = safeFields.map(field => ({ ...field, currency: field.currency || 'SAR', options: [...(field.options||[])] }));
+            const safeEntities = Array.isArray(f.entities) ? f.entities : (f.entities ? Object.values(f.entities) : []);
+            if (safeEntities.length) {
+                safeEntities.forEach(entId => {
+                    const cb = document.getElementById(`bpr-${entId}`);
+                    if (cb) cb.checked = true;
+                });
+            }
         } else {
             if (nameEl) nameEl.value = '';
         }
@@ -379,13 +383,14 @@ export function FormsView() {
             }
             validFields.push({
                 ...f,
-                label: f.label.trim() || f.name
+                label: typeof f.label === 'string' ? f.label.trim() : (f.label || f.name)
             });
         }
 
         const entities = Array.from(document.querySelectorAll('.builder-proj-cb:checked')).map(cb => cb.value);
         if(entities.length === 0) return alert('Assign to at least one entity type above.');
 
+        const isUpdate = !!editingFormId;
         const fid = editingFormId || 'FORM-' + Math.random().toString(36).substr(2, 9).toUpperCase();
 
         const formObj = { 
@@ -401,7 +406,11 @@ export function FormsView() {
         btn.disabled = true;
         
         try {
-            await db.create('forms', formObj, fid);
+            if (isUpdate) {
+                await db.update('forms', fid, formObj);
+            } else {
+                await db.create('forms', formObj, fid);
+            }
             closeBuilder();
         } catch(e) {
             alert('Failed to save form config: ' + e.message);

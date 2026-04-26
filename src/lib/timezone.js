@@ -2,10 +2,13 @@ export const tzOffsetsCache = {};
 
 export function getServerOffsetMinutes(dateStr, serverTz) {
     if (!serverTz) serverTz = 'UTC';
+    if (!dateStr || dateStr === 'undefined' || dateStr === 'null') return 0;
     const key = `${dateStr}_${serverTz}`;
     if (tzOffsetsCache[key] !== undefined) return tzOffsetsCache[key];
 
     const d = new Date(`${dateStr}T12:00:00`);
+    if (isNaN(d.getTime())) return 0; // Fallback for invalid dates
+    
     const parts = new Intl.DateTimeFormat('en-GB', { 
         timeZone: serverTz, 
         timeZoneName: 'longOffset'
@@ -28,7 +31,7 @@ export function getServerOffsetMinutes(dateStr, serverTz) {
 }
 
 export function formatServerToLocalTime(serverDateStr, serverTimeStr, serverTz) {
-    if (!serverTimeStr) return '';
+    if (!serverTimeStr || !serverDateStr || serverDateStr === 'undefined' || serverDateStr === 'null') return serverTimeStr || '';
     const serverOffset = getServerOffsetMinutes(serverDateStr, serverTz);
     
     // Create Date representing that local time in the browser (ignoring what literal moment it is)
@@ -59,7 +62,7 @@ export function formatServerToLocalTime(serverDateStr, serverTimeStr, serverTz) 
 }
 
 export function convertLocalToServerTime(localDateStr, localTimeStr, serverTz) {
-    if (!localTimeStr) return { date: localDateStr, time: '' };
+    if (!localTimeStr || !localDateStr || localDateStr === 'undefined' || localDateStr === 'null') return { date: localDateStr || '', time: localTimeStr || '' };
     
     // E.g. local wants 10:00 (which is 10:00 NY time).
     // The exact moment:
@@ -67,6 +70,8 @@ export function convertLocalToServerTime(localDateStr, localTimeStr, serverTz) {
     const [hr, min] = localTimeStr.split(':').map(Number);
     const localDateObj = new Date(y, m - 1, d, hr, min);
     
+    if (isNaN(localDateObj.getTime())) return { date: localDateStr, time: localTimeStr };
+
     // Now, format this exact moment in the server's timezone.
     const formatter = new Intl.DateTimeFormat('en-CA', { // en-CA yields YYYY-MM-DD
         timeZone: serverTz,

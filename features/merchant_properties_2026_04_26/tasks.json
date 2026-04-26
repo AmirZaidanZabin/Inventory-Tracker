@@ -1,0 +1,59 @@
+{
+  "original_prompt": "- add metadata to the propertieis for the merchant,  and a new property which is  [merchant_reference]",
+  "rephrased_goal": "Update Merchant entity in firebase-blueprint.json and DB adapter to include metadata and merchant_reference.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Update blueprint",
+      "subtasks_required": ["Add metadata", "Add merchant_reference"],
+      "owner": "Caveman",
+      "analogy_reference": "paint new animal on wall",
+      "status": "pending",
+      "testing_criteria": "JSON parses properly with new properties."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Inspect blueprint",
+      "subtasks_required": ["Check format"],
+      "owner": "Caveman",
+      "analogy_reference": "look at painting",
+      "status": "pending",
+      "testing_criteria": "No syntax errors."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Update Database Adapter",
+      "subtasks_required": ["Add to essentials array"],
+      "owner": "Caveman",
+      "analogy_reference": "make stick match painting",
+      "status": "pending",
+      "testing_criteria": "Adapter file updated."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Inspect Adapter",
+      "subtasks_required": ["Cat file lines"],
+      "owner": "Caveman",
+      "analogy_reference": "look at stick",
+      "status": "pending",
+      "testing_criteria": "No syntax errors."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail before sleep",
+      "status": "pending",
+      "testing_criteria": "App rules deployed."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

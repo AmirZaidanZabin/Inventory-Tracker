@@ -385,6 +385,8 @@ async function startServer() {
       // But actually, the policy usually is: if you breach Level 1, you go to Level 1. If you breach Level 2, you go to Level 2.
       // So we check from Level 3 down to Level 1. The first one that is breached is the one we route to.
       
+      const { calculateNBR } = require('./src/lib/financial/nbr');
+
       for (const tier of sortedTiers) {
           let breached = false;
           
@@ -398,20 +400,53 @@ async function startServer() {
               });
           }
           
-          if (tier.thresholds) {
+          if (tier.approval_strategy === 'nbr') {
+              let madaRate = 0;
+              let ccRate = 0;
+              const hasPlusOneSar = lead.has_plus_one_sar === true || lead.has_plus_one_sar === 'true';
+              
               for (const card of cardsList) {
                   const reqRateRaw = lead[`rate_${card.id}`];
                   if (reqRateRaw !== undefined && reqRateRaw !== '') {
-                      const reqRate = parseFloat(reqRateRaw);
-                      const threshold = tier.thresholds[card.id];
-                      if (threshold !== undefined && reqRate < threshold) {
-                          breached = true;
-                          breachDetails.push({ 
-                              type: `Card (${card.name})`,
-                              requested: reqRate, 
-                              min_required: threshold, 
-                              tier_breached: tier.name 
-                          });
+                      const reqRate = parseFloat(reqRateRaw) || 0;
+                      const cardNameLower = (card.name || '').toLowerCase();
+                      if (cardNameLower.includes('mada')) {
+                          madaRate = reqRate;
+                      } else if (cardNameLower.includes('cc') || cardNameLower.includes('credit')) {
+                          ccRate = reqRate;
+                      }
+                  }
+              }
+              
+              const nbrThreshold = tier.nbr_threshold !== undefined ? parseFloat(tier.nbr_threshold) : (tier.thresholds?.default || 0.01);
+              const nbrValue = calculateNBR(madaRate, ccRate, hasPlusOneSar);
+              
+              if (nbrValue < nbrThreshold) {
+                  breached = true;
+                  breachDetails.push({
+                      type: 'NBR',
+                      requested: nbrValue,
+                      min_required: nbrThreshold,
+                      tier_breached: tier.name
+                  });
+              }
+          } else {
+              // Normal percentage approval
+              if (tier.thresholds) {
+                  for (const card of cardsList) {
+                      const reqRateRaw = lead[`rate_${card.id}`];
+                      if (reqRateRaw !== undefined && reqRateRaw !== '') {
+                          const reqRate = parseFloat(reqRateRaw);
+                          const threshold = tier.thresholds[card.id];
+                          if (threshold !== undefined && reqRate < threshold) {
+                              breached = true;
+                              breachDetails.push({ 
+                                  type: `Card (${card.name})`,
+                                  requested: reqRate, 
+                                  min_required: threshold, 
+                                  tier_breached: tier.name 
+                              });
+                          }
                       }
                   }
               }

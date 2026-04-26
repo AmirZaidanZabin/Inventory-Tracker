@@ -1,0 +1,77 @@
+{
+  "original_prompt": "i would need these stratigies to be configuratble form the front end in the pricing rules > approval tiers",
+  "rephrased_goal": "Add UI in view.pricing_rules.js to select approval_strategy (normal/nbr) and set nbr_threshold for pricing tiers.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Read view.pricing_rules.js",
+      "subtasks_required": ["cat file"],
+      "owner": "Caveman",
+      "analogy_reference": "look at wall painting",
+      "status": "pending",
+      "testing_criteria": "Know where to insert drop down."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify file logic",
+      "subtasks_required": ["find render tier modal"],
+      "owner": "Caveman",
+      "analogy_reference": "poke wall",
+      "status": "pending",
+      "testing_criteria": "Identify exact lines to edit."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Add UI elements",
+      "subtasks_required": ["Add approval_strategy select", "Add nbr_threshold input", "Toggle conditionally in JS if easy"],
+      "owner": "Caveman",
+      "analogy_reference": "paint new controls",
+      "status": "pending",
+      "testing_criteria": "File edited successfully."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify UI file",
+      "subtasks_required": ["Check syntax error"],
+      "owner": "Caveman",
+      "analogy_reference": "look at new controls",
+      "status": "pending",
+      "testing_criteria": "No syntax errors in view.pricing_rules.js."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Update blueprint",
+      "subtasks_required": ["Add properties to pricing_tier"],
+      "owner": "Caveman",
+      "analogy_reference": "teach tribe",
+      "status": "pending",
+      "testing_criteria": "Blueprint has new keys."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify blueprint",
+      "subtasks_required": ["Check format"],
+      "owner": "Caveman",
+      "analogy_reference": "look at JSON",
+      "status": "pending",
+      "testing_criteria": "Valid JSON."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail",
+      "status": "pending",
+      "testing_criteria": "Feature works."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

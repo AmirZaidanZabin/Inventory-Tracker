@@ -1,0 +1,95 @@
+{
+  "original_prompt": "- when i am deleting appointments they are not being deleted\n- add the functionality to select items and bulk delete",
+  "rephrased_goal": "Fix single appointment deletion and add bulk delete feature.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Find appointment deletion bug",
+      "subtasks_required": ["cat view.appointments.js", "cat server.js delete route"],
+      "owner": "Caveman",
+      "analogy_reference": "find broken spear",
+      "status": "pending",
+      "testing_criteria": "Know why delete fails."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify bug knowledge",
+      "subtasks_required": ["Review findings"],
+      "owner": "Caveman",
+      "analogy_reference": "poke broken spear",
+      "status": "pending",
+      "testing_criteria": "Bug identified."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Fix single delete in view",
+      "subtasks_required": ["Edit view.appointments.js delete handler", "Check API route permissions"],
+      "owner": "Caveman",
+      "analogy_reference": "fix broken spear point",
+      "status": "pending",
+      "testing_criteria": "Single delete function correctly calls API."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify fix",
+      "subtasks_required": ["Check frontend logic"],
+      "owner": "Caveman",
+      "analogy_reference": "test spear throw",
+      "status": "pending",
+      "testing_criteria": "Code looks solid."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Add bulk delete UI",
+      "subtasks_required": ["Add checkboxes to table", "Add select-all checkbox", "Add Bulk Delete button"],
+      "owner": "Caveman",
+      "analogy_reference": "make big net",
+      "status": "pending",
+      "testing_criteria": "Checkboxes and button exist in HTML."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify bulk UI logic",
+      "subtasks_required": ["Check HTML structure"],
+      "owner": "Caveman",
+      "analogy_reference": "inspect net",
+      "status": "pending",
+      "testing_criteria": "Checkboxes correspond to appointment IDs."
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Add bulk delete JS logic",
+      "subtasks_required": ["Implement Promise.all for selected IDs", "Refresh state on success"],
+      "owner": "Caveman",
+      "analogy_reference": "pull net",
+      "status": "pending",
+      "testing_criteria": "JS function bulk deletes and re-renders."
+    },
+    {
+      "id": 8,
+      "description": "Check-Pebble: Verify bulk JS logic",
+      "subtasks_required": ["Check syntax and state management"],
+      "owner": "Caveman",
+      "analogy_reference": "check catch",
+      "status": "pending",
+      "testing_criteria": "No syntax errors."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail",
+      "status": "pending",
+      "testing_criteria": "Appointments single and bulk delete work."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

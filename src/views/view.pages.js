@@ -286,10 +286,12 @@ export function PageRunView(paramStr) {
             if(!state.page) throw new Error("Page schema not found");
             
             // fetch the forms definitions
-            state.page.forms.sort((a,b)=>a.order - b.order);
+            if (state.page.forms) {
+                state.page.forms.sort((a,b)=>a.order - b.order);
+            }
             const allForms = await db.findMany('forms') || [];
             
-            state.formsModels = state.page.forms.map(pf => {
+            state.formsModels = (state.page.forms || []).map(pf => {
                 return allForms.find(f => f.id === pf.form_id);
             }).filter(Boolean);
 

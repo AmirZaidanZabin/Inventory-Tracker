@@ -1,0 +1,113 @@
+{
+  "original_prompt": "appointment table is not fetching the correct fields, gantt chart, calender. correct these issues",
+  "rephrased_goal": "Ensure appointments table, gantt chart, and calendar use the correct fields for display and calculations.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Inspect view.appointments.js, view.gantt.js, view.calendar.js to see what fields they expect.",
+      "subtasks_required": [
+        "grep for appointment_name, schedule_date, appointment_time in those files."
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "check what tools need",
+      "status": "pending",
+      "testing_criteria": "Understanding of required fields."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify understanding",
+      "subtasks_required": [
+        "Review grep output."
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "understand findings",
+      "status": "pending",
+      "testing_criteria": "Know exactly which fields are missing or wrongly referenced."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Fix view.appointments.js",
+      "subtasks_required": [
+        "Update table render logic to use correct fields if they differ from what is provided."
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "fix tool 1",
+      "status": "pending",
+      "testing_criteria": "table logic updated."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify appointments view",
+      "subtasks_required": [
+        "Check eslint or view changes"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "test tool 1",
+      "status": "pending",
+      "testing_criteria": "no syntax errors."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Fix view.gantt.js",
+      "subtasks_required": [
+        "Update gantt render logic to use correct fields for date and time."
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "fix tool 2",
+      "status": "pending",
+      "testing_criteria": "gantt logic updated."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify gantt view",
+      "subtasks_required": [
+        "Check view changes"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "test tool 2",
+      "status": "pending",
+      "testing_criteria": "no syntax errors."
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Fix view.calendar.js",
+      "subtasks_required": [
+        "Update calendar render logic to use correct fields for date and time."
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "fix tool 3",
+      "status": "pending",
+      "testing_criteria": "calendar logic updated."
+    },
+    {
+      "id": 8,
+      "description": "Check-Pebble: Verify calendar view",
+      "subtasks_required": [
+        "Check view changes"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "test tool 3",
+      "status": "pending",
+      "testing_criteria": "no syntax errors."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": [
+        "Review app completely"
+      ],
+      "owner": "Caveman",
+      "analogy_reference": "walk trail",
+      "status": "pending",
+      "testing_criteria": "All views using the right fields."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

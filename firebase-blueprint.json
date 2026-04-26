@@ -5,6 +5,7 @@
       "description": "Inventory storage location",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "van_id": { "type": "string" },
         "location_id": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" },
@@ -19,6 +20,7 @@
       "description": "Inventory hardware definitions (formerly Item Catalog)",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "catalog_id": { "type": "string" },
         "item_type": { "type": "string", "enum": ["Sim Card", "Pico Device"] },
         "item_name": { "type": "string" },
@@ -35,11 +37,13 @@
       "description": "Serialized inventory unit",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "item_id": { "type": "string" },
         "catalog_id": { "type": "string" },
         "current_location_type": { "type": "string", "enum": ["VAN", "WAREHOUSE", "INSTALLED"] },
         "current_location_id": { "type": "string" },
         "is_available": { "type": "boolean" },
+        "status": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" },
         "updated_at": { "type": "string", "format": "date-time" },
         "metadata": { "type": "object" }
@@ -51,6 +55,7 @@
       "description": "User role and authorities",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "role_id": { "type": "string" },
         "role_name": { "type": "string" },
         "authorities": { "type": "array", "items": { "type": "string" } },
@@ -65,6 +70,7 @@
       "description": "System user",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "user_id": { "type": "string" },
         "role_id": { "type": "string" },
         "user_name": { "type": "string" },
@@ -94,8 +100,10 @@
       "description": "Technician appointment",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "appointment_id": { "type": "string" },
         "tech_id": { "type": "string" },
+        "user_id": { "type": "string" },
         "van_id": { "type": "string" },
         "product_type_id": { "type": "string" },
         "status": { "type": "string", "enum": ["scheduled", "rescheduled", "in_progress", "completed", "cancelled"] },
@@ -110,6 +118,7 @@
       "description": "Definition of installable products linked to hardware",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "type_id": { "type": "string" },
         "name": { "type": "string" },
         "catalog_id": { "type": "string", "description": "Reference to InventoryHardwareType" },
@@ -125,6 +134,7 @@
       "description": "Inventory audit trails",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "log_id": { "type": "string" },
         "user_id": { "type": "string" },
         "van_id": { "type": "string" },
@@ -136,9 +146,200 @@
         "metadata": { "type": "object" }
       },
       "required": ["log_id", "user_id", "van_id", "log_type"]
+    },
+    "ItemType": {
+      "title": "Item Type",
+      "description": "Inventory item types",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type_id": { "type": "string" },
+        "name": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["type_id", "name"]
+    },
+    "Form": {
+      "title": "Form",
+      "description": "Custom form definition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "fields": { "type": "array", "items": { "type": "object" } },
+        "entities": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "name"]
+    },
+    "CustomForm": {
+      "title": "Custom Form",
+      "description": "Legacy custom form definition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "form_name": { "type": "string" },
+        "schema_definition": { "type": "object" },
+        "fields": { "type": "array", "items": { "type": "object" } },
+        "entities": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "form_name"]
+    },
+    "FormSubmission": {
+      "title": "Form Submission",
+      "description": "Submission of a custom form",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "form_id": { "type": "string" },
+        "appointment_id": { "type": "string" },
+        "submitted_by": { "type": "string" },
+        "data": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "form_id"]
+    },
+    "SavedReport": {
+      "title": "Saved Report",
+      "description": "Saved SQL report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "creator_id": { "type": "string" },
+        "name": { "type": "string" },
+        "query": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "name", "query"]
+    },
+    "Trigger": {
+      "title": "Trigger",
+      "description": "Automation trigger",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "event_type": { "type": "string" },
+        "action_to_take": { "type": "string" },
+        "condition_logic": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "event_type"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "Sales lead",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_name": { "type": "string" },
+        "cr_number": { "type": "string" },
+        "status": { "type": "string" },
+        "owner_id": { "type": "string" },
+        "country": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "approved_at": { "type": "string", "format": "date-time" },
+        "rejected_at": { "type": "string", "format": "date-time" },
+        "current_approver_uid": { "type": "string" },
+        "breach_details": { "type": "object" }
+      },
+      "required": ["id", "merchant_name", "status"]
+    },
+    "Merchant": {
+      "title": "Merchant",
+      "description": "Approved merchant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_name": { "type": "string" },
+        "merchant_reference": { "type": "string" },
+        "cr_number": { "type": "string" },
+        "country": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "merchant_name"]
+    },
+    "Approval": {
+      "title": "Approval",
+      "description": "Approval record for leads",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "lead_id": { "type": "string" },
+        "status": { "type": "string" },
+        "tier_id": { "type": "string" },
+        "approver_uid": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "resolved_by": { "type": "string" },
+        "resolved_at": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "lead_id", "status"]
+    },
+    "PricingTier": {
+      "title": "Pricing Tier",
+      "description": "Approval threshold tiers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "level": { "type": "number" },
+        "approver_email": { "type": "string" },
+        "min_monthly_gmv": { "type": "number" },
+        "thresholds": { "type": "object" },
+        "approval_strategy": { "type": "string", "enum": ["normal", "nbr"] },
+        "nbr_threshold": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "level"]
+    },
+    "PricingCard": {
+      "title": "Pricing Card Config",
+      "description": "Card base config limits",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "min_pct": { "type": "number" },
+        "max_pct": { "type": "number" },
+        "min_flat": { "type": "number" },
+        "max_flat": { "type": "number" },
+        "default_pct": { "type": "number" },
+        "mandatory": { "type": "boolean" },
+        "active_countries": { "type": "array", "items": { "type": "string" } },
+        "sort_order": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
     }
   },
   "firestore": {
+    "/pricing_tiers/{tierId}": {
+      "schema": { "$ref": "PricingTier" },
+      "description": "Rule threshold definitions"
+    },
+    "/pricing_cards/{cardId}": {
+      "schema": { "$ref": "PricingCard" },
+      "description": "Approved base card list"
+    },
     "/vans/{vanId}": {
       "schema": { "$ref": "Van" },
       "description": "Van fleet collection"
@@ -168,20 +369,44 @@
       "description": "Stock take history"
     },
     "/saved_reports/{reportId}": {
-      "schema": { "type": "object", "properties": { "name": { "type": "string" }, "query": { "type": "string" } } },
+      "schema": { "$ref": "SavedReport" },
       "description": "Saved SQL reports"
     },
     "/forms/{formId}": {
-      "schema": { "type": "object" },
+      "schema": { "$ref": "Form" },
       "description": "Custom form configurations"
     },
+    "/custom_forms/{formId}": {
+      "schema": { "$ref": "CustomForm" },
+      "description": "Legacy custom form configurations"
+    },
+    "/form_submissions/{submissionId}": {
+      "schema": { "$ref": "FormSubmission" },
+      "description": "Form submissions"
+    },
     "/triggers/{triggerId}": {
-      "schema": { "type": "object" },
+      "schema": { "$ref": "Trigger" },
       "description": "Automation triggers"
     },
     "/product_types/{typeId}": {
       "schema": { "$ref": "InventoryProductType" },
       "description": "Inventory product types"
+    },
+    "/item_types/{typeId}": {
+      "schema": { "$ref": "ItemType" },
+      "description": "Inventory item types"
+    },
+    "/leads/{leadId}": {
+      "schema": { "$ref": "Lead" },
+      "description": "Sales leads"
+    },
+    "/merchants/{merchantId}": {
+      "schema": { "$ref": "Merchant" },
+      "description": "Approved merchants"
+    },
+    "/approvals/{approvalId}": {
+      "schema": { "$ref": "Approval" },
+      "description": "Lead approvals"
     }
   }
 }

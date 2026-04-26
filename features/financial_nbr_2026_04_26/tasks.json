@@ -1,0 +1,68 @@
+{
+  "original_prompt": "Financial NBR Workflow Implementation...",
+  "rephrased_goal": "Implement Net Blended Rate (NBR) financial math and workflow routing.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Create NBR math module",
+      "subtasks_required": ["Define precision constants", "Write calculating function", "Write Workflow router"],
+      "owner": "Caveman",
+      "analogy_reference": "count pebbles exact",
+      "status": "pending",
+      "testing_criteria": "File src/lib/financial/nbr.js created without syntax errors."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify NBR math",
+      "subtasks_required": ["Cat file lines"],
+      "owner": "Caveman",
+      "analogy_reference": "look at stones",
+      "status": "pending",
+      "testing_criteria": "No syntax errors."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Create NBR module tests",
+      "subtasks_required": ["Write Jest tests for NBR"],
+      "owner": "Caveman",
+      "analogy_reference": "poke stones",
+      "status": "pending",
+      "testing_criteria": "Tests cover +1SAR and no +1SAR."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify tests",
+      "subtasks_required": ["Cat tests"],
+      "owner": "Caveman",
+      "analogy_reference": "look at test stones",
+      "status": "pending",
+      "testing_criteria": "Test syntax valid."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Write NBR Architectural Doc",
+      "subtasks_required": ["Format markdown"],
+      "owner": "Caveman",
+      "analogy_reference": "paint wall",
+      "status": "pending",
+      "testing_criteria": "Markdown built."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail before sleep",
+      "status": "pending",
+      "testing_criteria": "Code fits spec."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

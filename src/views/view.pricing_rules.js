@@ -179,12 +179,22 @@ export function PricingRulesView() {
                                             <div class="small fw-medium text-primary"><i class="bi bi-envelope me-1"></i>${t.approver_email || 'Not set'}</div>
                                         </div>
                                         <div class="col-md-7 border-end">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <div class="small fw-bold text-muted me-2">Approval Strategy:</div>
+                                                <span class="badge ${t.approval_strategy === 'nbr' ? 'bg-info' : 'bg-secondary'}">${t.approval_strategy === 'nbr' ? 'Net Blended Rate (NBR)' : 'Per-Card Strict'}</span>
+                                            </div>
                                             <div class="small fw-bold text-muted mb-2">Escalation Thresholds <span class="fw-normal">(triggers if rate is below value)</span></div>
                                             <div class="d-flex flex-wrap gap-2 mb-2">
                                                 <div class="border rounded px-2 py-1 bg-light border-primary">
                                                     <span class="small text-muted me-2">Min Monthly GMV:</span>
                                                     <strong class="text-primary">${t.min_monthly_gmv ? Number(t.min_monthly_gmv).toLocaleString() : 'N/A'}</strong>
                                                 </div>
+                                                ${t.approval_strategy === 'nbr' ? `
+                                                <div class="border rounded px-2 py-1 bg-info bg-opacity-10 border-info">
+                                                    <span class="small text-muted me-2">NBR Threshold:</span>
+                                                    <strong class="text-info">${t.nbr_threshold ? (t.nbr_threshold * 100).toFixed(2) + '%' : 'N/A'}</strong>
+                                                </div>
+                                                ` : ''}
                                             </div>
                                             <div class="d-flex flex-wrap gap-2">
                                                 ${state.cards.map(c => `
@@ -392,7 +402,27 @@ export function PricingRulesView() {
                     </div>
 
                     <div class="col-12"><hr class="my-1"></div>
-                    <div class="col-12"><h6 class="text-primary small mb-2 fw-bold">Per-Card Escalation Thresholds</h6></div>
+                    <div class="col-12"><h6 class="text-primary small mb-2 fw-bold">Strategy & Per-Card Escalation Thresholds</h6></div>
+                    
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label small fw-bold">Approval Strategy</label>
+                        <select name="approval_strategy" id="sel-strategy" class="form-select form-select-sm">
+                            <option value="normal" ${tier?.approval_strategy !== 'nbr' ? 'selected' : ''}>Per-Card Strict (Normal)</option>
+                            <option value="nbr" ${tier?.approval_strategy === 'nbr' ? 'selected' : ''}>Net Blended Rate (NBR)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6 mb-2 nbr-fields" style="${tier?.approval_strategy === 'nbr' ? '' : 'display:none;'}">
+                        <label class="form-label small fw-bold">NBR Minimum Threshold (%)</label>
+                        <input type="number" step="0.001" name="nbr_threshold" class="form-control form-control-sm" value="${tier?.nbr_threshold ? (tier.nbr_threshold * 100).toFixed(3) : ''}" placeholder="e.g. 1.05">
+                    </div>
+
+                    <div class="col-12 mb-2 normal-fields" style="${tier?.approval_strategy !== 'nbr' ? '' : 'display:none;'}">
+                        <div class="alert alert-warning small py-1 mb-0 border-0">
+                            <strong>Note:</strong> Standard card thresholds are ignored if NBR strategy is active, but you can retain them for reference.
+                        </div>
+                    </div>
+
                     <div class="col-12 mb-2">
                         <label class="form-label small fw-bold">Min Monthly GMV (triggers tier if GMV is below value)</label>
                         <div class="input-group input-group-sm">
@@ -412,6 +442,14 @@ export function PricingRulesView() {
         });
         modal.show();
 
+        modal.element.querySelector('#sel-strategy').addEventListener('change', (e) => {
+            const isNbr = e.target.value === 'nbr';
+            const nbrFields = modal.element.querySelectorAll('.nbr-fields');
+            const normalFields = modal.element.querySelectorAll('.normal-fields');
+            nbrFields.forEach(f => f.style.display = isNbr ? '' : 'none');
+            normalFields.forEach(f => f.style.display = isNbr ? 'none' : '');
+        });
+
         modal.element.querySelector('#tier-config-form').onsubmit = async (e) => {
             e.preventDefault();
             const fd = new FormData(e.target);
@@ -423,12 +461,19 @@ export function PricingRulesView() {
             });
 
             const lvl = parseInt(fd.get('level'));
+            
+            // convert nbr % layout to decimal
+            const rawNbr = fd.get('nbr_threshold');
+            const nbrParsed = rawNbr ? parseFloat(rawNbr) / 100 : undefined;
+
             const data = {
                 id: tier ? tier.id : `tier${lvl}_${Math.random().toString(36).substr(2,5)}`, // simple id
                 name: fd.get('name'),
                 level: lvl,
                 approver_email: fd.get('approver_email'),
                 min_monthly_gmv: parseFloat(fd.get('min_monthly_gmv')) || 0,
+                approval_strategy: fd.get('approval_strategy') || 'normal',
+                nbr_threshold: nbrParsed,
                 thresholds
             };
 

@@ -1,0 +1,59 @@
+{
+  "original_prompt": "implement it in the approval tiers, multiple stratigies of approval [\n- normal percentage approval\n- nbr approval \n]",
+  "rephrased_goal": "Integrate NBR vs Normal strategies into server.js lead approval tier routing.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Extract exact card IDs for Mada and CC",
+      "subtasks_required": ["Find Mada and CC card logic"],
+      "owner": "Caveman",
+      "analogy_reference": "find the exact stones for mada and cc",
+      "status": "pending",
+      "testing_criteria": "Know exactly how card thresholds map to Mada and CC."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify understanding",
+      "subtasks_required": ["Check how rate_{card.id} works"],
+      "owner": "Caveman",
+      "analogy_reference": "poke stones",
+      "status": "pending",
+      "testing_criteria": "Understand input shapes."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Implement NBR Strategy routing in server.js",
+      "subtasks_required": ["Import NBR module", "Update loop in server.js"],
+      "owner": "Caveman",
+      "analogy_reference": "build multi-path bridge",
+      "status": "pending",
+      "testing_criteria": "server.js has strategy branching for tiers."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify server.js",
+      "subtasks_required": ["Test startup", "Check syntax"],
+      "owner": "Caveman",
+      "analogy_reference": "walk bridge",
+      "status": "pending",
+      "testing_criteria": "Server starts."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail before sleep",
+      "status": "pending",
+      "testing_criteria": "Code fits spec."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

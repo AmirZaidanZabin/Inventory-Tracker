@@ -1,6 +1,2 @@
-try {
-  const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  console.log("Parsed OK. Project IS:", sa.project_id);
-} catch(e) {
-  console.error("Failed to parse", e.message);
-}
+import { db } from './src/lib/db/index.js';
+console.log(db.adapter.constructor.name);

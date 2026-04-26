@@ -160,8 +160,10 @@ export function LeadsNewView() {
         `;
 
         state.schemas.forEach(schema => {
+            const isSectionVisible = checkCondition(schema.condition);
+            const sectionDisplay = isSectionVisible ? 'block' : 'none';
             html += `
-                <div class="card border-0 shadow-sm mb-4" id="section-${schema.id}">
+                <div class="card border-0 shadow-sm mb-4" id="section-${schema.id}" style="display: ${sectionDisplay}">
                     <div class="card-header bg-light border-bottom-0"><h6 class="mb-0 fw-bold">${schema.name}</h6></div>
                     <div class="card-body">
                         <div class="row g-3">
@@ -178,9 +180,10 @@ export function LeadsNewView() {
                 const isDisabled = (state.merchantContext && schema.section_order === 1) ? 'disabled readonly' : '';
                 
                 if (f.type === 'select') {
+                    const safeOptions = Array.isArray(f.options) ? f.options : [];
                     html += `<select class="form-select inp-dynamic" name="${f.name}" ${f.required&&isVisible?'required':''} ${isDisabled}>
                                 <option value="">Select...</option>
-                                ${(f.options||[]).map(o => `<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}
+                                ${safeOptions.map(o => `<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}
                              </select>`;
                 } else if (f.type === 'textarea') {
                     html += `<textarea class="form-control inp-dynamic" name="${f.name}" rows="3" ${f.required&&isVisible?'required':''} ${isDisabled}>${val}</textarea>`;
@@ -482,7 +485,8 @@ export function LeadsNewView() {
                     const markersGroup = L.layerGroup().addTo(map);
                     let locations = [];
                     try {
-                        locations = JSON.parse(state.data[f.name] || '[]');
+                        const parsed = JSON.parse(state.data[f.name] || '[]');
+                        if (Array.isArray(parsed)) locations = parsed;
                     } catch(e) {}
 
                     const renderPinsList = () => {
