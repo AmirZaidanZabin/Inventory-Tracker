@@ -1,0 +1,77 @@
+{
+  "original_prompt": "Fix map reuse, fix CR check, add missing lead detail view, migrate SalesBackend to server.js.",
+  "rephrased_goal": "Migrate backend logic to server.js, fix map initialization in UI, and improve CR validation.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Migrate SalesBackend logic to server.js",
+      "subtasks_required": ["Read src/modules/sales.backend.js", "Add /api/sales/submit-lead and related logic to server.js"],
+      "owner": "Caveman",
+      "analogy_reference": "move fire to big cave",
+      "status": "pending",
+      "testing_criteria": "server.js has sales API endpoints"
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify server.js API endpoints",
+      "subtasks_required": ["view_file server.js"],
+      "owner": "Caveman",
+      "analogy_reference": "check if fire burns in big cave",
+      "status": "pending",
+      "testing_criteria": "Endpoints exist and handle leads/approvals"
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Update UI to call new server APIs",
+      "subtasks_required": ["Update src/views/view.leads_new.js to use fetch('/api/sales/submit-lead')"],
+      "owner": "Caveman",
+      "analogy_reference": "use new fire for cooking",
+      "status": "pending",
+      "testing_criteria": "fetch calls replace direct backend module calls"
+    },
+    {
+      "id": 4,
+      "description": "Do-Pebble: Fix Map container reuse error",
+      "subtasks_required": ["Modify src/views/view.leads_new.js to destroy existing map instance if it exists"],
+      "owner": "Caveman",
+      "analogy_reference": "clean cave before new paint",
+      "status": "pending",
+      "testing_criteria": "No map reuse error in console"
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Fix CR checking logic",
+      "subtasks_required": ["Refine checking logic in leads_new.js and server.js"],
+      "owner": "Caveman",
+      "analogy_reference": "sharpen spear tip",
+      "status": "pending",
+      "testing_criteria": "Duplicate CRs blocked correctly"
+    },
+    {
+      "id": 6,
+      "description": "Do-Pebble: Add missing Lead Detail view routing",
+      "subtasks_required": ["Ensure src/views/view.lead_detail.js is correctly registered in main.js"],
+      "owner": "Caveman",
+      "analogy_reference": "mark new trail on map",
+      "status": "pending",
+      "testing_criteria": "Lead detail view accessible via hash"
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS SWEEP",
+      "subtasks_required": ["Verify all changes, compile, and check for map instance leaks"],
+      "owner": "Caveman",
+      "analogy_reference": "last look at horizon",
+      "status": "pending",
+      "testing_criteria": "App functional and clean"
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

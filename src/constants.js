@@ -26,5 +26,12 @@ export const PREDEFINED_AUTHORITIES = [
     { id: 'roles:view', label: 'View Roles' },
     { id: 'roles:manage', label: 'Manage Roles' },
     { id: 'users:view', label: 'View Users' },
-    { id: 'users:manage', label: 'Manage Users' }
+    { id: 'users:manage', label: 'Manage Users' },
+    { id: 'leads:view', label: 'View Leads Pipeline' },
+    { id: 'leads:create', label: 'Create/Edit Leads' },
+    { id: 'merchants:view', label: 'View Merchants' },
+    { id: 'approvals:manage', label: 'Manage Tiered Approvals' },
+    { id: 'pricing_rules:manage', label: 'Manage Pricing Rules' },
+    { id: 'pages:manage', label: 'Manage Dynamic Pages' },
+    { id: 'admin:view', label: 'Access Global Admin Console' }
 ];

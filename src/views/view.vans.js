@@ -111,6 +111,7 @@ export function VansView() {
 
         // Initialize Map
         const map = L.map('van-map-picker').setView([24.7136, 46.6753], 6); // Riyadh default
+        setTimeout(() => map.invalidateSize(), 500);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
             maxZoom: 19
@@ -183,6 +184,8 @@ export function VansView() {
             
             const assigned_users = data.assigned_tech_id ? [data.assigned_tech_id] : [];
             delete data.assigned_tech_id;
+            const coverage_area = data.coverage_area;
+            delete data.coverage_area;
 
             try {
                 // Check if VAN already exists
@@ -194,12 +197,14 @@ export function VansView() {
 
                 await db.create('vans', {
                     ...data,
-                    custom_data: customData,
-                    assigned_users,
                     created_at: db.serverTimestamp(),
                     updated_at: db.serverTimestamp(),
                     is_deleted: false,
-                    metadata: {}
+                    metadata: {
+                        custom_data: customData,
+                        assigned_users: assigned_users,
+                        coverage_area: coverage_area
+                    }
                 }, data.van_id);
                 db.logAction("VAN Created", `VAN ${data.van_id} added at ${data.location_id}`);
                 modal.hide();
@@ -247,7 +252,7 @@ export function VansView() {
                     row.innerHTML = `
                         <td><code class="data-mono fw-bold">${van.van_id}</code></td>
                         <td>${van.location_id}</td>
-                        <td class="small text-muted">${van.created_at ? (typeof van.created_at === 'object' && van.created_at.toDate ? van.created_at.toDate().toLocaleDateString() : new Date(van.created_at).toLocaleDateString()) : '...'}</td>
+                        <td class="small text-muted">${van.created_at ? (typeof van.created_at === 'object' && van.created_at.toDate ? van.created_at.toDate().toLocaleDateString() : (van.created_at === '__server_timestamp__' ? new Date() : new Date(van.created_at)).toLocaleDateString()) : '...'}</td>
                         <td>
                             <button class="btn-pico btn-pico-outline table-action-btn edit-van me-1" data-id="${van.van_id}">
                                 <i class="bi bi-pencil"></i>
@@ -261,7 +266,7 @@ export function VansView() {
                     row.querySelector('.edit-van').addEventListener('click', async () => {
                         const techs = await db.findMany('users');
 
-                        const vanAssigned = van.assigned_users?.[0] || '';
+                        const vanAssigned = van.metadata?.assigned_users?.[0] || '';
                         const techOptions = techs.map(t => `
                             <option value="${t.user_id}" ${vanAssigned === t.user_id ? 'selected' : ''}>
                                 ${t.user_name} (${t.role_id})
@@ -291,7 +296,7 @@ export function VansView() {
                                     <div class="col-12">
                                         <label class="form-label small fw-bold">Coverage Area (Map Selection)</label>
                                         <div id="van-map-picker-edit" class="border rounded" style="height: 300px; width: 100%;"></div>
-                                        <input type="hidden" name="coverage_area" id="van-coverage-edit" value='${van.coverage_area || ''}'>
+                                        <input type="hidden" name="coverage_area" id="van-coverage-edit" value='${van.metadata?.coverage_area || ''}'>
                                         <div class="small text-muted mt-1">Use the toolbar to edit or redraw the coverage area.</div>
                                     </div>
                                 <div class="col-12 mt-4">
@@ -311,7 +316,7 @@ export function VansView() {
                         editFormSchemas.forEach(schema => {
                             cfHtml += `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">${schema.name}</h6><div class="row g-2">`;
                             schema.fields.forEach(f => {
-                                const existingVal = van.custom_data?.[f.name] || '';
+                                const existingVal = van.metadata?.custom_data?.[f.name] || '';
                                 cfHtml += `<div class="col-12">`;
                                 cfHtml += `<label class="form-label small fw-bold">${f.label} ${f.required?'<span class="text-danger">*</span>':''}</label>`;
                                 if (f.type === 'textarea') {
@@ -341,6 +346,7 @@ export function VansView() {
 
                     // Initialize Map for Edit
                     const map = L.map('van-map-picker-edit').setView([van.default_lat || 24.7136, van.default_lng || 46.6753], 10);
+                    setTimeout(() => map.invalidateSize(), 500);
                     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                         attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
                         maxZoom: 19
@@ -358,9 +364,9 @@ export function VansView() {
                     const drawnItems = new L.FeatureGroup();
                     map.addLayer(drawnItems);
                     
-                    if (van.coverage_area) {
+                    if (van.metadata?.coverage_area) {
                         try {
-                            const geoData = JSON.parse(van.coverage_area);
+                            const geoData = JSON.parse(van.metadata.coverage_area);
                             const layer = L.geoJSON(geoData);
                             layer.eachLayer(l => drawnItems.addLayer(l));
                             map.fitBounds(drawnItems.getBounds());
@@ -399,7 +405,7 @@ export function VansView() {
                         const assigned_users = assigned_tech_id ? [assigned_tech_id] : [];
 
                         try {
-                            const customData = van.custom_data || {};
+                            const customData = van.metadata?.custom_data || {};
                             for (let [key, val] of fd.entries()) {
                                 if (key.startsWith('custom_')) {
                                     customData[key.replace('custom_', '')] = val;
@@ -416,9 +422,13 @@ export function VansView() {
 
                             await db.update('vans', van.van_id, {
                                 location_id: fd.get('location_id'),
-                                coverage_area: fd.get('coverage_area'),
-                                assigned_users,
-                                custom_data: customData,
+                                updated_at: db.serverTimestamp(),
+                                metadata: {
+                                    ...(van.metadata || {}),
+                                    coverage_area: fd.get('coverage_area'),
+                                    assigned_users,
+                                    custom_data: customData
+                                },
                                 updated_at: db.serverTimestamp()
                             });
                             db.logAction("VAN Updated", `VAN ${van.van_id} updated with location ${fd.get('location_id')}`);

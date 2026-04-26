@@ -1,0 +1,59 @@
+{
+  "original_prompt": "approvals buttons not working",
+  "rephrased_goal": "Identify and fix why Confirm Approval does not update the UI or Lead state.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Sharpen Frontend (view.approvals.js). Add robust logs and safe button disabling.",
+      "subtasks_required": ["Add [APPROVAL_FLOW] logs after confirm", "Replace querySelector for disabling with a safer loop"],
+      "owner": "Caveman",
+      "analogy_reference": "sharpen spear for clear throw",
+      "status": "pending",
+      "testing_criteria": "Code should reach fetch and log status."
+    },
+    {
+      "id": 2,
+      "description": "Do-Pebble: Sync DB Schemas (FirebaseAdminAdapter.js). Add approval fields to essentials.",
+      "subtasks_required": ["Add approved_at, rejected_at, resolved_by to essentials"],
+      "owner": "Caveman",
+      "analogy_reference": "make sure main rock has all parts",
+      "status": "pending",
+      "testing_criteria": "findOne should return these fields without complex history joins."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Harden Backend (server.js). Add detailed logs and JSON safety.",
+      "subtasks_required": ["Log starting update", "Log finishing update", "Ensure json() returned"],
+      "owner": "Caveman",
+      "analogy_reference": "watch gate close properly",
+      "status": "pending",
+      "testing_criteria": "Backend should log 'SUCCESS' or 'EXCEPTION'."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify the hunt.",
+      "subtasks_required": ["Compile applet", "Check for errors"],
+      "owner": "Caveman",
+      "analogy_reference": "poke meat with finger",
+      "status": "pending",
+      "testing_criteria": "Build must pass."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS SWEEP",
+      "subtasks_required": ["Ensure no missing rocks", "Check all collection references"],
+      "owner": "Caveman",
+      "analogy_reference": "walk trail before sleep",
+      "status": "pending",
+      "testing_criteria": "Entire project cave clean."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

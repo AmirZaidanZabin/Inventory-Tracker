@@ -1,5 +1,6 @@
 import { controller } from '../lib/controller.js';
 import { db } from '../lib/db/index.js';
+import { formatServerToLocalTime } from '../lib/timezone.js';
 
 export function AppointmentDetailView(appointmentId) {
     const view = controller({
@@ -447,7 +448,8 @@ export function AppointmentDetailView(appointmentId) {
                     is_available: false, 
                     status: 'assigned', 
                     current_location_type: 'APPOINTMENT', 
-                    current_location_id: appointmentId 
+                    current_location_id: appointmentId,
+                    updated_at: db.serverTimestamp() 
                 }));
             }
         });
@@ -459,7 +461,8 @@ export function AppointmentDetailView(appointmentId) {
             status: 'completed',
             'metadata.hardware': deployedHw,
             'metadata.completion_description': completionDesc,
-            'metadata.completed_at': db.serverTimestamp()
+            'metadata.completed_at': db.serverTimestamp(),
+            updated_at: db.serverTimestamp()
         });
         
         Promise.all([...itemUpdates, aptUpdate]).then(() => {
@@ -522,14 +525,23 @@ export function AppointmentDetailView(appointmentId) {
                 const startTimeStr = aptData.appointment_time || '00:00';
                 const duration = aptData.metadata?.duration_minutes || 60;
                 
+                const serverTz = window.state?.data?.settings?.server_timezone || 'UTC';
+                // Just use formatServerToLocalTime for start and manually shift for end
+                // We'll import formatServerToLocalTime at top of this file implicitly or directly
+                
+                // Fast format using native Intl instead of writing new logic just for end time
+                // A better approach is parsing exact datetime relative to server:
                 const [sh, sm] = startTimeStr.split(':').map(Number);
-                const startDate = new Date();
-                startDate.setHours(sh, sm, 0);
+                const startMins = sh * 60 + sm;
+                const endMins = startMins + duration;
                 
-                const endDate = new Date(startDate.getTime() + duration * 60000);
-                
-                const formatTime = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                view.$('det-time-range').textContent = `${aptData.schedule_date} | ${formatTime(startDate)} - ${formatTime(endDate)}`;
+                const formatterFn = (mins) => {
+                    const hr = Math.floor(mins / 60) % 24;
+                    const mn = mins % 60;
+                    return formatServerToLocalTime?.(aptData.schedule_date, `${hr.toString().padStart(2,'0')}:${mn.toString().padStart(2,'0')}`, serverTz) || `${hr % 12 || 12}:${mn.toString().padStart(2,'0')} ${hr >= 12 ? 'PM':'AM'}`;
+                };
+
+                view.$('det-time-range').textContent = `${aptData.schedule_date} | ${formatterFn(startMins)} - ${formatterFn(endMins)}`;
             }
 
             if(view.$('det-location')) view.$('det-location').textContent = aptData.location_name || 'N/A';

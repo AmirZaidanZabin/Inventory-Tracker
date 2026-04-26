@@ -211,7 +211,7 @@ export function MobileStockView() {
                         current_location_type: 'VAN',
                         current_location_id: vanId,
                         is_available: true,
-                        status: 'available',
+                        metadata: { status: 'available' },
                         updated_at: db.serverTimestamp()
                     }, item.item_id));
                     inventoryIds.push(item.item_id);
@@ -222,12 +222,15 @@ export function MobileStockView() {
                 await db.create('stock_take_logs', {
                     log_id: logId,
                     log_type: 'morning_load',
-                    target_van: vanId,
+                    van_id: vanId,
                     user_id: auth.currentUser?.uid || 'Unknown',
-                    user_email: auth.currentUser?.email || 'Unknown',
-                    timestamp: db.serverTimestamp(),
+                    created_at: db.serverTimestamp(),
+                    updated_at: db.serverTimestamp(),
                     scanned_items: inventoryIds,
-                    count: inventoryIds.length
+                    metadata: {
+                        user_email: auth.currentUser?.email || 'Unknown',
+                        count: inventoryIds.length
+                    }
                 }, logId);
 
                 alert(`Success! ${inventoryIds.length} items loaded into ${vanId}.`);
@@ -253,13 +256,16 @@ export function MobileStockView() {
                 await db.create('stock_take_logs', {
                     log_id: logId,
                     log_type: 'evening_reconcile',
-                    target_van: vanId,
+                    van_id: vanId,
                     user_id: auth.currentUser?.uid || 'Unknown',
-                    user_email: auth.currentUser?.email || 'Unknown',
-                    timestamp: db.serverTimestamp(),
+                    created_at: db.serverTimestamp(),
+                    updated_at: db.serverTimestamp(),
                     scanned_items: [...uploadedIds],
-                    count: uploadedIds.size,
-                    discrepancies: { missing, extra }
+                    discrepancies: { missing, extra },
+                    metadata: {
+                        user_email: auth.currentUser?.email || 'Unknown',
+                        count: uploadedIds.size
+                    }
                 }, logId);
 
                 alert(`Audit complete!\nMissing: ${missing.length}\nExtra: ${extra.length}\nReport saved to history.`);

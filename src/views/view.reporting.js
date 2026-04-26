@@ -545,11 +545,11 @@ ORDER BY Total_Jobs DESC;`;
 
     view.trigger('click', 'report-stock', () => {
         view.$('sql-query').value = `SELECT 
-    user_email as User,
+    json_extract(metadata, '$.user_email') as User,
     type as Load_Type,
     COUNT(log_id) as Entries,
-    SUM(count) as Total_Items_Handled,
-    strftime('%Y-%m-%d', timestamp) as Day
+    SUM(json_extract(metadata, '$.count')) as Total_Items_Handled,
+    strftime('%Y-%m-%d', created_at) as Day
 FROM stock_takes
 GROUP BY User, Load_Type, Day
 ORDER BY Day DESC;`;
@@ -559,18 +559,18 @@ ORDER BY Day DESC;`;
 
     view.trigger('click', 'report-variance', () => {
          view.$('sql-query').value = `SELECT 
-    target_van,
-    user_email as Auditor,
+    van_id,
+    json_extract(metadata, '$.user_email') as Auditor,
     json_extract(discrepancies, '$.missing') as Missing_Items,
     json_extract(discrepancies, '$.extra') as Extra_Items,
     json_array_length(json_extract(discrepancies, '$.missing')) as Missing_Count,
     json_array_length(json_extract(discrepancies, '$.extra')) as Extra_Count,
-    timestamp as Audit_Date
+    created_at as Audit_Date
 FROM stock_take_logs
 WHERE log_type = 'evening_reconcile' 
   AND (json_array_length(json_extract(discrepancies, '$.missing')) > 0 
        OR json_array_length(json_extract(discrepancies, '$.extra')) > 0)
-ORDER BY timestamp DESC;`;
+ORDER BY created_at DESC;`;
          updateHighlighting();
          runQuery();
     });

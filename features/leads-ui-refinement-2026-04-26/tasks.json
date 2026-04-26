@@ -1,0 +1,78 @@
+{
+  "original_prompt": "Fix back button, location display, data capture, timeline alignment, and add loading on submit.",
+  "rephrased_goal": "Polish the Leads UX: fix navigation, mapping, data persistence, and UI alignment while adding interactive feedback.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Fix back button in Lead Detail",
+      "subtasks_required": ["Update back button event to use programmatic navigation to #leads"],
+      "owner": "Caveman",
+      "status": "done",
+      "testing_criteria": "Clicking back button returns to leads pipeline."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify navigation",
+      "subtasks_required": ["Confirm view switches back without full page reload errors"],
+      "owner": "Caveman",
+      "status": "done",
+      "testing_criteria": "Leads view loads correctly after back."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Fix location display in Lead Detail",
+      "subtasks_required": ["Ensure Leaflet map initializes with markers from lead branches data"],
+      "owner": "Caveman",
+      "status": "done",
+      "testing_criteria": "Markers appear on the map in lead detail view."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify mapping",
+      "subtasks_required": ["Check console for Leaflet errors"],
+      "owner": "Caveman",
+      "status": "done",
+      "testing_criteria": "Map is visible and correctly cented on markers."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Improve data capture in Leads New",
+      "subtasks_required": ["Explicitly pull data from form before saving", "Fix multi-map data sync"],
+      "owner": "Caveman",
+      "status": "done",
+      "testing_criteria": "Newly created leads have all fields populated in database."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify data capture",
+      "subtasks_required": ["Create test lead and check db record"],
+      "owner": "Caveman",
+      "status": "done",
+      "testing_criteria": "CR number, Merchant Name, and Custom Data are present."
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Fix timeline alignment and add loading states",
+      "subtasks_required": ["Adjust timeline CSS", "Add spinner to submit buttons"],
+      "owner": "Caveman",
+      "status": "done",
+      "testing_criteria": "Timeline looks aligned. Button shows spinner on click."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS SWEEP",
+      "subtasks_required": ["Check all views", "Verify lead -> merchant conversion works"],
+      "owner": "Caveman",
+      "status": "done",
+      "testing_criteria": "Entire leads flow is polished and functional."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

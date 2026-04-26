@@ -1,0 +1,77 @@
+{
+  "original_prompt": "make sure the views update the database properly, based on the blueprint available",
+  "rephrased_goal": "Update all view.[entity].js to match firebase-blueprint.json schema structures.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Read all views and identify db updates",
+      "subtasks_required": ["Grep db.update in src/views"],
+      "owner": "Caveman",
+      "analogy_reference": "Find broken rocks",
+      "status": "pending",
+      "testing_criteria": "Found which views are mismatching."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Analyze mismatch",
+      "subtasks_required": ["Compare db updates with blueprint"],
+      "owner": "Caveman",
+      "analogy_reference": "Compare sticks",
+      "status": "pending",
+      "testing_criteria": "Know exactly what to fix."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Fix view.vans.js",
+      "subtasks_required": ["Move coverage_area, custom_data, assigned_users under metadata"],
+      "owner": "Caveman",
+      "analogy_reference": "Sharpen stick 1",
+      "status": "pending",
+      "testing_criteria": "vans update is compliant."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Check van update",
+      "subtasks_required": ["Verify view.vans.js lines"],
+      "owner": "Caveman",
+      "analogy_reference": "Poke finger on stick 1",
+      "status": "pending",
+      "testing_criteria": "Matches blueprint."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Fix view.items.js & view.users.js",
+      "subtasks_required": ["Fix current_location mapping, User metadata.schedule mapping"],
+      "owner": "Caveman",
+      "analogy_reference": "Sharpen stick 2",
+      "status": "pending",
+      "testing_criteria": "Updates compliant."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Check items & users update",
+      "subtasks_required": ["Verify views lines"],
+      "owner": "Caveman",
+      "analogy_reference": "Poke finger on stick 2",
+      "status": "pending",
+      "testing_criteria": "Matches blueprint."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Check all db.update calls"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail before sleep",
+      "status": "pending",
+      "testing_criteria": "All updates compliant with blueprint."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

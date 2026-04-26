@@ -438,3 +438,67 @@ h1, h2, h3, h4, h5, h6, .fw-bold {
 .gantt-group-header { background: #d0d7de !important; color: #1f2328 !important; padding: 0.4rem 1rem; font-size: 0.75rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #afb8c1; }
 .hour-tick { border-right: 1px dashed #cbd5e1; }
 .day-tick { border-right: 1px solid #e2e8f0; }
+
+/* 8. Split Pane / Insights Drawer */
+.insights-split-container { display: flex; width: 100%; height: 100%; overflow: hidden; position: relative; }
+.insights-main-content {
+    flex: 1;
+    min-width: 0;
+    transition: all 0.3s ease;
+    overflow-y: auto;
+}
+.insights-drawer {
+    width: 0;
+    flex-shrink: 0;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-left: 0px solid transparent;
+    background: #fdfdfd;
+    display: flex;
+    flex-direction: column;
+    overflow-y: hidden;
+    overflow-x: hidden;
+    position: relative;
+    z-index: 5;
+}
+.insights-split-container.has-open-drawer .insights-drawer {
+    width: 400px;
+    border-left: 1px solid #e5e7eb;
+}
+.insights-drawer-inner {
+    padding: 1.5rem;
+    flex: 1;
+}
+
+.insights-toggle-btn {
+    position: absolute;
+    left: -28px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 60px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.02);
+    z-index: 10;
+    color: #6b7280;
+    transition: color 0.15s ease;
+}
+.insights-toggle-btn:hover { color: var(--primary-color); background: #f9fafb; }
+.insights-toggle-btn i { transition: transform 0.3s ease; }
+.insights-split-container.has-open-drawer .insights-toggle-btn i { transform: rotate(180deg); }
+
+.insight-card {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: var(--card-shadow);
+}
+.insight-chart-placeholder {
+    height: 120px; width: 100%; background: #f9fafb; border-radius: 4px; display: flex; align-items: flex-end; justify-content: space-around;
+    padding: 10px; box-sizing: border-box; overflow: hidden; gap: 4px; border: 1px solid #f3f4f6;
+}
+.insight-bar { width: 100%; background: var(--primary-color); opacity: 0.8; border-radius: 2px 2px 0 0; transition: height 0.5s ease; }
+

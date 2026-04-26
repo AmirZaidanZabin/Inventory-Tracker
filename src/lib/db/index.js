@@ -41,8 +41,21 @@ class DatabaseManager {
         return await this.adapter.create(table, data, id);
     }
 
+    async insert(table, data, id = null) {
+        return await this.create(table, data, id);
+    }
+
     async update(table, id, data) {
         return await this.adapter.update(table, id, data);
+    }
+
+    async updateOrCreate(table, id, data) {
+        const existing = await this.findOne(table, id);
+        if (existing) {
+            return await this.update(table, id, data);
+        } else {
+            return await this.create(table, data, id);
+        }
     }
 
     async remove(table, id) {

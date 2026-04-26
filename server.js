@@ -204,7 +204,7 @@ async function startServer() {
   }
 
   // Generic CRUD implementation
-  const collections = ["vans", "item_catalog", "items", "appointments", "stock_take_logs", "roles", "users", "audit_logs", "stock_takes", "test_collection", "triggers", "forms", "saved_reports", "product_types", "item_types", "custom_forms", "form_submissions"];
+  const collections = ["vans", "item_catalog", "items", "appointments", "stock_take_logs", "roles", "users", "audit_logs", "stock_takes", "test_collection", "triggers", "forms", "saved_reports", "product_types", "item_types", "custom_forms", "form_submissions", "leads", "merchants", "approvals", "pricing_tiers", "pricing_cards", "app_settings"];
 
   // Admin: Change User Password
   app.post("/api/admin/users/:uid/password", authenticate, async (req, res) => {
@@ -298,10 +298,10 @@ async function startServer() {
             current_location_type: 'VAN',
             current_location_id: van_id,
             is_available: true,
-            status: item.status || 'available',
             updated_at: '__server_timestamp__',
             metadata: {
                 ...metadata,
+                status: item.status || 'available',
                 loaded_by: req.user.email
             }
           });
@@ -333,19 +333,233 @@ async function startServer() {
           log_type: log_type,
           van_id: van_id,
           user_id: req.user.uid,
-          user_email: req.user.email,
-          timestamp: '__server_timestamp__',
-          scanned_items: inventoryIds,
-          count: inventoryIds.length,
-          discrepancies: resultPayload.discrepancies || null,
           created_at: '__server_timestamp__',
-          updated_at: '__server_timestamp__'
+          updated_at: '__server_timestamp__',
+          scanned_items: inventoryIds,
+          discrepancies: resultPayload.discrepancies || null,
+          metadata: {
+              user_email: req.user.email,
+              count: inventoryIds.length
+          }
       }, logId);
 
       res.json(resultPayload);
     } catch (err) {
       console.error("Bulk Stock Take Error:", err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Sales Module APIs
+  app.post("/api/sales/submit-lead", authenticate, async (req, res) => {
+    const { lead_id } = req.body;
+    if (!lead_id) return res.status(400).json({ error: "Missing lead_id" });
+
+    try {
+      // Logic from SalesBackend.submitLead
+      const lead = await db.findOne('leads', lead_id);
+      if (!lead || lead.status === 'approved') return res.status(400).json({ error: 'Invalid lead state' });
+
+      const settings = await db.findOne('app_settings', 'global') || {};
+      
+      if (settings.enforce_kyc && !lead.kyc_document) {
+          return res.status(400).json({ error: 'KYC Document is required by system settings.' });
+      }
+
+      // If registry verification is required, we check if they bypassed the frontend. 
+      // (Simplified: we assume frontend does the check and attaches registry data, 
+      // but to strictly enforce backend we could re-run it. We'll simply enforce KYC here as an example.)
+
+      const tiersList = await db.findMany('pricing_tiers') || [];
+      const sortedTiers = (tiersList || []).sort((a, b) => (b.level || 0) - (a.level || 0));
+      const cardsList = await db.findMany('pricing_cards') || [];
+      
+      // Determine starting tier
+      let requiredTier = null;
+      let breachDetails = [];
+      const requestedGmv = parseFloat(lead.monthly_gmv) || 0;
+
+      // Iteratively check tiers from highest level to lowest
+      // If a tier's threshold is breached, that tier (and potentially higher ones) is required.
+      // We want to find the LOWEST level tier that is still "higher" than the request.
+      // But actually, the policy usually is: if you breach Level 1, you go to Level 1. If you breach Level 2, you go to Level 2.
+      // So we check from Level 3 down to Level 1. The first one that is breached is the one we route to.
+      
+      for (const tier of sortedTiers) {
+          let breached = false;
+          
+          if (tier.min_monthly_gmv && requestedGmv < tier.min_monthly_gmv) {
+              breached = true;
+              breachDetails.push({ 
+                  type: 'GMV',
+                  requested: requestedGmv, 
+                  min_required: tier.min_monthly_gmv, 
+                  tier_breached: tier.name 
+              });
+          }
+          
+          if (tier.thresholds) {
+              for (const card of cardsList) {
+                  const reqRateRaw = lead[`rate_${card.id}`];
+                  if (reqRateRaw !== undefined && reqRateRaw !== '') {
+                      const reqRate = parseFloat(reqRateRaw);
+                      const threshold = tier.thresholds[card.id];
+                      if (threshold !== undefined && reqRate < threshold) {
+                          breached = true;
+                          breachDetails.push({ 
+                              type: `Card (${card.name})`,
+                              requested: reqRate, 
+                              min_required: threshold, 
+                              tier_breached: tier.name 
+                          });
+                      }
+                  }
+              }
+          }
+          
+          if (breached) {
+              requiredTier = tier;
+              break; // Stop at highest breached tier
+          }
+      }
+
+      if (!requiredTier) {
+          console.log(`[APPROVAL_DEBUG] No thresholds breached. Auto-approving lead ${lead_id}`);
+          await db.update('leads', lead_id, { status: 'approved', approved_at: db.serverTimestamp(), breach_details: null });
+          return res.json({ success: true, action: 'auto_approved' });
+      } else {
+          console.log(`[APPROVAL_DEBUG] Breach detected. Routing lead ${lead_id} to ${requiredTier.name} (${requiredTier.approver_email})`);
+          
+          const approvalItem = {
+              lead_id,
+              tier_id: requiredTier.id,
+              approver_uid: requiredTier.approver_email, // Routing to functional email
+              status: 'pending',
+              created_at: db.serverTimestamp(),
+              breach_details: breachDetails
+          };
+
+          const approvalRecord = await db.create('approvals', approvalItem);
+          await db.update('leads', lead_id, { 
+              status: 'pending', 
+              current_approver_uid: requiredTier.approver_email,
+              pending_approval_id: approvalRecord.id,
+              breach_details: breachDetails
+          });
+
+          return res.json({ success: true, action: 'routed_for_approval', required_tier: requiredTier.name, breachDetails });
+      }
+    } catch (error) {
+      console.error("submit-lead error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sales/check-cr/:cr", authenticate, async (req, res) => {
+    const { cr } = req.params;
+    try {
+      const allMerchants = await db.findMany('merchants');
+      const merchant = allMerchants.find(m => m.cr_number === cr);
+      
+      const allLeads = await db.findMany('leads');
+      const activeLead = allLeads.find(l => l.cr_number === cr && ["draft", "pending", "approved"].includes(l.status));
+      
+      let registryData = null;
+      let externalCheckAttempted = false;
+
+      // External CR Proxy Check
+      const settings = await db.findOne('app_settings', 'global');
+      if (settings && settings.require_registry_verification && settings.cr_api_url) {
+          externalCheckAttempted = true;
+          const url = settings.cr_api_url.replace('{{cr}}', cr);
+          let headers = {};
+          try { headers = JSON.parse(settings.cr_api_headers || '{}'); } catch(e){}
+          
+          try {
+              const remoteRes = await fetch(url, { headers });
+              if (remoteRes.ok) {
+                  const rData = await remoteRes.json();
+                  // Normalize data structure for frontend (standardize on "name")
+                  registryData = {
+                      name: rData.name || rData.merchantName || rData.businessName || rData.company_name
+                  };
+              }
+          } catch(e) {
+              console.error("External CR Check Failed:", e.message);
+          }
+      }
+
+      res.json({
+        duplicateMerchant: merchant ? { id: merchant.id, name: merchant.merchant_name || merchant.business_name } : null,
+        duplicateLead: activeLead ? { id: activeLead.id, status: activeLead.status } : null,
+        registryData,
+        externalCheckAttempted
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/sales/process-approval", authenticate, async (req, res) => {
+    const { approval_id, decision, notes } = req.body;
+    const approverUid = req.user.email; 
+
+    try {
+      if (!approval_id) return res.status(400).json({ error: "Missing approval_id" });
+      console.log(`[APPROVAL_FLOW] 1. Request start:`, { approval_id, decision, notes, approverUid });
+      
+      const approval = await db.findOne('approvals', String(approval_id));
+      if (!approval) {
+          console.error(`[APPROVAL_FLOW] 2. Approval record NOT FOUND for ID: ${approval_id}`);
+          return res.status(404).json({ error: `Approval record not found for ID: ${approval_id}` });
+      }
+      
+      console.log(`[APPROVAL_FLOW] 3. Found approval:`, { id: approval.id, status: approval.status, lead_id: approval.lead_id });
+
+      if (approval.status !== 'pending') {
+          console.error(`[APPROVAL_FLOW] 4. Approval ${approval_id} is already ${approval.status}`);
+          return res.status(400).json({ error: `Approval is already ${approval.status}` });
+      }
+
+      const leadId = approval.lead_id;
+      if (!leadId) {
+          console.error(`[APPROVAL_FLOW] 5. LEAD_ID missing in record ${approval_id}`);
+          return res.status(500).json({ error: 'Record corrupt: missing lead_id' });
+      }
+
+      const lead = await db.findOne('leads', leadId);
+      if (!lead) {
+          console.error(`[APPROVAL_FLOW] 6. Target Lead NOT FOUND: ${leadId}`);
+          return res.status(404).json({ error: `Lead ${leadId} not found for this approval` });
+      }
+
+      console.log(`[APPROVAL_FLOW] 7. Executing updates for ${approval_id} and ${leadId}...`);
+
+      await db.update('approvals', String(approval_id), {
+          status: decision,
+          resolved_by: approverUid,
+          notes: notes,
+          resolved_at: db.serverTimestamp()
+      });
+
+      const leadUpdate = { 
+          status: decision === 'approved' ? 'approved' : 'rejected', 
+          current_approver_uid: null 
+      };
+      
+      if (decision === 'approved') {
+          leadUpdate.approved_at = db.serverTimestamp();
+      } else {
+          leadUpdate.rejected_at = db.serverTimestamp();
+      }
+
+      await db.update('leads', String(leadId), leadUpdate);
+
+      console.log(`[APPROVAL_FLOW] 8. SUCCESS for approval ${approval_id} and lead ${leadId}`);
+      res.json({ success: true, decision, leadId });
+    } catch (error) {
+      console.error("[APPROVAL_FLOW] 9. EXCEPTION:", error);
+      res.status(500).json({ error: "Server Exception: " + error.message });
     }
   });
 
@@ -361,7 +575,13 @@ async function startServer() {
       product_types: 'admin',
       triggers: 'admin',
       forms: 'forms:view',
-      saved_reports: 'reporting:view'
+      saved_reports: 'reporting:view',
+      leads: 'leads:view',
+      merchants: 'merchants:view',
+      approvals: 'approvals:view',
+      pricing_tiers: 'pricing:view',
+      pricing_cards: 'pricing:view',
+      app_settings: 'admin'
   };
 
   collections.forEach(colName => {

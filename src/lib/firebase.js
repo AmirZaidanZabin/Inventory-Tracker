@@ -185,7 +185,9 @@ export const firebase = {
   db: {
     collection: (db, name) => ({ type: "collection", path: name }),
     doc: (db, col, id) => ({ type: "doc", path: `${col}/${id}`, col, id }),
-    query: (ref) => ref,
+    query: (ref, ...ops) => ({ ...ref, ops }),
+    where: (field, op, value) => ({ type: 'where', field, value }),
+    limit: (n) => ({ type: 'limit', value: n }),
 
     subscribe: (ref, arg2, arg3, arg4) => {
       let options = {};
@@ -342,6 +344,12 @@ export const firebase = {
       let path = `/api/${ref.path}`;
       const params = new URLSearchParams();
       if (options.limit) params.append("limit", options.limit);
+      if (ref.ops) {
+          ref.ops.forEach(op => {
+              if (op.type === 'limit') params.append("limit", op.value);
+              if (op.type === 'where') params.append(op.field, op.value);
+          });
+      }
       if (options.page) params.append("page", options.page);
       if (options.fields)
         params.append(

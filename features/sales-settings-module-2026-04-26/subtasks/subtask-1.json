@@ -1,0 +1,6 @@
+{
+  "task_id": 1,
+  "input": "Firestore schemas for leads, branches, lead_devices, lead_rates, cards, card_countries, card_tier_thresholds, tiers, approvals, expansions, app_settings",
+  "expected_output": "A file that specifies schemas and firebase security rules (sales.firestore.rules).",
+  "status": "in_progress"
+}

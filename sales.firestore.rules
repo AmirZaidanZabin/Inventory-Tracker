@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- Global Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      // Assuming custom claim 'admin' or checking an admins collection. 
+      // Using a basic existing token check or simulated function.
+      return isSignedIn() && (request.auth.token.role == 'admin' || exists(/databases/$(database)/documents/roles/admin/users/$(request.auth.uid)));
+    }
+    function isOwner(resourceData) {
+      return resourceData.owner_id == request.auth.uid;
+    }
+    function isApprover(resourceData) {
+      // Determines if the user's role is in the pending approval tiers or their email is attached
+      return resourceData.current_approver_uid == request.auth.uid;
+    }
+
+    // --- Module: Settings & System Constraints ---
+    
+    // Admin only collections
+    match /app_settings/{document} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /cards/{document} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /card_countries/{document} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /card_tier_thresholds/{document} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /tiers/{document} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Module: Sales (Leads & Details) ---
+    
+    match /leads/{leadId} {
+      // Read: Owner, the assigned approver, or Admin
+      allow read: if isSignedIn() && (
+        isOwner(resource.data) || 
+        isApprover(resource.data) || 
+        isAdmin()
+      );
+      
+      // Create: Any authenticated user can create a lead (they become owner)
+      allow create: if isSignedIn() && 
+                    request.resource.data.owner_id == request.auth.uid;
+      
+      // Update: Owner can update if draft/rejected. Admin can update always.
+      // Note: Backend handles the submission state change to 'pending'.
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (
+          isOwner(resource.data) && 
+          resource.data.status in ['draft', 'rejected']
+        )
+      );
+      
+      // Delete: Only owner (if draft) or Admin
+      allow delete: if isSignedIn() && (
+        isAdmin() || 
+        (isOwner(resource.data) && resource.data.status == 'draft')
+      );
+    }
+
+    // Child relations of leads
+    // Note: Can use collectionGroups if queried across all, but nested subcollections or flat with lead_id works.
+    // Assuming flat collections linked by lead_id for better querying and indexing capabilities without massive nesting.
+    
+    match /branches/{branchId} {
+      function getLead() { return get(/databases/$(database)/documents/leads/$(resource.data.lead_id)).data; }
+      allow read: if isSignedIn() && (isOwner(getLead()) || isApprover(getLead()) || isAdmin());
+      allow write: if isSignedIn() && (isOwner(getLead()) || isAdmin());
+      allow create: if isSignedIn(); // Add constraints based on incoming lead check if necessary
+    }
+    match /lead_devices/{deviceId} {
+      function getLead() { return get(/databases/$(database)/documents/leads/$(resource.data.lead_id)).data; }
+      allow read: if isSignedIn() && (isOwner(getLead()) || isApprover(getLead()) || isAdmin());
+      allow write: if isSignedIn() && (isOwner(getLead()) || isAdmin());
+      allow create: if isSignedIn();
+    }
+    match /lead_rates/{rateId} {
+      function getLead() { return get(/databases/$(database)/documents/leads/$(resource.data.lead_id)).data; }
+      allow read: if isSignedIn() && (isOwner(getLead()) || isApprover(getLead()) || isAdmin());
+      allow write: if isSignedIn() && (isOwner(getLead()) || isAdmin());
+      allow create: if isSignedIn();
+    }
+    match /approvals/{approvalId} {
+      // Approvals belong to leads. 
+      function getLead() { return get(/databases/$(database)/documents/leads/$(resource.data.lead_id)).data; }
+      allow read: if isSignedIn() && (isOwner(getLead()) || isApprover(getLead()) || isAdmin() || resource.data.approver_uid == request.auth.uid);
+      allow create: if isAdmin() || false; // Should only be created by backend submitLead function, thus false for client
+      allow update: if isAdmin() || (isSignedIn() && resource.data.approver_uid == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+    match /expansions/{expansionId} {
+      function getLead() { return get(/databases/$(database)/documents/leads/$(resource.data.lead_id)).data; }
+      allow read: if isSignedIn() && (isOwner(getLead()) || isAdmin());
+      allow create: if isSignedIn() && (isOwner(getLead()) || isAdmin());
+      allow update, delete: if isSignedIn() && isAdmin();
+    }
+  }
+}

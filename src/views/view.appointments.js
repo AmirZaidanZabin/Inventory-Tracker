@@ -1,5 +1,6 @@
 import { controller, debounce } from '../lib/controller.js';
 import { db } from '../lib/db/index.js';
+import { formatServerToLocalTime } from '../lib/timezone.js';
 
 import { createModal } from '../lib/modal.js';
 import { renderTable } from '../lib/table.js';
@@ -182,6 +183,17 @@ export function AppointmentsView() {
             const dateHeader = modal.element.querySelector('#daily-view-date');
             const container = modal.element.querySelector('#daily-schedule-container');
             const dateStr = modal.element.querySelector('[name="schedule_date"]')?.value;
+            const serverTz = (window.state?.data?.settings?.server_timezone || 'UTC');
+
+            // Update select dropdown labels based on selected date
+            const timeSelect = modal.element.querySelector('[name="appointment_time"]');
+            if (dateStr && timeSelect && timeSelect.options) {
+                Array.from(timeSelect.options).forEach(opt => {
+                    if (opt.value) {
+                        opt.text = formatServerToLocalTime(dateStr, opt.value, serverTz);
+                    }
+                });
+            }
             
             // 1. Clear previous highlights
             if (container) {
@@ -203,8 +215,9 @@ export function AppointmentsView() {
             
             // Check shift end boundary
             const date = new Date(dateStr);
-            const tech = userDataArray.find(u => u.id === selectedTechId);
-            const sched = tech?.schedule?.[date.getDay()];
+            const tech = userDataArray.find(u => (u.user_id || u.id) === selectedTechId);
+            const userSched = tech?.metadata?.schedule || tech?.schedule;
+            const sched = userSched?.[date.getDay()];
             const shiftEndMins = sched ? parseTime(sched.end) : 1020; // 17:00 default
             
             const isExceeding = endMins > shiftEndMins;
@@ -342,9 +355,10 @@ export function AppointmentsView() {
             if (lat && lng) {
                 const pt = [lng, lat];
                 vanDataArray.forEach(v => {
-                    if (v.coverage_area) {
+                    const coverageArea = v.metadata?.coverage_area || v.coverage_area;
+                    if (coverageArea) {
                         try {
-                            const geo = JSON.parse(v.coverage_area);
+                            const geo = JSON.parse(coverageArea);
                             if (geo.geometry && geo.geometry.type === 'Polygon') {
                                 const ring = geo.geometry.coordinates[0];
                                 if (pointInPolygon(pt, ring)) validVans.push(v);
@@ -356,19 +370,20 @@ export function AppointmentsView() {
 
             if (validVans.length > 0) {
                 const primaryVan = validVans[0];
-                modal.element.querySelector('#auto_van_id').value = primaryVan.id;
+                modal.element.querySelector('#auto_van_id').value = primaryVan.van_id || primaryVan.id;
                 
-                const assignedUserId = primaryVan.assigned_users?.[0];
-                const assignedUser = userDataArray.find(u => u.user_id === assignedUserId);
+                const assignedUserId = (primaryVan.metadata?.assigned_users || primaryVan.assigned_users)?.[0];
+                const assignedUser = userDataArray.find(u => u.user_id === assignedUserId || u.id === assignedUserId);
                 const techName = assignedUser ? assignedUser.user_name : 'Unassigned';
 
-                modal.element.querySelector('#location-status').innerHTML = `<span class="badge badge-pale-success"><i class="bi bi-check-circle me-1"></i>Covered by ${primaryVan.id} (Assigned PS: ${techName})</span>`;
+                modal.element.querySelector('#location-status').innerHTML = `<span class="badge badge-pale-success"><i class="bi bi-check-circle me-1"></i>Covered by VAN: ${primaryVan.van_id || primaryVan.id} (Assigned To: ${techName})</span>`;
                 
                 let techIds = new Set();
                 validVans.forEach(v => {
-                    if(v.assigned_users) v.assigned_users.forEach(uid => techIds.add(uid));
+                    const assignedUsers = v.metadata?.assigned_users || v.assigned_users;
+                    if(assignedUsers) assignedUsers.forEach(uid => techIds.add(uid));
                 });
-                validTechs = userDataArray.filter(u => techIds.has(u.user_id));
+                validTechs = userDataArray.filter(u => techIds.has(u.user_id) || techIds.has(u.id));
             } else if (lat && lng) {
                 modal.element.querySelector('#auto_van_id').value = '';
                 modal.element.querySelector('#location-status').innerHTML = `<span class="badge badge-pale-danger"><i class="bi bi-exclamation-triangle me-1"></i>Out of bounds.</span>`;
@@ -377,7 +392,10 @@ export function AppointmentsView() {
             if (dateStr && validTechs.length > 0) {
                 const d = new Date(dateStr);
                 const dayIdx = d.getDay(); 
-                validTechs = validTechs.filter(u => !!(u.schedule && u.schedule[dayIdx]));
+                validTechs = validTechs.filter(u => {
+                    const sched = u.metadata?.schedule || u.schedule;
+                    return !!(sched && sched[dayIdx]);
+                });
             }
 
             currentValidTechs = validTechs;
@@ -405,12 +423,11 @@ export function AppointmentsView() {
             const dailyApts = allAppointments.filter(a => a.schedule_date === dateStr && !a.is_deleted);
             const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
             
+            const serverTz = (window.state?.data?.settings?.server_timezone || 'UTC');
+
             function formatTime(t) {
                 if(!t)return'';
-                let [h, m] = t.split(':');
-                let hInt = parseInt(h);
-                let ampm = hInt >= 12 ? 'PM' : 'AM';
-                return `${hInt % 12 || 12}:${m} ${ampm}`;
+                return formatServerToLocalTime(dateStr || new Date().toISOString().split('T')[0], t, serverTz);
             }
 
             const worker = new Worker(new URL('../workers/travel.worker.js', import.meta.url));
@@ -465,7 +482,8 @@ export function AppointmentsView() {
                         let totalServiceableTechs = 0;
 
                         currentValidTechs.forEach(t => {
-                            const sched = t.schedule?.[dDay];
+                            const userSched = t.metadata?.schedule || t.schedule;
+                            const sched = userSched?.[dDay];
                             let startHour = sched ? parseInt((sched.start || '09:00').split(':')[0], 10) : 9;
                             let endHour = sched ? parseInt((sched.end || '17:00').split(':')[0], 10) : 17;
 
@@ -475,7 +493,7 @@ export function AppointmentsView() {
                                 totalServiceableTechs++;
                                 
                                 const overlappingApt = dailyApts.find(a => {
-                                    if (a.tech_id !== t.id) return false;
+                                    if (a.tech_id !== (t.user_id || t.id)) return false;
                                     const [ah, am] = (a.appointment_time || '08:00').split(':').map(Number);
                                     const s = ah * 60 + am;
                                     const e = s + (a.metadata?.duration_minutes || 60);
@@ -510,14 +528,14 @@ export function AppointmentsView() {
                         else if (totalServiceableTechs === 0) {
                             // Check if all techs in this shift are on vacation
                             const anyShiftMemberNotOnVacation = currentValidTechs.some(t => {
-                                const sched = t.schedule?.[dDay];
+                                const sched = (t.metadata?.schedule || t.schedule)?.[dDay];
                                 let startHour = sched ? parseInt((sched.start || '09:00').split(':')[0], 10) : 9;
                                 let endHour = sched ? parseInt((sched.end || '17:00').split(':')[0], 10) : 17;
                                 return cellH >= startHour && cellH < endHour;
                             });
                             
                             const allOnVacation = anyShiftMemberNotOnVacation && currentValidTechs.every(t => {
-                                const sched = t.schedule?.[dDay];
+                                const sched = (t.metadata?.schedule || t.schedule)?.[dDay];
                                 let startHour = sched ? parseInt((sched.start || '09:00').split(':')[0], 10) : 9;
                                 let endHour = sched ? parseInt((sched.end || '17:00').split(':')[0], 10) : 17;
                                 if (cellH >= startHour && cellH < endHour) {
@@ -639,8 +657,9 @@ export function AppointmentsView() {
                 }
             }
 
-            const tech = userDataArray.find(u => u.id === selectedTechId);
-            const schedule = tech?.schedule?.[new Date(data.schedule_date).getDay()] || { start: '09:00', end: '17:00' };
+            const tech = userDataArray.find(u => (u.user_id || u.id) === selectedTechId);
+            const userSched = tech?.metadata?.schedule || tech?.schedule;
+            const schedule = userSched?.[new Date(data.schedule_date).getDay()] || { start: '09:00', end: '17:00' };
             const shiftEndTotal = parseInt((schedule.end || '17:00').split(':')[0], 10) * 60 + parseInt((schedule.end || '17:00').split(':')[1], 10);
             const startTotal = parseInt((data.appointment_time || '00:00').split(':')[0], 10) * 60 + parseInt((data.appointment_time || '00:00').split(':')[1], 10);
             const endTotal = startTotal + currentTotalDuration;
@@ -693,7 +712,7 @@ export function AppointmentsView() {
                 };
 
                 if (isUpdate) {
-                    await db.update('appointments', existingAptData.appointment_id, payload);
+                    await db.update('appointments', existingAptData.appointment_id, { ...payload, updated_at: db.serverTimestamp() });
                     db.logAction("Appointment Rescheduled", `Job ${existingAptData.appointment_id} updated via modular flow`);
                 } else {
                     const newId = 'APT-' + Math.random().toString(36).substr(2, 9).toUpperCase();
@@ -778,11 +797,17 @@ export function AppointmentsView() {
                 if(apt.status === 'rescheduled') statusClass = 'badge-pale-warning';
                 if(apt.status === 'completed') statusClass = 'badge-pale-success';
 
+                let localTime = '-';
+                if (apt.appointment_time && apt.schedule_date) {
+                    const serverTz = (window.state?.data?.settings?.server_timezone || 'UTC');
+                    localTime = formatServerToLocalTime(apt.schedule_date, apt.appointment_time, serverTz);
+                }
+
                 row.innerHTML = `
                     <td><code class="data-mono fw-bold">${apt.appointment_id}</code></td>
                     <td class="fw-bold">${apt.appointment_name}</td>
                     <td>${apt.schedule_date}</td>
-                    <td>${apt.appointment_time || '-'}</td>
+                    <td>${localTime}</td>
                     <td class="text-truncate" style="max-width: 150px;" title="${apt.location_name}">${apt.location_name || '-'}</td>
                     <td>${userMap[apt.tech_id] || apt.tech_id || 'Unassigned'}</td>
                     <td><span class="badge ${statusClass} text-capitalize text-xs">${apt.status}</span></td>
@@ -828,7 +853,7 @@ export function AppointmentsView() {
                         deleteModal.element.querySelector('.confirm-btn').onclick = async () => {
                             deleteModal.hide();
                             try {
-                                await db.update('appointments', apt.appointment_id, { is_deleted: true });
+                                await db.update('appointments', apt.appointment_id, { is_deleted: true, updated_at: db.serverTimestamp() });
                             } catch (err) { console.error('Delete failed: ', err.message); }
                         };
                         deleteModal.show();

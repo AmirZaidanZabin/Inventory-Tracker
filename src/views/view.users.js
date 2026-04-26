@@ -68,7 +68,7 @@ export function UsersView() {
             formSchemas.forEach(schema => {
                 customFieldsHtml += `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">${schema.name}</h6><div class="row g-2">`;
                 schema.fields.forEach(f => {
-                    const existingVal = user?.custom_data?.[f.name] || '';
+                    const existingVal = user?.metadata?.custom_data?.[f.name] || user?.custom_data?.[f.name] || '';
                     customFieldsHtml += `<div class="col-12">`;
                     customFieldsHtml += `<label class="form-label small fw-bold">${f.label} ${f.required?'<span class="text-danger">*</span>':''}</label>`;
                     if (f.type === 'textarea') {
@@ -105,13 +105,17 @@ export function UsersView() {
                     </div>
                     <div class="col-12">
                         <label class="form-label small fw-bold">Email</label>
-                        <input type="email" name="email" class="form-control" value="${user?.metadata?.email || ''}" ${user ? 'disabled' : 'required'}>
+                        <input type="email" name="email" class="form-control" value="${user?.email || user?.metadata?.email || ''}" ${user ? 'disabled' : 'required'}>
                     </div>
                     <div class="col-12">
                         <label class="form-label small fw-bold">Role</label>
                         <select name="role_id" class="form-select">
                             ${roles.map(r => `<option value="${r.id}" ${user?.role_id === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
                         </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Approver Email (Optional)</label>
+                        <input type="email" name="approver_email" class="form-control" value="${user?.metadata?.approver_email || user?.approver_email || ''}" placeholder="manager@example.com">
                     </div>
                     <div id="vacation-manager-container">
                         ${renderVacationManager(user?.metadata?.vacation || [])}
@@ -164,7 +168,7 @@ export function UsersView() {
             e.preventDefault();
             const fd = new FormData(form);
             
-            const customData = user?.custom_data || {};
+            const customData = user?.metadata?.custom_data || user?.custom_data || {};
             const keysToRemove = [];
             
             for (let [key, val] of fd.entries()) {
@@ -187,10 +191,12 @@ export function UsersView() {
             const data = {
                 user_name: fd.get('user_name'),
                 role_id: fd.get('role_id'),
-                custom_data: customData,
+                email: fd.get('email') || user?.email || user?.metadata?.email,
                 updated_at: db.serverTimestamp(),
                 metadata: {
                     ...(user?.metadata || {}),
+                    approver_email: fd.get('approver_email'),
+                    custom_data: customData,
                     vacation: Array.from(modal.element.querySelectorAll('#vacation-list > div')).map(div => ({
                         start: div.querySelector('.vac-start').value,
                         end: div.querySelector('.vac-end').value
@@ -203,18 +209,12 @@ export function UsersView() {
                     await db.update('users', user.user_id, data);
                     db.logAction("User Updated", `User ${data.user_name} updated`);
                 } else {
-                    const email = fd.get('email');
-                    // We generate a dummy ID for users added manually (they sync on first login anyway)
                     const tempId = `manual_${Math.random().toString(36).substr(2, 9)}`;
                     await db.create('users', {
                         ...data,
                         user_id: tempId,
                         created_at: db.serverTimestamp(),
-                        is_deleted: false,
-                        metadata: { 
-                            ...data.metadata,
-                            email 
-                        }
+                        is_deleted: false
                     }, tempId);
                     db.logAction("User Created", `User ${data.user_name} added manually`);
                 }
@@ -243,10 +243,10 @@ export function UsersView() {
                 row.innerHTML = `
                     <td>
                         <div class="fw-bold">${user.user_name}</div>
-                        <div class="small text-muted">${user.metadata?.email || ''}</div>
+                        <div class="small text-muted">${user.email || user.metadata?.email || ''}</div>
                     </td>
                     <td><span class="badge badge-pale-primary">${user.role_id}</span></td>
-                    <td class="small text-muted">${user.created_at && typeof user.created_at.toDate === 'function' ? user.created_at.toDate().toLocaleDateString() : (user.created_at ? new Date(user.created_at).toLocaleDateString() : '...')}</td>
+                    <td class="small text-muted">${user.created_at && typeof user.created_at.toDate === 'function' ? user.created_at.toDate().toLocaleDateString() : (user.created_at ? (user.created_at === '__server_timestamp__' ? new Date() : new Date(user.created_at)).toLocaleDateString() : '...')}</td>
                     <td>
                         <button class="btn-pico btn-pico-outline table-action-btn edit-user me-1" title="Edit">
                             <i class="bi bi-pencil"></i>
@@ -265,7 +265,7 @@ export function UsersView() {
                 
                 const openScheduleModal = (user) => {
                     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                    const currentSchedule = user.schedule || {};
+                    const currentSchedule = user.metadata?.schedule || user.schedule || {};
                     
                     const rowsInfo = days.map((day, idx) => {
                         const s = currentSchedule[idx];
@@ -332,7 +332,13 @@ export function UsersView() {
                         });
                         
                         try {
-                            await db.update('users', user.user_id, { schedule: newSchedule });
+                            await db.update('users', user.user_id, { 
+                                updated_at: db.serverTimestamp(),
+                                metadata: {
+                                    ...(user.metadata || {}),
+                                    schedule: newSchedule
+                                }
+                            });
                             db.logAction("Schedule Updated", `Set working hours for ${user.user_name}`);
                             modal.hide();
                         } catch (err) { alert(err.message); }
@@ -344,7 +350,7 @@ export function UsersView() {
                 row.querySelector('.edit-user').addEventListener('click', () => openUserModal(user));
                 row.querySelector('.schedule-user').addEventListener('click', () => openScheduleModal(user));
                 row.querySelector('.reset-pw-user').addEventListener('click', async () => {
-                    const email = user.metadata?.email;
+                    const email = user.email || user.metadata?.email;
                     if (!email) return alert("User has no email associated.");
                     
                     const modal = createModal({

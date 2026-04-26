@@ -1,0 +1,77 @@
+{
+  "original_prompt": "Fix Leads Pipeline Routing, Data Binding, and Strict CR Validation.",
+  "rephrased_goal": "Fix 'View' button, fix data binding for merchant/CR, and upgrade duplicate check to parallel leads/merchants query.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Fix 'View' button event listener in Leads Pipeline",
+      "subtasks_required": ["Inspect src/views/view.leads.js", "Add or fix click event listener for .view-lead"],
+      "owner": "Caveman",
+      "analogy_reference": "repair bridge across river",
+      "status": "pending",
+      "testing_criteria": "Clicking View button updates hash to #leads/:id"
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify 'View' button works",
+      "subtasks_required": ["view_file src/views/view.leads.js"],
+      "owner": "Caveman",
+      "analogy_reference": "jump on bridge to see if hold",
+      "status": "pending",
+      "testing_criteria": "Event listener uses stopPropagation and correct hash"
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Fix Merchant Name & CR Number Data Binding",
+      "subtasks_required": ["Inspect table rendering in view.leads.js", "Update template literals to use correct lead.merchant_name or lead.cr_number"],
+      "owner": "Caveman",
+      "analogy_reference": "paint correct animal on wall",
+      "status": "pending",
+      "testing_criteria": "Table cells show real data, not 'N/A' or empty"
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify Data Binding in view.leads.js",
+      "subtasks_required": ["view_file src/views/view.leads.js"],
+      "owner": "Caveman",
+      "analogy_reference": "look at painting with torch",
+      "status": "pending",
+      "testing_criteria": "Template strings match schema keys"
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Upgrade Duplicate CR Check in LeadsNewView",
+      "subtasks_required": ["Modify src/views/view.leads_new.js blur listener", "Implement Promise.all for merchants and leads collections"],
+      "owner": "Caveman",
+      "analogy_reference": "set two traps instead of one",
+      "status": "pending",
+      "testing_criteria": "Error triggers if CR found in either collection"
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify Parallel Query Logic",
+      "subtasks_required": ["view_file src/views/view.leads_new.js"],
+      "owner": "Caveman",
+      "analogy_reference": "check both traps",
+      "status": "pending",
+      "testing_criteria": "Promise.all used, correct collections queried"
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS SWEEP",
+      "subtasks_required": ["Verify all fixes, run compile"],
+      "owner": "Caveman",
+      "analogy_reference": "walk trail one last time",
+      "status": "pending",
+      "testing_criteria": "App builds, logic and UI solid"
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "original_prompt": "Implement Tanar Leads Tracker test suite and fix 3 integration bugs (Type Casting, Race Condition, Security Rules).",
+  "rephrased_goal": "Implement tests, diagnose specific bugs, and apply surgical fixes to leads tracker.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Implement approvals.test.js",
+      "subtasks_required": ["Create src/tests/approvals.test.js"],
+      "owner": "Caveman",
+      "analogy_reference": "make spear for tiger",
+      "status": "done",
+      "testing_criteria": "File exists with valid t.test calls"
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify approvals.test.js contents",
+      "subtasks_required": ["view_file src/tests/approvals.test.js"],
+      "owner": "Caveman",
+      "analogy_reference": "check spear sharpness",
+      "status": "done",
+      "testing_criteria": "Syntax is correct"
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Implement leads-ui.test.js",
+      "subtasks_required": ["Create src/tests/leads-ui.test.js"],
+      "owner": "Caveman",
+      "analogy_reference": "make trap for bird",
+      "status": "done",
+      "testing_criteria": "File exists with UI test logic"
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify leads-ui.test.js contents",
+      "subtasks_required": ["view_file src/tests/leads-ui.test.js"],
+      "owner": "Caveman",
+      "analogy_reference": "check trap spring",
+      "status": "done",
+      "testing_criteria": "Syntax/Logic is correct"
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Implement database.test.js",
+      "subtasks_required": ["Create src/tests/database.test.js"],
+      "owner": "Caveman",
+      "analogy_reference": "dig hole for mammoth",
+      "status": "done",
+      "testing_criteria": "File exists with CRUD and cleanup logic"
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify database.test.js contents",
+      "subtasks_required": ["view_file src/tests/database.test.js"],
+      "owner": "Caveman",
+      "analogy_reference": "check hole depth",
+      "status": "done",
+      "testing_criteria": "CRUD logic and finally block present"
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Update src/tests/index.js",
+      "subtasks_required": ["Import and call new tests in index.js"],
+      "owner": "Caveman",
+      "analogy_reference": "set off hunt party",
+      "status": "done",
+      "testing_criteria": "Entry point calls all suites"
+    },
+    {
+      "id": 8,
+      "description": "Do-Pebble: Fix Bug 1 (Type Casting)",
+      "subtasks_required": ["Add parseInt/parseFloat to gmv evaluation in view.leads_new.js or backend"],
+      "owner": "Caveman",
+      "analogy_reference": "fix leaky gourd",
+      "status": "done",
+      "testing_criteria": "GMV compared as number"
+    },
+    {
+      "id": 9,
+      "description": "Do-Pebble: Fix Bug 2 (Race Condition)",
+      "subtasks_required": ["Disable submit button during CR check in view.leads_new.js"],
+      "owner": "Caveman",
+      "analogy_reference": "wait for water to clear",
+      "status": "done",
+      "testing_criteria": "Submit blocked until check done"
+    },
+    {
+      "id": 10,
+      "description": "Do-Pebble: Fix Bug 3 (Firestore Rules)",
+      "subtasks_required": ["Update firestore.rules with merchant collection permissions"],
+      "owner": "Caveman",
+      "analogy_reference": "build wall around cave",
+      "status": "done",
+      "testing_criteria": "Merchant writes allowed for owners"
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS SWEEP",
+      "subtasks_required": ["Check all files, fix missing pieces, compile"],
+      "owner": "Caveman",
+      "analogy_reference": "sniff wind for danger",
+      "status": "done",
+      "testing_criteria": "All tests pass (conceptually) and compile succeeds"
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

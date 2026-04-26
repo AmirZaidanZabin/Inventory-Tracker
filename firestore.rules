@@ -70,5 +70,31 @@ service cloud.firestore {
     match /saved_reports/{reportId} {
       allow read, write, delete: if isAuthenticated();
     }
+
+    // Sales Lead Tracker Modules
+    match /leads/{leadId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /merchants/{merchantId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /approvals/{approvalId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /pricing_tiers/{tierId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    match /pricing_cards/{cardId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
   }
 }

@@ -353,29 +353,33 @@ ROUTER-789,catalog-router,available,Zain`;
 
             const docs = data.sort((a,b) => {
                 let aTime = 0; let bTime = 0;
-                if (a.timestamp?.seconds) aTime = a.timestamp.seconds;
-                else if (typeof a.timestamp === 'string' && a.timestamp.includes('server')) aTime = Date.now()/1000;
-                else if (a.timestamp) aTime = new Date(a.timestamp).getTime()/1000;
-
-                if (b.timestamp?.seconds) bTime = b.timestamp.seconds;
-                else if (typeof b.timestamp === 'string' && b.timestamp.includes('server')) bTime = Date.now()/1000;
-                else if (b.timestamp) bTime = new Date(b.timestamp).getTime()/1000;
+                let aTs = a.created_at || a.timestamp;
+                let bTs = b.created_at || b.timestamp;
                 
-                return bTime - aTime;
+                if (aTs?.seconds) aTime = aTs.seconds;
+                else if (typeof aTs === 'string' && aTs.includes('server')) aTime = Date.now()/1000;
+                else if (aTs) aTime = new Date(aTs).getTime()/1000;
+
+                if (bTs?.seconds) bTime = bTs.seconds;
+                else if (typeof bTs === 'string' && bTs.includes('server')) bTime = Date.now()/1000;
+                else if (bTs) bTime = new Date(bTs).getTime()/1000;
+                
+                return (bTime || 0) - (aTime || 0);
             });
 
             docs.forEach(doc => {
                 const tr = document.createElement('tr');
                 let dateRaw = 'N/A';
-                if (doc.timestamp) {
-                    if (doc.timestamp.seconds !== undefined) {
-                        dateRaw = new Date(doc.timestamp.seconds * 1000).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'});
-                    } else if (typeof doc.timestamp === 'string' && doc.timestamp.includes('serverTimestamp')) {
+                const ts = doc.created_at || doc.timestamp;
+                if (ts) {
+                    if (ts.seconds !== undefined) {
+                        dateRaw = new Date(ts.seconds * 1000).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'});
+                    } else if (typeof ts === 'string' && ts.includes('server')) {
                         dateRaw = new Date().toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'}) + ' (Processing)';
-                    } else if (typeof doc.timestamp === 'number') {
-                        dateRaw = new Date(doc.timestamp).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'});
+                    } else if (typeof ts === 'number') {
+                        dateRaw = new Date(ts).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'});
                     } else {
-                        const parsed = new Date(doc.timestamp);
+                        const parsed = new Date(ts);
                         if (!isNaN(parsed.getTime())) dateRaw = parsed.toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'});
                     }
                 }
@@ -402,10 +406,10 @@ ROUTER-789,catalog-router,available,Zain`;
                         <div class="fw-bold text-dark">${dateRaw}</div>
                         <code class="data-mono">${doc.log_id}</code>
                     </td>
-                    <td><span class="fw-bold">${doc.target_van || 'Unknown'}</span></td>
+                    <td><span class="fw-bold">${doc.van_id || doc.target_van || 'Unknown'}</span></td>
                     <td>${typeBadge}</td>
-                    <td class="small">${doc.user_email || doc.user_id}</td>
-                    <td><span class="badge bg-light text-dark border">${doc.count}</span></td>
+                    <td class="small">${doc.metadata?.user_email || doc.user_email || doc.user_id}</td>
+                    <td><span class="badge bg-light text-dark border">${doc.metadata?.count ?? doc.count ?? 0}</span></td>
                     <td>${discHtml}</td>
                 `;
                 

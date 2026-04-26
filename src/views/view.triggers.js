@@ -5,7 +5,8 @@ import { createModal } from '../lib/modal.js';
 // --- Constants & System Mappings ---
 const SYSTEM_TABLES = [
     "appointments", "users", "vans", "items", "item_catalog", 
-    "product_types", "roles", "audit_logs", "stock_takes", "stock_take_logs", "forms"
+    "product_types", "roles", "audit_logs", "stock_takes", "stock_take_logs", "forms",
+    "leads", "approvals", "cards", "tiers", "card_tier_thresholds"
 ];
 
 const COLLECTION_FIELDS = {
@@ -14,11 +15,16 @@ const COLLECTION_FIELDS = {
     'users': ['role_id', 'user_name', 'email'],
     'vans': ['status', 'location_id', 'van_id'],
     'item_catalog': ['item_type', 'provider', 'duration_minutes'],
-    'product_types': ['catalog_id', 'name', 'duration_minutes']
+    'product_types': ['catalog_id', 'name', 'duration_minutes'],
+    'leads': ['status', 'country', 'merchant_name'],
+    'approvals': ['status', 'lead_id', 'tier_id'],
+    'cards': ['name', 'mandatory'],
+    'tiers': ['level', 'name'],
+    'card_tier_thresholds': ['tier_id', 'card_id', 'threshold']
 };
 
 const KNOWN_VALUES = {
-    'status': ['pending', 'assigned', 'completed', 'available', 'damaged', 'returned'],
+    'status': ['pending', 'assigned', 'completed', 'available', 'damaged', 'returned', 'draft', 'approved', 'rejected', 'closed_won'],
     'is_available': ['true', 'false'],
     'current_location_type': ['WAREHOUSE', 'VAN', 'APPOINTMENT']
 };

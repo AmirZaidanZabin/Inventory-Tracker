@@ -1,0 +1,149 @@
+{
+  "original_prompt": "We are building an internal sales operations tool... develop an implementation plan and modular code to integrate the Sales and Settings features...",
+  "rephrased_goal": "Add Sales and Settings modules as pluggable, isolated files. Define Firestore architecture, leads dash, lead forms, approval queues, lead details, and an admin console.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Design Firestore schemas and define strict security rules.",
+      "subtasks_required": ["Identify collections", "Write rules for isolated access", "Create standalone rules.sales.json / or rules file"],
+      "owner": "Caveman",
+      "analogy_reference": "Draw boundaries of different caves",
+      "status": "pending",
+      "testing_criteria": "Security rules file exists."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Review rules.",
+      "subtasks_required": ["Verify roles and conditions are correct for sales, manager, admin"],
+      "owner": "Caveman",
+      "analogy_reference": "Poke the wall to ensure it holds",
+      "status": "pending",
+      "testing_criteria": "No logical flaws in the paths outlined."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Build Sales Dashboard UI `/leads`.",
+      "subtasks_required": ["Search/filters", "Row actions", "Pluggable view file"],
+      "owner": "Caveman",
+      "analogy_reference": "A board with many strings",
+      "status": "pending",
+      "testing_criteria": "File `src/views/view.leads.js` created using proper DOM shell wrappers."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Review Sales Dashboard.",
+      "subtasks_required": ["Ensure no core files were modified", "Check DOM bindings"],
+      "owner": "Caveman",
+      "analogy_reference": "Check strings",
+      "status": "pending",
+      "testing_criteria": "Complies with existing architecture plugins."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Build Leads New Form UI `/leads/new`.",
+      "subtasks_required": ["Section 1 Merchant", "Section 2 Branches", "Section 3 Cards"],
+      "owner": "Caveman",
+      "analogy_reference": "The capturing net",
+      "status": "pending",
+      "testing_criteria": "File `src/views/view.leads_new.js` created."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Review Leads Form.",
+      "subtasks_required": ["Check inputs", "Validate components existence"],
+      "owner": "Caveman",
+      "analogy_reference": "Look for holes in net",
+      "status": "pending",
+      "testing_criteria": "Code has the right form structure."
+    },
+    {
+      "id": 7,
+      "description": "Do-Pebble: Engineer Approval Backend.",
+      "subtasks_required": ["Design Cloud function simulation file or logic wrapper"],
+      "owner": "Caveman",
+      "analogy_reference": "Brain for deciding path",
+      "status": "pending",
+      "testing_criteria": "Isolated backend module `src/modules/sales.backend.js` provided."
+    },
+    {
+      "id": 8,
+      "description": "Check-Pebble: Review Approval Logic.",
+      "subtasks_required": ["Check iteration across tiers", "Rate min/max checking"],
+      "owner": "Caveman",
+      "analogy_reference": "Test path with fake rock",
+      "status": "pending",
+      "testing_criteria": "Logic correctly iterates thresholds."
+    },
+    {
+      "id": 9,
+      "description": "Do-Pebble: Build Approvals UI `/approvals`.",
+      "subtasks_required": ["Queue display", "Approve/Reject with notes"],
+      "owner": "Caveman",
+      "analogy_reference": "The judgment seat",
+      "status": "pending",
+      "testing_criteria": "File `src/views/view.approvals.js` exists."
+    },
+    {
+      "id": 10,
+      "description": "Check-Pebble: Review Approvals UI.",
+      "subtasks_required": ["Ensure roles are checked"],
+      "owner": "Caveman",
+      "analogy_reference": "Check seat is for chief",
+      "status": "pending",
+      "testing_criteria": "Roles properly mocked."
+    },
+    {
+      "id": 11,
+      "description": "Do-Pebble: Build Merch Details View `/leads/:id`.",
+      "subtasks_required": ["Map", "Rates", "Milestone tracker", "Pie chart (placeholder)", "Timeline", "Expansions"],
+      "owner": "Caveman",
+      "analogy_reference": "Big animal drawing",
+      "status": "pending",
+      "testing_criteria": "File `src/views/view.lead_detail.js` created."
+    },
+    {
+      "id": 12,
+      "description": "Check-Pebble: Review Details View.",
+      "subtasks_required": ["Check components"],
+      "owner": "Caveman",
+      "analogy_reference": "Check animal legs",
+      "status": "pending",
+      "testing_criteria": "Timeline and expansions present."
+    },
+    {
+      "id": 13,
+      "description": "Do-Pebble: Build Admin Console UI `/admin`.",
+      "subtasks_required": ["Tabs: Users, Cards, Tiers, Leads, Settings", "Pluggable view file"],
+      "owner": "Caveman",
+      "analogy_reference": "Chief's big cave",
+      "status": "pending",
+      "testing_criteria": "File `src/views/view.admin.js` created."
+    },
+    {
+      "id": 14,
+      "description": "Check-Pebble: Review Admin Console UI.",
+      "subtasks_required": ["Ensure all tabs mock logic correctly"],
+      "owner": "Caveman",
+      "analogy_reference": "Count chief rocks",
+      "status": "pending",
+      "testing_criteria": "Admin UI complete."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all files", "Check any core file modification (must be 0)", "Verify isolation"],
+      "owner": "Caveman",
+      "analogy_reference": "Walk whole trail before sleep",
+      "status": "pending",
+      "testing_criteria": "Codebase is pristine, plugins are isolated but complete."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

@@ -6,12 +6,15 @@ const FIELD_TYPES = [
     { value: 'text',     label: 'Short Text' },
     { value: 'textarea', label: 'Long Text' },
     { value: 'number',   label: 'Number' },
+    { value: 'decimal',  label: 'Decimal (e.g. 0.7)' },
+    { value: 'currency', label: 'Currency' },
     { value: 'email',    label: 'Email Address' },
     { value: 'tel',      label: 'Phone Number' },
     { value: 'date',     label: 'Date' },
     { value: 'select',   label: 'Dropdown' },
     { value: 'checkbox', label: 'Checkbox' },
-    { value: 'regex',    label: 'Custom Regex' }
+    { value: 'regex',    label: 'Custom Regex' },
+    { value: 'multi-map',label: 'Multi-Pin Map' }
 ];
 
 function fieldTypeLabel(t) {
@@ -22,7 +25,8 @@ const ENTITIES = [
     { id: 'appointments', name: 'Appointments' },
     { id: 'users',        name: 'Users' },
     { id: 'vans',         name: 'Vans' },
-    { id: 'items',        name: 'Hardware Items' }
+    { id: 'items',        name: 'Hardware Items' },
+    { id: 'leads',        name: 'Sales Leads' }
 ];
 
 export function FormsView() {
@@ -66,12 +70,38 @@ export function FormsView() {
                             <input class="form-control form-control-sm bf-options text-xs" data-fi="${i}"
                                 value="${(f.options||[]).join(', ')}" placeholder="Options (comma-separated, e.g. Low, Medium, High)">
                         </div>` : ''}
+                    ${f.type === 'currency' ? `
+                        <div class="mt-2">
+                            <select class="form-select form-select-sm bf-currency text-xs" data-fi="${i}">
+                                <option value="SAR" ${f.currency === 'SAR' ? 'selected' : ''}>SAR - Saudi Riyal</option>
+                                <option value="USD" ${f.currency === 'USD' ? 'selected' : ''}>USD - US Dollar</option>
+                                <option value="EUR" ${f.currency === 'EUR' ? 'selected' : ''}>EUR - Euro</option>
+                                <option value="GBP" ${f.currency === 'GBP' ? 'selected' : ''}>GBP - British Pound</option>
+                                <option value="AED" ${f.currency === 'AED' ? 'selected' : ''}>AED - UAE Dirham</option>
+                            </select>
+                        </div>` : ''}
                     ${f.type === 'regex' ? `
                         <div class="mt-2">
                             <input class="form-control form-control-sm bf-pattern font-monospace text-xs" data-fi="${i}"
                                 value="${(f.pattern||'').replace(/"/g,'&quot;')}" placeholder="Regex pattern (e.g. ^[A-Z]{3}-\\d{4}$)">
                             <div class="form-text text-xs mt-1">Pattern will be applied to the HTML input validation.</div>
                         </div>` : ''}
+                    <div class="mt-2 p-2 bg-light border rounded">
+                        <div class="form-check d-flex align-items-center mb-1">
+                            <input class="form-check-input bf-has-cond" type="checkbox" data-fi="${i}" id="bf-cond-${i}" ${f.condition ? 'checked' : ''}>
+                            <label class="form-check-label small ms-1" for="bf-cond-${i}">Conditional Display</label>
+                        </div>
+                        ${f.condition ? `
+                        <div class="row g-2 align-items-center mt-1">
+                            <div class="col-md-5">
+                                <input class="form-control form-control-sm bf-cond-field" data-fi="${i}" placeholder="Depends on Field Name" value="${f.condition.field || ''}">
+                            </div>
+                            <div class="col-md-2 text-center small text-muted">==</div>
+                            <div class="col-md-5">
+                                <input class="form-control form-control-sm bf-cond-value" data-fi="${i}" placeholder="Equals Value" value="${f.condition.value || ''}">
+                            </div>
+                        </div>` : ''}
+                    </div>
                 </div>
                 <button class="btn btn-sm btn-outline-danger border-0 bf-del flex-shrink-0 mt-1" data-fi="${i}" title="Remove field">
                     <i class="bi bi-x-circle fs-6"></i>
@@ -255,8 +285,29 @@ export function FormsView() {
             builderFields[+e.target.dataset.fi].options = (e.target.value || '').split(',').map(s => s.trim()).filter(Boolean);
         }));
 
+        listEl.querySelectorAll('.bf-currency').forEach(el => el.addEventListener('change', e => {
+            builderFields[+e.target.dataset.fi].currency = e.target.value;
+        }));
+
         listEl.querySelectorAll('.bf-pattern').forEach(el => el.addEventListener('input', e => {
             builderFields[+e.target.dataset.fi].pattern = e.target.value;
+        }));
+        
+        listEl.querySelectorAll('.bf-has-cond').forEach(el => el.addEventListener('change', e => {
+            if (e.target.checked) {
+                builderFields[+e.target.dataset.fi].condition = { field: '', value: '' };
+            } else {
+                delete builderFields[+e.target.dataset.fi].condition;
+            }
+            renderBuilderFields();
+        }));
+        
+        listEl.querySelectorAll('.bf-cond-field').forEach(el => el.addEventListener('input', e => {
+            if(builderFields[+e.target.dataset.fi].condition) builderFields[+e.target.dataset.fi].condition.field = e.target.value;
+        }));
+        
+        listEl.querySelectorAll('.bf-cond-value').forEach(el => el.addEventListener('input', e => {
+            if(builderFields[+e.target.dataset.fi].condition) builderFields[+e.target.dataset.fi].condition.value = e.target.value;
         }));
         
         listEl.querySelectorAll('.bf-del').forEach(el => el.addEventListener('click', e => {
@@ -286,7 +337,7 @@ export function FormsView() {
         if (formId) {
             const f = state.forms.find(x => x.id === formId);
             if (nameEl) nameEl.value = f.name;
-            builderFields = f.fields.map(field => ({ ...field, options: [...(field.options||[])] }));
+            builderFields = f.fields.map(field => ({ ...field, currency: field.currency || 'SAR', options: [...(field.options||[])] }));
             f.entities?.forEach(entId => {
                 const cb = document.getElementById(`bpr-${entId}`);
                 if (cb) cb.checked = true;
@@ -309,7 +360,7 @@ export function FormsView() {
     view.trigger('click', 'btn-new-form', () => openBuilder(null));
 
     view.trigger('click', 'btn-add-field', () => {
-        builderFields.push({ id: `f_${Date.now()}`, name: '', label: '', type: 'text', required: false, options: [], pattern: '' });
+        builderFields.push({ id: `f_${Date.now()}`, name: '', label: '', type: 'text', required: false, options: [], currency: 'SAR', pattern: '' });
         renderBuilderFields();
     });
 

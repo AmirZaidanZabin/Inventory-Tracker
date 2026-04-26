@@ -1,31 +1,20 @@
 {
   "general_facts": [
-    "Application is a hardware inventory management system",
-    "Uses vanilla JS with a custom 'controller' library for the frontend",
-    "Uses Express for the backend",
-    "Primary database is currently Firebase Realtime Database (RTDB) via server.js"
+    "Fire hot, mammoth big.",
+    "Approval flow uses a custom proxy backend route /api/sales/process-approval.",
+    "RTDB adapter splits document data into 'essentials' (main node) and 'transactional' (history node).",
+    "Frontend uses 'rest' provider by default, hitting generic CRUD endpoints."
   ],
   "tech_stack": {
-    "frontend": "Vanilla JS, Vite, Tailwind CSS",
-    "backend": "Express, Firebase Admin SDK",
-    "database": "Firebase RTDB (pluggable via adapters)",
-    "devops": "Docker, Nginx (optimized for SPA)"
+    "backend": "Express with firebase-admin",
+    "frontend": "Vanilla JS with custom view/state management",
+    "DB": "Firebase Realtime Database"
   },
   "FAQ": {
-    "Architecture": [
+    "Approvals": [
       {
-        "Q": "How are views structured?",
-        "A": "Views are functional components returning an element and using a custom 'controller' for state/events."
-      },
-      {
-        "Q": "How does data fetching work?",
-        "A": "Frontend uses src/lib/db/index.js which routes requests via adapters. Default is RestAdapter pointing to local server, configurable via VITE_DB_PROVIDER."
-      }
-    ],
-    "Deployment": [
-      {
-        "Q": "How is the app containerized?",
-        "A": "Multi-stage Docker build: Node.js builder stage compiles assets, Nginx stage serves statics with SPA support."
+        "Q": "Why buttons no work?",
+        "A": "Maybe selector fail or fetch hang. Add logs to find."
       }
     ]
   }

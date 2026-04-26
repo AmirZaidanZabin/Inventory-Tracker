@@ -80,6 +80,7 @@ export function RolesView() {
                     role_id: id,
                     role_name: name,
                     authorities: auths,
+                    created_at: db.serverTimestamp(),
                     updated_at: db.serverTimestamp()
                 }, id);
                 db.logAction("Role Created", `Role ${name} saved with ${auths.length} authorities`);

@@ -1,5 +1,6 @@
 import { controller } from "../lib/controller.js";
 import { db } from "../lib/db/index.js";
+import { formatServerToLocalTime } from "../lib/timezone.js";
 
 const MONTH_NAMES = [
   "January",
@@ -20,13 +21,9 @@ function toYMD(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function formatTime(timeStr) {
+function formatTime(timeStr, dateStr, serverTz) {
   if (!timeStr) return "";
-  const [h, m] = timeStr.split(":");
-  let hours = parseInt(h, 10);
-  const suffix = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12 || 12;
-  return `${hours}:${m} ${suffix}`;
+  return formatServerToLocalTime(dateStr || new Date().toISOString().split('T')[0], timeStr, serverTz || 'UTC');
 }
 
 function buildMonthWeeks(date) {
@@ -63,8 +60,8 @@ export function DashboardView() {
                     .cal-task-pill.status-pending { border-left-color: #f59e0b; }
                 </style>
                 <!-- Header Stats -->
-                <div class="row g-4 mb-4">
-                    <div class="col-md-3">
+                <div class="row g-3 mb-4">
+                    <div class="col-md">
                         <div class="card border-0 shadow-sm rounded-4 h-100 card-clickable overflow-hidden" data-view="vans">
                             <div class="card-body p-4 border-start border-primary border-5">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -76,7 +73,7 @@ export function DashboardView() {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md">
                         <div class="card border-0 shadow-sm rounded-4 h-100 card-clickable overflow-hidden" data-view="items">
                             <div class="card-body p-4 border-start border-success border-5">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -88,7 +85,7 @@ export function DashboardView() {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md">
                         <div class="card border-0 shadow-sm rounded-4 h-100 card-clickable overflow-hidden" data-view="items">
                             <div class="card-body p-4 border-start border-info border-5">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -100,7 +97,7 @@ export function DashboardView() {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md">
                         <div class="card border-0 shadow-sm rounded-4 h-100 card-clickable overflow-hidden" data-view="appointments">
                             <div class="card-body p-4 border-start border-warning border-5">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -109,6 +106,18 @@ export function DashboardView() {
                                 </div>
                                 <h2 id="count-jobs" class="mb-0 fw-bold">0</h2>
                                 <div class="small text-muted mt-2">Scheduling queue</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md">
+                        <div class="card border-0 shadow-sm rounded-4 h-100 card-clickable overflow-hidden" data-view="merchants">
+                            <div class="card-body p-4 border-start border-purple border-5" style="border-color: var(--bs-purple, #6f42c1) !important;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-uppercase small fw-bold text-muted mb-0">Active Merchants</h6>
+                                    <div class="stats-icon text-white" style="background-color: var(--bs-purple, #6f42c1); border-radius: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-shop"></i></div>
+                                </div>
+                                <h2 id="count-merchants" class="mb-0 fw-bold">0</h2>
+                                <div class="small text-muted mt-2">Closed Won</div>
                             </div>
                         </div>
                     </div>
@@ -174,6 +183,7 @@ export function DashboardView() {
     .onboard({ id: "count-pico" })
     .onboard({ id: "count-sim" })
     .onboard({ id: "count-jobs" })
+    .onboard({ id: "count-merchants" })
     .onboard({ id: "recent-logs" })
     .onboard({ id: "inventory-chart" })
     .onboard({ id: "weekly-grid-container" })
@@ -185,7 +195,8 @@ export function DashboardView() {
     items: [],
     vans: [],
     itemCatalog: [],
-    stats: { vans: 0, pico: 0, sim: 0, pending: 0 },
+    merchants: [],
+    stats: { vans: 0, pico: 0, sim: 0, pending: 0, merchants: 0 },
   };
 
   /**
@@ -197,6 +208,7 @@ export function DashboardView() {
       const activeVans = (localState.vans || []).filter(v => !v.is_deleted);
       const activeItems = (localState.items || []).filter(i => !i.is_deleted);
       const activeApts = (localState.appointments || []).filter(a => !a.is_deleted);
+      const activeMerchants = (localState.merchants || []).filter(m => (m.status || 'active') === 'active');
 
       // Create mapping from catalog to type (lowercase for soft-matching)
       const catalogMap = {};
@@ -222,7 +234,8 @@ export function DashboardView() {
         vans: activeVans.length,
         pico: picoCount,
         sim: simCount,
-        pending: pendingCount
+        pending: pendingCount,
+        merchants: activeMerchants.length
       };
 
       // Direct DOM updates (Atomic Pebble: State-UI decoupling)
@@ -230,6 +243,7 @@ export function DashboardView() {
       if (view.$("count-pico")) view.$("count-pico").textContent = localState.stats.pico;
       if (view.$("count-sim")) view.$("count-sim").textContent = localState.stats.sim;
       if (view.$("count-jobs")) view.$("count-jobs").textContent = localState.stats.pending;
+      if (view.$("count-merchants")) view.$("count-merchants").textContent = localState.stats.merchants;
     } catch (e) {
       console.warn("Dashboard counter update failed:", e);
     }
@@ -295,7 +309,7 @@ export function DashboardView() {
                                          data-task-id="${t.appointment_id}">
                                         <div class="d-flex justify-content-between mb-1">
                                             <span class="text-muted fw-bold" style="font-size: 0.6rem;">${t.prettyDate}</span>
-                                            <span class="fw-bold text-primary" style="font-size: 0.6rem;">${t.appointment_time ? formatTime(t.appointment_time) : "Anytime"}</span>
+                                            <span class="fw-bold text-primary" style="font-size: 0.6rem;">${t.appointment_time ? formatTime(t.appointment_time, t.schedule_date, window.state?.data?.settings?.server_timezone || "UTC") : "Anytime"}</span>
                                         </div>
                                         <div class="fw-bold mb-1" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${t.appointment_name}</div>
                                         <div class="d-flex justify-content-between align-items-center">
@@ -442,9 +456,10 @@ export function DashboardView() {
     }
 
     logs.slice(0, 10).forEach((log) => {
-      const date = log.timestamp?.toDate
-        ? log.timestamp.toDate()
-        : new Date(log.timestamp);
+      const ts = log.timestamp || log.created_at || Date.now();
+      const date = ts?.toDate
+        ? ts.toDate()
+        : (ts === '__server_timestamp__' ? new Date() : new Date(ts));
 
       const item = document.createElement("div");
       item.className = "list-group-item border-0 px-4 py-3 hover-bg-light";
@@ -476,7 +491,7 @@ export function DashboardView() {
     view.emit("loading:start");
 
     let loaded = 0;
-    const total = 6; // vans, items, catalog, appointments, users, logs
+    const total = 7; // vans, items, catalog, appointments, users, logs, merchants
     const markLoaded = () => {
       loaded++;
       if (loaded >= total) {
@@ -546,6 +561,15 @@ export function DashboardView() {
     view.unsub(
       db.subscribe("audit_logs", {}, (data) => {
         updateRecentLogs(data);
+        markLoaded();
+      }),
+    );
+
+    // Merchants
+    view.unsub(
+      db.subscribe("merchants", {}, (data) => {
+        localState.merchants = data;
+        updateCounters();
         markLoaded();
       }),
     );

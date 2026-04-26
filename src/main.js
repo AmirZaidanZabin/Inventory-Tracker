@@ -3,6 +3,14 @@ import { db } from './lib/db/index.js';
 import { controller } from './lib/controller.js';
 import { runTests } from './tests/index.js';
 
+import { LeadsView } from './views/view.leads.js';
+import { SalesDashboardView } from './views/view.sales_dashboard.js';
+import { ApprovalsView } from './views/view.approvals.js';
+import { MerchantsView } from './views/view.merchants.js';
+import { MerchantDetailView } from './views/view.merchant_detail.js';
+import { LeadDetailView } from './views/view.lead_detail.js';
+import { PagesView, PageRunView } from './views/view.pages.js';
+
 const App = (() => {
     let state = {
         user: null,
@@ -330,7 +338,8 @@ const App = (() => {
 
         navigate: (path) => {
             if (!state.user) return;
-            let [viewId, param] = (path || '').split('/');
+            let [rawViewId, param] = (path || '').split('/');
+            let viewId = rawViewId.split('?')[0]; // Strip query strings from view mapping
             if (!viewId) viewId = state.activeView;
 
             // Guest/Viewer restriction: Only Calendar and Gantt
@@ -400,6 +409,20 @@ const App = (() => {
                         case 'item_types': module = await import('./views/view.item_types.js'); view = module.ItemTypesView(); break;
                         case 'mobile_appointment': module = await import('./views/view.mobile_appointment.js'); view = module.MobileAppointmentView(param); break;
                         case 'mobile_stock': module = await import('./views/view.mobile_stock.js'); view = module.MobileStockView(); break;
+                        case 'sales_dashboard': view = SalesDashboardView(); break;
+                        case 'leads': view = LeadsView(); break;
+                        case 'leads_new': module = await import('./views/view.leads_new.js'); view = module.LeadsNewView(); break;
+                        case 'lead': 
+                        case 'lead_detail':
+                        case 'leads_detail': view = LeadDetailView(param); break;
+                        case 'approvals': view = ApprovalsView(); break;
+                        case 'merchants': view = MerchantsView(); break;
+                        case 'merchant_detail': view = MerchantDetailView(param); break;
+                        case 'settings': module = await import('./views/view.settings.js'); view = module.SettingsView(); break;
+                        case 'insights': module = await import('./views/view.insights.js'); view = module.InsightsView(); break;
+                        case 'pricing_rules': module = await import('./views/view.pricing_rules.js'); view = module.PricingRulesView(); break;
+                        case 'pages': view = PagesView(); break;
+                        case 'page_run': view = PageRunView(param); break;
                     }
                 } catch (e) {
                     console.error("Failed to load view module", e);

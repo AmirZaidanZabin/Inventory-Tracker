@@ -83,11 +83,13 @@ export function ItemsView() {
                     item_id: cols[1],
                     current_location_type: van_id ? 'VAN' : 'WAREHOUSE',
                     current_location_id: van_id || '',
-                    status: 'available',
                     is_available: true,
-                    is_deleted: false,
                     created_at: db.serverTimestamp(),
-                    updated_at: db.serverTimestamp()
+                    updated_at: db.serverTimestamp(),
+                    metadata: {
+                        status: 'available',
+                        is_deleted: false
+                    }
                 };
                 if (!data.item_id) continue;
                 
@@ -222,8 +224,10 @@ export function ItemsView() {
                     current_location_type: data.van_id ? 'VAN' : 'WAREHOUSE',
                     current_location_id: data.van_id || '',
                     is_available: true,
-                    status: 'available',
-                    metadata: { custom_fields: customData },
+                    metadata: { 
+                        custom_fields: customData,
+                        status: 'available'
+                    },
                     created_at: db.serverTimestamp(),
                     updated_at: db.serverTimestamp()
                 }, data.item_id);
@@ -295,7 +299,7 @@ export function ItemsView() {
                     const row = document.createElement('tr');
                     
                     const catalog = catalogMap[item.catalog_id] || { item_type: 'Unknown', provider: 'Unknown' };
-                    const itemStatus = item.status || (item.is_available ? 'available' : 'assigned');
+                    const itemStatus = item.metadata?.status || item.status || (item.is_available ? 'available' : 'assigned');
                     let statusBadge = 'badge-pale-secondary';
                     if (itemStatus === 'available') statusBadge = 'badge-pale-success';
                     else if (itemStatus === 'damaged') statusBadge = 'badge-pale-danger';
@@ -323,7 +327,7 @@ export function ItemsView() {
                     row.querySelector('.edit-item').addEventListener('click', async () => {
                         const vans = await db.findMany('vans');
 
-                        const itemStatus = item.status || (item.is_available ? 'available' : 'assigned');
+                        const itemStatus = item.metadata?.status || item.status || (item.is_available ? 'available' : 'assigned');
 
                         const modal = createModal({
                             title: 'Edit Hardware',
@@ -423,11 +427,15 @@ export function ItemsView() {
 
                         try {
                             await db.update('items', item.item_id, {
+                                updated_at: db.serverTimestamp(),
                                 current_location_type: van_id ? 'VAN' : 'WAREHOUSE',
                                 current_location_id: van_id || '',
-                                status: statusVal,
                                 is_available: statusVal === 'available',
-                                'metadata.custom_fields': customData,
+                                metadata: {
+                                    ...(item.metadata || {}),
+                                    status: statusVal,
+                                    custom_fields: customData
+                                },
                                 updated_at: db.serverTimestamp()
                             });
                             db.logAction("Item Updated", `${catalog.item_type} ${item.item_id} updated to ${statusVal}`);

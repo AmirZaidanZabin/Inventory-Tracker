@@ -1,6 +1,7 @@
 import { controller } from '../lib/controller.js';
 import { auth } from '../lib/auth.js';
 import { db } from '../lib/db/index.js';
+import { formatServerToLocalTime } from '../lib/timezone.js';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -39,13 +40,9 @@ function buildWeekDays(date) {
     return cells;
 }
 
-function formatTime(timeStr) {
+function formatTime(timeStr, dateStr, serverTz) {
     if (!timeStr) return '';
-    const [h, m] = timeStr.split(':');
-    let hours = parseInt(h, 10);
-    const suffix = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    return `${hours}:${m} ${suffix}`;
+    return formatServerToLocalTime(dateStr || new Date().toISOString().split('T')[0], timeStr, serverTz || 'UTC');
 }
 
 export function CalendarView() {
@@ -198,6 +195,8 @@ export function CalendarView() {
              });
         }
         
+        const serverTz = window.state?.data?.settings?.server_timezone || 'UTC';
+        
         const headerEl = view.$('cal-month-year');
         if (!headerEl) return;
 
@@ -238,13 +237,14 @@ export function CalendarView() {
                                     const isCompleted = t.status === 'completed';
                                     const tName = techNames[t.tech_id] || t.tech_id || 'Unassigned';
                                     const showTech = techId !== 'all';
+                                    const locTime = formatTime(t.appointment_time, t.schedule_date, serverTz);
                                     return `
                                         <div id="cal-task-${t.appointment_id}"
                                             class="cal-task-pill ${isCompleted ? 'status-completed' : 'status-pending'}"
                                             draggable="true"
-                                            title="${t.appointment_time ? formatTime(t.appointment_time) : 'Anytime'} - ${t.appointment_name} (Tech: ${tName})"
+                                            title="${t.appointment_time ? locTime : 'Anytime'} - ${t.appointment_name} (Tech: ${tName})"
                                             data-task-id="${t.appointment_id}">
-                                            ${t.appointment_time ? '<b>' + formatTime(t.appointment_time) + '</b>' : ''} ${t.appointment_name}
+                                            ${t.appointment_time ? '<b>' + locTime + '</b>' : ''} ${t.appointment_name}
                                             ${showTech ? `<div style="font-size: 0.65rem; opacity: 0.8; margin-top: 1px;">${tName}</div>` : ''}
                                         </div>`;
                                 }).join('')}
@@ -298,14 +298,15 @@ export function CalendarView() {
                                 ${weekTasks.map(t => {
                                     const isCompleted = t.status === 'completed';
                                     const tName = techNames[t.tech_id] || t.tech_id || 'Unassigned';
+                                    const locTime = formatTime(t.appointment_time, t.schedule_date, serverTz);
                                     return `
                                         <div id="cal-task-${t.appointment_id}"
                                             class="cal-task-pill ${isCompleted ? 'status-completed' : 'status-pending'}"
                                             draggable="true"
-                                            title="${t.appointment_time ? formatTime(t.appointment_time) : 'Anytime'} - ${t.appointment_name} (Tech: ${tName})"
+                                            title="${t.appointment_time ? locTime : 'Anytime'} - ${t.appointment_name} (Tech: ${tName})"
                                             data-task-id="${t.appointment_id}">
                                             <div class="text-muted" style="font-size: 0.65rem;">${t.prettyDate} - ${tName}</div>
-                                            ${t.appointment_time ? '<b>' + formatTime(t.appointment_time) + '</b>' : ''} ${t.appointment_name}
+                                            ${t.appointment_time ? '<b>' + locTime + '</b>' : ''} ${t.appointment_name}
                                         </div>`;
                                 }).join('')}
                             </div>`;
@@ -364,7 +365,7 @@ export function CalendarView() {
                     if(aptToMove && aptToMove.schedule_date !== targetDateStr) {
                         aptToMove.schedule_date = targetDateStr; 
                         renderGrid();
-                        await db.update('appointments', taskId, { schedule_date: targetDateStr });
+                        await db.update('appointments', taskId, { schedule_date: targetDateStr, updated_at: db.serverTimestamp() });
                     }
                 } catch(err) {
                     alert('Update failed: ' + err.message);

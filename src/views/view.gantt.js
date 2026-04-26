@@ -159,7 +159,7 @@ export function AppointmentsGanttView() {
         // Build map: tech_id -> Van Name
         vanMap = {};
         vans.forEach(v => {
-            const techId = v.assigned_users?.[0] || v.assigned_tech_id || v.tech_id;
+            const techId = v.metadata?.assigned_users?.[0] || v.assigned_users?.[0] || v.assigned_tech_id || v.tech_id;
             if(techId) vanMap[techId] = v.van_id || v.id;
         });
 
@@ -446,7 +446,7 @@ export function AppointmentsGanttView() {
                 // Save back
                 for (const apt of optimized) {
                     await db.update('appointments', apt.appointment_id, 
-                        { appointment_time: apt.appointment_time }
+                        { appointment_time: apt.appointment_time, updated_at: db.serverTimestamp() }
                     );
                 }
                 

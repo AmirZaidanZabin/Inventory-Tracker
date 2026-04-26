@@ -97,7 +97,7 @@ export function ItemTypesView() {
                     </div>
                     <div class="col-12">
                         <div class="form-check mt-2">
-                            <input class="form-check-input" type="checkbox" name="requires_scan" id="requiresScanCheck" ${pt && pt.requires_scan === false ? '' : 'checked'}>
+                            <input class="form-check-input" type="checkbox" name="requires_scan" id="requiresScanCheck" ${pt && (pt.metadata?.requires_scan ?? pt.requires_scan) === false ? '' : 'checked'}>
                             <label class="form-check-label fw-bold small" for="requiresScanCheck">
                                 Required to be scanned on completion
                             </label>
@@ -130,7 +130,7 @@ export function ItemTypesView() {
         const btnAddCf = modalEl.querySelector('#btn-add-cf');
         const form = modalEl.querySelector('#it-form');
         
-        let cfs = pt ? (pt.custom_fields || []) : [];
+        let cfs = pt ? (pt.metadata?.custom_fields || pt.custom_fields || []) : [];
 
         const renderCfs = () => {
             cfContainer.innerHTML = '';
@@ -175,8 +175,13 @@ export function ItemTypesView() {
                 item_name: fd.get('item_name'),
                 duration_minutes: parseInt(fd.get('duration_minutes') || '0', 10),
                 provider: fd.get('provider'),
-                requires_scan: fd.get('requires_scan') === 'on',
-                custom_fields: cfs.map(c => ({...c, key: (c.label || '').toLowerCase().replace(/[^a-z0-9]/g, '_')}))
+                updated_at: db.serverTimestamp(),
+                ...(pt ? {} : { created_at: db.serverTimestamp() }),
+                metadata: {
+                    ...(pt?.metadata || {}),
+                    requires_scan: fd.get('requires_scan') === 'on',
+                    custom_fields: cfs.map(c => ({...c, key: (c.label || '').toLowerCase().replace(/[^a-z0-9]/g, '_')}))
+                }
             };
 
             const btn = form.querySelector('button[type="submit"]');
@@ -228,7 +233,7 @@ export function ItemTypesView() {
             data.forEach(pt => {
                 const tr = document.createElement('tr');
                 
-                const cfBadges = (pt.custom_fields || []).map(cf => `<span class="badge bg-light text-dark border me-1">${cf.label}</span>`).join('');
+                const cfBadges = (pt.metadata?.custom_fields || pt.custom_fields || []).map(cf => `<span class="badge bg-light text-dark border me-1">${cf.label}</span>`).join('');
                 
                 tr.innerHTML = `
                     <td><code class="data-mono fw-bold">${pt.catalog_id || pt.id}</code></td>

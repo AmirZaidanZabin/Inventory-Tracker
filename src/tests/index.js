@@ -5,10 +5,18 @@ import { runSystemTests } from './system.test.js';
 import { runAuthTests } from './auth.test.js';
 import { runScannerTests } from './scanner.test.js';
 import { runTrackingTests } from './tracking.test.js';
+import { runApprovalsTests } from './approvals.test.js';
+import { runLeadsUITests } from './leads-ui.test.js';
+import { runDatabaseTests } from './database.test.js';
 
 export async function runTests() {
     const t = tester();
     console.log("Starting Pico Inventory Pro Test Suite...");
+
+    // Sales Module Tests
+    await runApprovalsTests(t);
+    await runLeadsUITests(t);
+    await runDatabaseTests(t);
 
     // View Tests
     await runViewTests(t);

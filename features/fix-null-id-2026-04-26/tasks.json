@@ -1,0 +1,59 @@
+{
+  "original_prompt": "Fix Backend processing failed: Cannot read properties of null (reading 'id')",
+  "rephrased_goal": "Find and fix code where .id is accessed on a null object in the backend processing flow.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Search for '.id' usage in backend files",
+      "subtasks_required": ["grep -r '.id' src/modules src/views/view.leads_new.js"],
+      "owner": "Caveman",
+      "analogy_reference": "find footprint in mud",
+      "status": "pending",
+      "testing_criteria": "Find lines accessing .id"
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Inspect identified lines for null potential",
+      "subtasks_required": ["view_file on suspicious files"],
+      "owner": "Caveman",
+      "analogy_reference": "poke footprint to see if dry",
+      "status": "pending",
+      "testing_criteria": "Identify specific line causing error"
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Check DB create/insert return values in adapters",
+      "subtasks_required": ["view_file src/lib/db/providers/FirebaseAdapter.js"],
+      "owner": "Caveman",
+      "analogy_reference": "see what bird drop in hand",
+      "status": "pending",
+      "testing_criteria": "Confirm if adapters return null on success or failure"
+    },
+    {
+      "id": 4,
+      "description": "Do-Pebble: Apply fix to prevent null read",
+      "subtasks_required": ["edit_file to add null checks or fix return values"],
+      "owner": "Caveman",
+      "analogy_reference": "mend broken spear",
+      "status": "pending",
+      "testing_criteria": "Code no longer crashes on null"
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Compile and verify"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole cave path",
+      "status": "pending",
+      "testing_criteria": "App builds and works"
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}

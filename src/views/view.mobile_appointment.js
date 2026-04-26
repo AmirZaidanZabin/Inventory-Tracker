@@ -229,7 +229,8 @@ export function MobileAppointmentView(appointmentId) {
                     is_available: false, 
                     status: 'assigned', 
                     current_location_type: 'APPOINTMENT', 
-                    current_location_id: appointmentId 
+                    current_location_id: appointmentId,
+                    updated_at: db.serverTimestamp() 
                 }));
             }
         });
@@ -240,7 +241,8 @@ export function MobileAppointmentView(appointmentId) {
             status: 'completed',
             'metadata.hardware': deployedHw,
             'metadata.completion_description': completionDesc,
-            'metadata.completed_at': db.serverTimestamp()
+            'metadata.completed_at': db.serverTimestamp(),
+            updated_at: db.serverTimestamp()
         });
 
         Promise.all([...itemUpdates, aptUpdate]).then(() => {
@@ -322,7 +324,10 @@ export function MobileAppointmentView(appointmentId) {
                         
                         if (updateNeeded) {
                             try {
-                                await db.update('appointments', appointmentId, updates);
+                                await db.update('appointments', appointmentId, { 
+                                    ...updates,
+                                    updated_at: db.serverTimestamp()
+                                });
                             } catch (e) {
                                 console.warn("Geofence update failed:", e);
                             }
