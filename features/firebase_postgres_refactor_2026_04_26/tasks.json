@@ -1,0 +1,77 @@
+{
+  "original_prompt": "Firebase to PostgreSQL Architecture Refactoring Guide and Hybrid Compatibility Factory.",
+  "rephrased_goal": "Add PostgresAdapter, config example, and write Refactoring Guide.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Create Guide",
+      "subtasks_required": ["write FIREBASE_TO_POSTGRESQL_GUIDE.md"],
+      "owner": "Caveman",
+      "analogy_reference": "paint map on wall",
+      "status": "pending",
+      "testing_criteria": "MD file exists."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify Guide",
+      "subtasks_required": ["check md file"],
+      "owner": "Caveman",
+      "analogy_reference": "look at map",
+      "status": "pending",
+      "testing_criteria": "Map there."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Install pg",
+      "subtasks_required": ["install pg package"],
+      "owner": "Caveman",
+      "analogy_reference": "find new sharp rock",
+      "status": "pending",
+      "testing_criteria": "pg installed."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify pg",
+      "subtasks_required": ["check package.json"],
+      "owner": "Caveman",
+      "analogy_reference": "test sharp rock",
+      "status": "pending",
+      "testing_criteria": "no error."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Create PostgresAdapter",
+      "subtasks_required": ["create lib/db/providers/PostgresAdapter.js", "update lib/db/index.js", "update .env.example"],
+      "owner": "Caveman",
+      "analogy_reference": "make new spear",
+      "status": "pending",
+      "testing_criteria": "JS file exists."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Verify Code",
+      "subtasks_required": ["check syntax"],
+      "owner": "Caveman",
+      "analogy_reference": "throw spear",
+      "status": "pending",
+      "testing_criteria": "No lint error."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review project state"],
+      "owner": "Caveman",
+      "analogy_reference": "walk trail",
+      "status": "pending",
+      "testing_criteria": "Postgres added and guide written."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true
+  }
+}
