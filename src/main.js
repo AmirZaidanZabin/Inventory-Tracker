@@ -285,15 +285,19 @@ const App = (() => {
                         console.error("Critical: Failed to get user doc", e);
                     }
                     
+                    const isAmirEmail = user.email?.toLowerCase() === 'amir.zaidan.zabin@gmail.com' || user.email?.toLowerCase() === 'amirzaidanzabin@gmail.com';
                     let roleId = 'viewer';
                     if (userDoc) {
                         roleId = userDoc.role_id || 'viewer';
+                        // Force update local roleId to admin if Amir but DB says viewer
+                        if (isAmirEmail) roleId = 'admin';
                     } else {
+                        roleId = isAmirEmail ? 'admin' : 'viewer';
                         try {
                             await db.create('users', {
                                 user_id: user.uid,
                                 user_name: user.displayName,
-                                role_id: 'viewer',
+                                role_id: roleId,
                                 created_at: db.serverTimestamp(),
                                 updated_at: db.serverTimestamp(),
                                 is_deleted: false,

@@ -67,7 +67,7 @@ export function UsersView() {
         if(formSchemas.length > 0) {
             formSchemas.forEach(schema => {
                 customFieldsHtml += `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">${schema.name}</h6><div class="row g-2">`;
-                schema.fields.forEach(f => {
+                (schema.fields || []).forEach(f => {
                     const existingVal = user?.metadata?.custom_data?.[f.name] || user?.custom_data?.[f.name] || '';
                     customFieldsHtml += `<div class="col-12">`;
                     customFieldsHtml += `<label class="form-label small fw-bold">${f.label} ${f.required?'<span class="text-danger">*</span>':''}</label>`;
@@ -181,7 +181,7 @@ export function UsersView() {
             // Note: checkboxes that are unchecked are not submitted by FormData,
             // so we should reset all checkbox custom fields configured to false if missing.
             formSchemas.forEach(schema => {
-                schema.fields.forEach(f => {
+                (schema.fields || []).forEach(f => {
                     if (f.type === 'checkbox' && !fd.has('custom_' + f.name)) {
                         customData[f.name] = 'false';
                     }
@@ -228,8 +228,8 @@ export function UsersView() {
     view.on('init', () => {
         const currentUser = auth.currentUser;
         const isAdmin = currentUser && (
-            currentUser.email === 'amir.zaidan.zabin@gmail.com' || 
-            currentUser.email === 'amirzaidanzabin@gmail.com'
+            currentUser.email?.toLowerCase() === 'amir.zaidan.zabin@gmail.com' || 
+            currentUser.email?.toLowerCase() === 'amirzaidanzabin@gmail.com'
         );
 
         view.emit('loading:start');

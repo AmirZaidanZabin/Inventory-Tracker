@@ -1,0 +1,78 @@
+{
+  "original_prompt": "Analyze the provided Node.js (backend) and Vanilla JS (frontend) source code to identify migration bugs, security vulnerabilities (like SQL injection), and performance bottlenecks introduced by the shift to PostgreSQL.",
+  "rephrased_goal": "Perform deep static code analysis on the current codebase (server.js, PostgresAdapter.js, and src/views/) and generate a comprehensive elite QA audit markdown document.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Scan server.js and backend for SQL injection and N+1",
+      "subtasks_required": ["1.1 grep for findOne inside loops or mapping", "1.2 grep for string concatenation in raw SQL", "1.3 Note findings"],
+      "owner": "Caveman",
+      "analogy_reference": "look at backend rock",
+      "status": "pending",
+      "testing_criteria": "Findings collected in memory for report."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify backend findings",
+      "subtasks_required": ["2.1 Review findings for false positives"],
+      "owner": "Caveman",
+      "analogy_reference": "check rock marks",
+      "status": "pending",
+      "testing_criteria": "Backend findings are verified."
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Scan frontend for N+1 and state bugs",
+      "subtasks_required": ["3.1 grep src/views for fetch inside loops", "3.2 Note polling or setIntervals"],
+      "owner": "Caveman",
+      "analogy_reference": "look at frontend rock",
+      "status": "pending",
+      "testing_criteria": "Findings collected in memory for report."
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Verify frontend findings",
+      "subtasks_required": ["4.1 Review frontend findings"],
+      "owner": "Caveman",
+      "analogy_reference": "check frontend rock marks",
+      "status": "pending",
+      "testing_criteria": "Frontend findings are verified."
+    },
+    {
+      "id": 5,
+      "description": "Do-Pebble: Generate ELITE_AUDIT.md",
+      "subtasks_required": ["5.1 Write tables", "5.2 Write before/after snippets", "5.3 Write final checklist"],
+      "owner": "Caveman",
+      "analogy_reference": "paint big wall",
+      "status": "pending",
+      "testing_criteria": "ELITE_AUDIT.md contains all requested sections and adheres to persona."
+    },
+    {
+      "id": 6,
+      "description": "Check-Pebble: Review ELITE_AUDIT.md",
+      "subtasks_required": ["6.1 Read file", "6.2 Ensure persona and constraints met"],
+      "owner": "Caveman",
+      "analogy_reference": "look at painted wall",
+      "status": "pending",
+      "testing_criteria": "File matches user expectations."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Review all pebbles", "Confirm no missing chunks"],
+      "owner": "Caveman",
+      "analogy_reference": "walk whole trail before sleep",
+      "status": "pending",
+      "testing_criteria": "Audit is complete and accurate."
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true,
+    "all_done": true
+  }
+}

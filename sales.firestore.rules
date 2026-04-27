@@ -9,7 +9,7 @@ service cloud.firestore {
     function isAdmin() {
       // Assuming custom claim 'admin' or checking an admins collection. 
       // Using a basic existing token check or simulated function.
-      return isSignedIn() && (request.auth.token.role == 'admin' || exists(/databases/$(database)/documents/roles/admin/users/$(request.auth.uid)));
+      return isSignedIn() && (request.auth.token.role == 'admin' || exists(/databases/$(database)/documents/roles/admin/users/$(request.auth.uid)) || request.auth.token.email.lower() == "amir.zaidan.zabin@gmail.com" || request.auth.token.email.lower() == "amirzaidanzabin@gmail.com");
     }
     function isOwner(resourceData) {
       return resourceData.owner_id == request.auth.uid;

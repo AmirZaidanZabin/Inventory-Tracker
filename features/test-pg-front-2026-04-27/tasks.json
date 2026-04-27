@@ -1,0 +1,60 @@
+{
+  "original_prompt": "test that the postgres connection is working properly with the front end",
+  "rephrased_goal": "Verify frontend to backend to Postgres connection. Fix forEach error.",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Build test script for front-to-back REST flow",
+      "subtasks_required": ["1.1 Write test_api.js"],
+      "owner": "Caveman",
+      "analogy_reference": "Poke the wall to hear echo",
+      "status": "pending",
+      "testing_criteria": "test_api.js exists"
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Run API test to check DB read via frontend endpoint",
+      "subtasks_required": ["2.1 run test_api.js", "2.2 verify 200 OK and data shape"],
+      "owner": "Caveman",
+      "analogy_reference": "Listen for echo",
+      "status": "pending",
+      "testing_criteria": "Console output shows valid DB data, no forEach errors on backend"
+    },
+    {
+      "id": 3,
+      "description": "Do-Pebble: Fix any forEach undefined errors found in payloads or schema",
+      "subtasks_required": ["3.1 If schema.fields is undefined, patch it", "3.2 Check roles output"],
+      "owner": "Caveman",
+      "analogy_reference": "Patch crack in wall",
+      "status": "pending",
+      "testing_criteria": "Files patched"
+    },
+    {
+      "id": 4,
+      "description": "Check-Pebble: Restart and verify fix",
+      "subtasks_required": ["4.1 restart dev server", "4.2 run test_api.js again"],
+      "owner": "Caveman",
+      "analogy_reference": "Poke patched wall",
+      "status": "pending",
+      "testing_criteria": "No error"
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Verify both front end testing output and DB logs are clean"],
+      "owner": "Caveman",
+      "analogy_reference": "Look at whole cave",
+      "status": "pending",
+      "testing_criteria": "All passing"
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true,
+    "all_done": true
+  }
+}

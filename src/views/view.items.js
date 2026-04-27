@@ -120,7 +120,7 @@ export function ItemsView() {
         if(formSchemas.length > 0) {
             formSchemas.forEach(schema => {
                 customFieldsHtml += `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">${schema.name}</h6><div class="row g-2">`;
-                schema.fields.forEach(f => {
+                (schema.fields || []).forEach(f => {
                     const existingVal = '';
                     customFieldsHtml += `<div class="col-12">`;
                     customFieldsHtml += `<label class="form-label small fw-bold">${f.label} ${f.required?'<span class="text-danger">*</span>':''}</label>`;
@@ -203,7 +203,7 @@ export function ItemsView() {
             }
 
             formSchemas.forEach(schema => {
-                schema.fields.forEach(f => {
+                (schema.fields || []).forEach(f => {
                     if (f.type === 'checkbox' && !fd.has('custom_' + f.name)) {
                         customData[f.name] = 'false';
                     }
@@ -374,7 +374,7 @@ export function ItemsView() {
                         let cfHtml = '';
                         editFormSchemas.forEach(schema => {
                             cfHtml += `<div class="col-12 mt-3"><h6 class="text-accent mb-2 fw-bold border-bottom pb-1">${schema.name}</h6><div class="row g-2">`;
-                            schema.fields.forEach(f => {
+                            (schema.fields || []).forEach(f => {
                                 const existingVal = (item.metadata?.custom_fields?.[f.name]) || '';
                                 cfHtml += `<div class="col-12">`;
                                 cfHtml += `<label class="form-label small fw-bold">${f.label} ${f.required?'<span class="text-danger">*</span>':''}</label>`;
@@ -418,7 +418,7 @@ export function ItemsView() {
                         }
                         // Handle checkboxes
                         editFormSchemas.forEach(schema => {
-                            schema.fields.forEach(f => {
+                            (schema.fields || []).forEach(f => {
                                 if (f.type === 'checkbox' && !fd.has('custom_' + f.name)) {
                                     customData[f.name] = 'false';
                                 }

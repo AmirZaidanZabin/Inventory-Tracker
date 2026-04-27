@@ -4,8 +4,17 @@ import 'dotenv/config';
 
 const { Pool } = pg;
 
+let connectionString = process.env.DATABASE_URL;
+if (connectionString) {
+    connectionString = connectionString.replace(/%0A/g, '').replace(/\n/g, '');
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+    connectionString,
+    onConnect: () => console.log('Connected to PostgreSQL'),
+    ssl: {
+        rejectUnauthorized: false,
+    },
 });
 
 const schema = `

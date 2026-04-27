@@ -169,7 +169,7 @@ export function LeadsNewView() {
                         <div class="row g-3">
             `;
             
-            schema.fields.forEach(f => {
+            (schema.fields || []).forEach(f => {
                 const isVisible = checkCondition(f.condition);
                 const display = isVisible ? 'block' : 'none';
                 
@@ -378,7 +378,7 @@ export function LeadsNewView() {
                 sectionEl.style.display = isSectionVisible ? 'block' : 'none';
             }
 
-            schema.fields.forEach(f => {
+            (schema.fields || []).forEach(f => {
                 const wrapper = element.querySelector(`#wrapper-${f.name}`);
                 if (!wrapper) return;
                 
@@ -457,7 +457,7 @@ export function LeadsNewView() {
         maps = [];
 
         state.schemas.forEach(schema => {
-            schema.fields.forEach(f => {
+            (schema.fields || []).forEach(f => {
                 if (f.type === 'multi-map') {
                     const mapEl = element.querySelector(`#map-${f.name}`);
                     if (!mapEl) return;

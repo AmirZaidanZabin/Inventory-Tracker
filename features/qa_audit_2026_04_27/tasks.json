@@ -1,0 +1,42 @@
+{
+  "original_prompt": "conduct the audit",
+  "rephrased_goal": "Write QA Audit Markdown file with specific tests for Node/Postgres/Vanilla JS",
+  "architecture": "CoT",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Do-Pebble: Formulate QA Audit markdown",
+      "subtasks_required": ["1.1 Cover Data Integrity", "1.2 Cover Connection Tests", "1.3 Cover N+1 and Injection", "1.4 Cover Real-time replacement"],
+      "owner": "Caveman",
+      "analogy_reference": "paint instructions on big wall",
+      "status": "pending",
+      "testing_criteria": "QA_AUDIT.md file contains all constraints."
+    },
+    {
+      "id": 2,
+      "description": "Check-Pebble: Verify QA file exists",
+      "subtasks_required": ["2.1 Read QA_AUDIT.md"],
+      "owner": "Caveman",
+      "analogy_reference": "look at wall",
+      "status": "pending",
+      "testing_criteria": "QA document has right tone, no ORMs, vanilla constraints included."
+    },
+    {
+      "id": "FINAL",
+      "description": "Sweep-Pebble: BIG BOSS CHECK",
+      "subtasks_required": ["Check if output fulfills user goal completely"],
+      "owner": "Caveman",
+      "analogy_reference": "grunt at wall",
+      "status": "pending",
+      "testing_criteria": "File successfully written, all constraints met"
+    }
+  ],
+  "validation_check": {
+    "mapped_to_goal": true,
+    "atomic_subtasks_confirmed": true,
+    "check_pebbles_inserted": true,
+    "big_boss_sweep_at_end": true,
+    "dependencies_captured": true,
+    "all_done": true
+  }
+}
