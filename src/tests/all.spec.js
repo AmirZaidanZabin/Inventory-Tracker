@@ -6,7 +6,7 @@ beforeAll(() => {
 });
 
 test('Insights Configuration feature setup', async () => {
-    const { db } = await import('../lib/db/index.js');
+    const { db } = await import('../lib/api-client.js');
     
     // Mock the adapter
     const memoryDb = { insights_configs: [], app_settings: [] };
@@ -57,7 +57,7 @@ test('Insights Configuration feature setup', async () => {
 });
 
 test('Settings feature system validation options', async () => {
-    const { db } = await import('../lib/db/index.js');
+    const { db } = await import('../lib/api-client.js');
     
     // Save system settings via DB
     await db.updateOrCreate('app_settings', 'global', {

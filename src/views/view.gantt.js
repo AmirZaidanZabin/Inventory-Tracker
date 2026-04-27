@@ -1,6 +1,6 @@
 // src/views/view.gantt.js
 import { controller, debounce } from '../lib/controller.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { optimizeRoute } from '../lib/travel-logic.js';
 
 function toDate(str) {
@@ -152,7 +152,7 @@ export function AppointmentsGanttView() {
             .filter(a => !a.is_deleted);
 
         technicians = (usersData || [])
-            .filter(u => u.role_id === 'technician' || appointments.some(a => a.tech_id === u.user_id));
+            .filter(u => u.role_id === 'technician' || appointments.some(a => a.tech_id === (u.user_id || u.id)));
 
         vans = (vansData || []);
         
@@ -224,13 +224,13 @@ export function AppointmentsGanttView() {
         view.$('gantt-date-range').textContent = rangeText;
 
         const visibleTechs = technicians.filter(t => 
-            !hiddenTechs.has(t.user_id) && 
+            !hiddenTechs.has(t.user_id || t.id) && 
             (t.user_name || '').toLowerCase().includes(resourceSearch)
         );
         
         const groups = {};
         visibleTechs.forEach(t => {
-            const van = vanMap[t.user_id] || 'Unassigned';
+            const van = vanMap[t.user_id || t.id] || 'Unassigned';
             if (!groups[van]) groups[van] = [];
             groups[van].push(t);
         });
@@ -238,7 +238,7 @@ export function AppointmentsGanttView() {
         const flatItems = [];
         let runningY = 0;
         Object.entries(groups).forEach(([van, techs]) => {
-            const groupAppts = appointments.filter(a => techs.some(t => t.user_id === a.tech_id) && a.schedule_date >= toYMD(windowMinDate) && a.schedule_date <= toYMD(windowMaxDate));
+            const groupAppts = appointments.filter(a => techs.some(t => (t.user_id || t.id) === a.tech_id) && a.schedule_date >= toYMD(windowMinDate) && a.schedule_date <= toYMD(windowMaxDate));
             const totalGroupMins = groupAppts.reduce((sum, a) => sum + (a.metadata?.duration_minutes || 60), 0);
             const groupUtil = totalGroupMins > 0 ? Math.min(100, Math.round((totalGroupMins / (techs.length * 480)) * 100)) : 0;
             
@@ -246,7 +246,7 @@ export function AppointmentsGanttView() {
             runningY += 32;
             
             techs.forEach(t => {
-                const techAppts = appointments.filter(a => a.tech_id === t.user_id && a.schedule_date >= toYMD(windowMinDate) && a.schedule_date <= toYMD(windowMaxDate));
+                const techAppts = appointments.filter(a => a.tech_id === (t.user_id || t.id) && a.schedule_date >= toYMD(windowMinDate) && a.schedule_date <= toYMD(windowMaxDate));
                 const totalMins = techAppts.reduce((sum, a) => sum + (a.metadata?.duration_minutes || 60), 0);
                 const utilPercent = Math.min(100, Math.round((totalMins / 480) * 100));
                 flatItems.push({ type: 'tech', t, techAppts, totalMins, utilPercent, y: runningY, h: ROW_H });
@@ -350,7 +350,7 @@ export function AppointmentsGanttView() {
                                 <div class="text-end d-flex align-items-center gap-1 border border-secondary-subtle rounded-3 px-2 py-1 text-muted bg-light bg-opacity-10" style="font-size: 0.65rem;">
                                     <div class="rounded-circle" style="width: 8px; height: 8px; background: ${utilPercent > 80 ? '#ef4444' : '#10b981'};"></div>
                                     <span class="fw-bold text-dark">${(totalMins/60).toFixed(1)}h</span>
-                                    <button class="btn btn-link p-0 text-primary ms-1 btn-optimize-tech" data-tech="${t.user_id}" title="Optimize Today's Route">
+                                    <button class="btn btn-link p-0 text-primary ms-1 btn-optimize-tech" data-tech="${t.user_id || t.id}" title="Optimize Today's Route">
                                         <i class="bi bi-lightning-charge-fill"></i>
                                     </button>
                                 </div>

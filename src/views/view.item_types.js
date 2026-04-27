@@ -1,5 +1,5 @@
 import { controller } from '../lib/controller.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { renderTable } from '../lib/table.js';
 
 export function ItemTypesView() {

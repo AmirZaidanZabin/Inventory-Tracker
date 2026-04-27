@@ -1,5 +1,5 @@
 import { SalesBackend } from '../modules/sales.backend.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 
 export async function runApprovalsTests(t) {
     t.test('Approvals: Auto-Approval for high GMV and standard rates', async () => {

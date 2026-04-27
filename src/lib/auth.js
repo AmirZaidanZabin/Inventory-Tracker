@@ -1,52 +1,69 @@
 
-import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-  signInAnonymously,
-  signInWithEmailAndPassword,
-  sendPasswordResetEmail,
-} from "firebase/auth";
-import firebaseConfig from "../../firebase-applet-config.json";
-
-const app = initializeApp(firebaseConfig);
-const _auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope("https://www.googleapis.com/auth/calendar.events");
-
 export const auth = {
     get currentUser() {
-        return _auth.currentUser;
+        try {
+            const token = localStorage.getItem('applet_auth_token');
+            if (token) {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                return { 
+                    uid: payload.uid, 
+                    email: payload.email, 
+                    getIdToken: async () => token 
+                };
+            }
+        } catch(e) { }
+        return null;
     },
 
     signIn: async () => {
-        try {
-            const result = await signInWithPopup(_auth, googleProvider);
-            const credential = GoogleAuthProvider.credentialFromResult(result);
-            if (credential?.accessToken) {
-                localStorage.setItem("google_oauth_access_token", credential.accessToken);
-            }
-            return result;
-        } catch (error) {
-            if (error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request") {
-                return null;
-            }
-            throw error;
-        }
+        alert('Google Sign-In is disabled for the local DB deployment. Please use Email/Password sign-in.');
+        return null;
     },
 
-    signInAnonymously: () => signInAnonymously(_auth),
+    signInAnonymously: async () => {
+        const res = await fetch("/api/auth/anonymous", { method: 'POST' });
+        if (!res.ok) throw new Error('Anonymous auth failed');
+        const data = await res.json();
+        if (data.token) {
+            localStorage.setItem('applet_auth_token', data.token);
+            _triggerAuthChange();
+        }
+        return data.user;
+    },
     
-    signInEmail: (email, pass) => signInWithEmailAndPassword(_auth, email, pass),
+    signInEmail: async (email, pass) => {
+        const res = await fetch("/api/auth/login", { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: pass }) 
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            const error = new Error(err.error || 'Login failed');
+            error.code = 'auth/invalid-credential'; // To match frontend logic
+            throw error;
+        }
+        const data = await res.json();
+        if (data.token) localStorage.setItem('applet_auth_token', data.token);
+        _triggerAuthChange();
+        return data.user;
+    },
     
-    resetPassword: (email) => sendPasswordResetEmail(_auth, email),
+    resetPassword: (email) => {
+        // Mocked or inform user
+        return Promise.reject(new Error("Local Database does not support email reset tokens. Please ask an admin to reset it in Settings."));
+    },
     
-    signOut: () => signOut(_auth),
+    signOut: () => {
+        localStorage.removeItem('applet_auth_token');
+        _triggerAuthChange();
+    },
     
-    onAuth: (cb) => onAuthStateChanged(_auth, cb),
+    onAuth: (cb) => {
+        _listeners.push(cb);
+        cb(auth.currentUser);
+        return () => { _listeners = _listeners.filter(l => l !== cb); };
+    },
 
     changeUserPassword: async (uid, newPassword) => {
         const { apiFetch } = await import('./api.js');
@@ -56,10 +73,16 @@ export const auth = {
         });
     },
 
-    // Helper to get token for API calls
     getToken: async () => {
-        const user = _auth.currentUser;
+        const user = auth.currentUser;
         if (!user && window._isTesting) return 'TEST_BYPASS_TOKEN';
         return user ? await user.getIdToken() : null;
     }
 };
+
+let _listeners = [];
+function _triggerAuthChange() {
+    const user = auth.currentUser;
+    for (const l of _listeners) l(user);
+}
+

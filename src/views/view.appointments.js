@@ -1,5 +1,5 @@
 import { controller, debounce } from '../lib/controller.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { formatServerToLocalTime } from '../lib/timezone.js';
 
 import { createModal } from '../lib/modal.js';
@@ -756,7 +756,7 @@ export function AppointmentsView() {
         // Fetch users once for the map
         db.findMany('users').then(users => {
             users.forEach(u => {
-                userMap[u.user_id] = u.user_name;
+                userMap[u.user_id || u.id] = u.user_name;
             });
             renderAptList();
         });

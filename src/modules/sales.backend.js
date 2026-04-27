@@ -5,7 +5,7 @@
 // In a true environment, this resides on Node.js/Firebase Cloud Functions.
 // ----------------------------------------------------------------------
 
-import { db } from '../lib/db/index.js'; // Assumes node/server environment compatibility
+import { apiDb as db } from '../lib/api-client.js'; // Assumes node/server environment compatibility
 
 export const SalesBackend = {
 

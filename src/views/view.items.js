@@ -1,5 +1,5 @@
 import { controller } from '../lib/controller.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { createModal } from '../lib/modal.js';
 import { CustomSelect } from '../lib/custom-select.js';
 import { renderTable } from '../lib/table.js';

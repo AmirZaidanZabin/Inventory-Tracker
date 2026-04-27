@@ -1,5 +1,6 @@
-import { firebase } from '../lib/firebase.js';
-import { db } from '../lib/db/index.js';
+import { auth } from '../lib/auth.js';
+const firebase = { ...auth, auth: auth };
+import { apiDb as db } from '../lib/api-client.js';
 import { AppointmentDetailView } from '../views/view.appointment_detail.js';
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));

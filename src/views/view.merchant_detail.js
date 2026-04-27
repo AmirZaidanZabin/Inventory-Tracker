@@ -1,4 +1,4 @@
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { createInsightsPanel } from '../lib/insights-panel.js';
 
 export function MerchantDetailView(merchantId) {

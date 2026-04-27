@@ -1,5 +1,6 @@
-import { firebase } from '../lib/firebase.js';
-import { db } from '../lib/db/index.js';
+import { auth } from '../lib/auth.js';
+const firebase = { ...auth, auth: auth };
+import { apiDb as db } from '../lib/api-client.js';
 import { MobileStockView } from '../views/view.mobile_stock.js';
 import { MobileAppointmentView } from '../views/view.mobile_appointment.js';
 

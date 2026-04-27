@@ -1,5 +1,5 @@
 import { controller } from '../lib/controller.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { createModal } from '../lib/modal.js';
 import { renderTable } from '../lib/table.js';
 
@@ -72,7 +72,7 @@ export function VansView() {
             });
         }
 
-        const techOptions = techs.map(t => `<option value="${t.user_id}">${t.user_name} (${t.role_id})</option>`).join('');
+        const techOptions = techs.map(t => `<option value="${t.user_id || t.id}">${t.user_name} (${t.role_id})</option>`).join('');
 
         const modal = createModal({
             title: 'Add New VAN',
@@ -267,11 +267,13 @@ export function VansView() {
                         const techs = await db.findMany('users');
 
                         const vanAssigned = van.metadata?.assigned_users?.[0] || '';
-                        const techOptions = techs.map(t => `
-                            <option value="${t.user_id}" ${vanAssigned === t.user_id ? 'selected' : ''}>
+                        const techOptions = techs.map(t => {
+                            const tid = t.user_id || t.id;
+                            return `
+                            <option value="${tid}" ${vanAssigned === tid ? 'selected' : ''}>
                                 ${t.user_name} (${t.role_id})
                             </option>
-                        `).join('');
+                        `}).join('');
 
                         const modal = createModal({
                             title: 'Edit VAN',

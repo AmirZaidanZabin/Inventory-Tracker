@@ -1,4 +1,4 @@
-import { db } from './db/index.js';
+import { apiDb as db } from './api-client.js';
 
 export function createInsightsPanel({ containerNode, mainContentNode, templates = [], getState, targetModule = null }) {
     // Modify containers to use our split structure

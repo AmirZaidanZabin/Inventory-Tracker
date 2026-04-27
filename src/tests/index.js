@@ -1,5 +1,5 @@
 import { tester } from '../lib/tester.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { runViewTests } from './views.test.js';
 import { runSystemTests } from './system.test.js';
 import { runAuthTests } from './auth.test.js';

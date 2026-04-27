@@ -1,4 +1,4 @@
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 
 export async function runDatabaseTests(t) {
     t.test('DB: Lead to Merchant Transition', async () => {

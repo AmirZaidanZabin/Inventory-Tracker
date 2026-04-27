@@ -1,6 +1,6 @@
 import { controller } from '../lib/controller.js';
 import { auth } from '../lib/auth.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { createModal } from '../lib/modal.js';
 
 export function StockView() {

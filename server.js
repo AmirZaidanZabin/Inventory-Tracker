@@ -2,6 +2,10 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import admin from "firebase-admin";
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
 
 import { db } from "./lib/db/index.js";
 
@@ -71,36 +75,77 @@ async function startServer() {
         return next();
     }
 
-    const [decodedToken, error] = await _tc(async () => await auth.verifyIdToken(idToken));
-    
-    if (error) {
+    try {
+        const decodedToken = jwt.verify(idToken, JWT_SECRET);
+        
+        // Fetch user role and authorities for server-side enforcement
+        const userDoc = await db.findOne("users", decodedToken.uid);
+        const authorities = [];
+        let roleId = 'viewer';
+        
+        if (userDoc) {
+            roleId = userDoc.role_id || 'viewer';
+            const roleData = await db.findOne("roles", roleId);
+            if (roleData) {
+                authorities.push(...(roleData.authorities || []));
+            }
+        }
+
+        req.user = { 
+            ...decodedToken, 
+            role_id: roleId, 
+            authorities,
+            isAdmin: decodedToken.email?.toLowerCase() === "amir.zaidan.zabin@gmail.com" || 
+                     decodedToken.email?.toLowerCase() === "amirzaidanzabin@gmail.com" ||
+                     roleId === 'admin'
+        };
+
+        next();
+    } catch (error) {
       console.error("Auth Token Verification Error:", error.message || error);
       return res.status(401).json({ error: "Unauthorized", details: error.message || error.toString() });
     }
-    
-    // Fetch user role and authorities for server-side enforcement
-    const userDoc = await db.findOne("users", decodedToken.uid);
-    const authorities = [];
-    let roleId = 'viewer';
-    
-    if (userDoc) {
-        roleId = userDoc.role_id || 'viewer';
-        const roleData = await db.findOne("roles", roleId);
-        if (roleData) {
-            authorities.push(...(roleData.authorities || []));
-        }
-    }
-
-    req.user = { 
-        ...decodedToken, 
-        role_id: roleId, 
-        authorities,
-        isAdmin: decodedToken.email?.toLowerCase() === "amir.zaidan.zabin@gmail.com" || 
-                 decodedToken.email?.toLowerCase() === "amirzaidanzabin@gmail.com" ||
-                 roleId === 'admin'
-    };
-    next();
   };
+
+  app.post("/api/auth/login", async (req, res) => {
+      const { email, password } = req.body;
+      if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
+
+      try {
+          const users = await db.findMany("users");
+          const userDoc = users.find(u => u.email === email);
+          if (!userDoc) {
+              return res.status(401).json({ error: "Invalid credentials (user not found)" });
+          }
+
+          const hashToCompare = userDoc.password_hash || (userDoc.metadata && userDoc.metadata.password_hash);
+          if (hashToCompare) {
+              const matched = await bcrypt.compare(password, hashToCompare);
+              if (!matched) return res.status(401).json({ error: "Invalid credentials (password mismatch)" });
+          } else if (password !== 'password123') { // Fallback for old users
+              return res.status(401).json({ error: "Invalid credentials (fallback mismatch)", hasHash: !!hashToCompare });
+          }
+
+          const token = jwt.sign({ uid: userDoc.id || userDoc.user_id, email: userDoc.email }, JWT_SECRET, { expiresIn: '7d' });
+          const safeUser = { ...userDoc };
+          delete safeUser.password_hash;
+          if (safeUser.metadata) delete safeUser.metadata.password_hash;
+          res.json({ token, user: safeUser });
+      } catch (err) {
+          console.error("Login mapping error:", err);
+          res.status(500).json({ error: "Internal server error during login" });
+      }
+  });
+
+  app.post("/api/auth/anonymous", async (req, res) => {
+      try {
+          const generatedId = `anon_${Math.random().toString(36).substr(2, 9)}`;
+          const token = jwt.sign({ uid: generatedId, email: `anon@${generatedId}.local` }, JWT_SECRET, { expiresIn: '1d' });
+          res.json({ token, user: { id: generatedId, role_id: 'viewer' } });
+      } catch (err) {
+          res.status(500).json({ error: "Internal server error" });
+      }
+  });
 
   const authorize = (permission) => {
       return (req, res, next) => {
@@ -210,7 +255,7 @@ async function startServer() {
   app.post("/api/admin/users/:uid/password", authenticate, async (req, res) => {
     const adminData = await db.findOne("users", req.user.uid);
     const isAmir = req.user.email?.toLowerCase() === "amir.zaidan.zabin@gmail.com" || req.user.email?.toLowerCase() === "amirzaidanzabin@gmail.com";
-    const isAdmin = isAmir || (adminData && adminData.role_id === 'admin');
+    const isAdmin = isAmir || (adminData && adminData.role_id === 'admin') || req.user.isAdmin;
 
     if (!isAdmin) {
         return res.status(403).json({ error: "Only admins can change passwords" });
@@ -223,56 +268,14 @@ async function startServer() {
         return res.status(400).json({ error: "Password must be at least 6 characters" });
     }
 
-    let [_, error] = await _tc(async () => await admin.auth().updateUser(uid, { password }));
-    
-    if (error && error.code === 'auth/user-not-found') {
-        console.log(`User ${uid} not found in Auth. Checking DB to auto-provision...`);
-        const userData = await db.findOne("users", uid);
-        if (userData && userData.metadata?.email) {
-            console.log(`Auto-provisioning Auth account for ${userData.metadata.email} with UID ${uid}`);
-            const [created, createErr] = await _tc(async () => await admin.auth().createUser({
-                uid: uid,
-                email: userData.metadata.email,
-                password: password,
-                displayName: userData.user_name
-            }));
-            if (!createErr) error = null; // Success!
-            else if (createErr.code === 'auth/email-already-exists') {
-                console.log(`Email ${userData.metadata.email} taken. Merging manual user ${uid} into existing Auth account.`);
-                const [existingUser, fetchErr] = await _tc(async () => await admin.auth().getUserByEmail(userData.metadata.email));
-                if (existingUser) {
-                    const existingUid = existingUser.uid;
-                    // Update password for the existing account
-                    await admin.auth().updateUser(existingUid, { password });
-                    
-                    // Migrate DB Main Data
-                    const existingData = await db.findOne('users', uid);
-                    if (existingData) {
-                        await db.create('users', { 
-                            ...existingData, 
-                            user_id: existingUid,
-                            id: existingUid 
-                        }, existingUid);
-                        await db.remove('users', uid);
-                    }
-                    error = null; // Successfully merged
-                } else {
-                    error = fetchErr || new Error("Failed to fetch existing user by email.");
-                }
-            } else {
-                error = createErr;
-            }
-        } else {
-            error = new Error("User not found in Auth and no email found in DB to auto-provision.");
-        }
-    }
-    
-    if (error) {
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await db.update("users", uid, { password_hash: hashedPassword });
+        res.json({ success: true, message: "Password updated successfully" });
+    } catch (error) {
         console.error(`Admin Error: Failed to change/provision password for ${uid}:`, error);
         return res.status(500).json({ error: `Admin Auth Error: ${error.message}` });
     }
-
-    res.json({ success: true, message: "Password updated successfully" });
   });
 
   // Bulk Stock Take
@@ -616,7 +619,8 @@ async function startServer() {
       approvals: 'approvals:view',
       pricing_tiers: 'pricing:view',
       pricing_cards: 'pricing:view',
-      app_settings: 'admin'
+      app_settings: 'admin',
+      audit_logs: 'viewer', // Allow viewer to write logs implicitly below
   };
 
   collections.forEach(colName => {
@@ -626,7 +630,15 @@ async function startServer() {
     app.get(`/api/${colName}`, authenticate, authorize(basePerm), async (req, res) => {
       console.log(`Backend: Fetching ${colName} (DAL)...`);
       try {
-        const data = await db.findMany(colName);
+        let data = await db.findMany(colName);
+        if (colName === 'users') {
+            data = data.map(d => {
+                const copy = { ...d };
+                delete copy.password_hash;
+                if (copy.metadata) delete copy.metadata.password_hash;
+                return copy;
+            });
+        }
         res.json(data);
       } catch (error) {
         console.error(`Backend Error: Error fetching ${colName}:`, error);
@@ -646,11 +658,18 @@ async function startServer() {
       const data = await db.findOne(colName, req.params.id);
       
       if (!data) return res.status(404).json({ error: "Not Found" });
+      if (colName === 'users') {
+        delete data.password_hash;
+        if (data.metadata) delete data.metadata.password_hash;
+      }
       res.json(data);
     });
 
     // Create (Normalized)
-    app.post(`/api/${colName}`, authenticate, authorize(`${basePerm}:create`), async (req, res) => {
+    app.post(`/api/${colName}`, authenticate, (req, res, next) => {
+        if (colName === 'audit_logs') return next();
+        authorize(`${basePerm}:create`)(req, res, next);
+    }, async (req, res) => {
       const data = req.body;
       console.log(`Backend: Saving ${colName} (DAL)...`, data.id);
       
@@ -663,6 +682,10 @@ async function startServer() {
             runTriggers(colName, null, newDoc);
           }
         })().catch(e => console.error(`Async trigger error for ${colName}:`, e));
+        if (colName === 'users' && result) {
+          delete result.password_hash;
+          if (result.metadata) delete result.metadata.password_hash;
+        }
         res.json(result);
       } catch (error) {
         console.error(`Backend Error: Error saving ${colName}:`, error);

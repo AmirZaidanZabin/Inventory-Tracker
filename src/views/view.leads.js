@@ -1,5 +1,5 @@
 import { auth } from '../lib/auth.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { renderTable } from '../lib/table.js';
 
 export function LeadsView() {

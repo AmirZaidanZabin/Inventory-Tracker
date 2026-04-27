@@ -1,4 +1,5 @@
-import { firebase } from '../lib/firebase.js';
+import { auth } from '../lib/auth.js';
+const firebase = { ...auth, auth: auth };
 
 export async function runAuthTests(t) {
     // --- Test 1: Verify Password Failure Logic ---

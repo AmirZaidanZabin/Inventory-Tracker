@@ -1,5 +1,5 @@
 import { controller } from '../lib/controller.js';
-import { db as genericDb } from '../lib/db/index.js';
+import { apiDb as genericDb } from '../lib/api-client.js';
 import initSqlJs from 'sql.js';
 
 export function ReportingView() {

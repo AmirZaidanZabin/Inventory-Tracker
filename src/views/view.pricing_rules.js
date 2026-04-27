@@ -1,4 +1,4 @@
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { createModal } from '../lib/modal.js';
 
 export function PricingRulesView() {

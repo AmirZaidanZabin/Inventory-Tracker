@@ -1,0 +1,39 @@
+39:  databaseURL: `https://${firebaseConfig.projectId}-default-rtdb.firebaseio.com/`
+59:  console.log(`Using RTDB at: https://${firebaseConfig.projectId}-default-rtdb.firebaseio.com/`);
+82:    const userDoc = await db.findOne("users", decodedToken.uid);
+88:        const roleData = await db.findOne("roles", roleId);
+136:      const triggers = await db.findMany('triggers');
+211:    const adminData = await db.findOne("users", req.user.uid);
+230:        const userData = await db.findOne("users", uid);
+249:                    const existingData = await db.findOne('users', uid);
+251:                        await db.create('users', { 
+256:                        await db.remove('users', uid);
+295:          return db.update("items", item_id, {
+314:        const allItemsList = await db.findMany('items');
+331:      await db.create("stock_take_logs", {
+360:      const lead = await db.findOne('leads', lead_id);
+363:      const settings = await db.findOne('app_settings', 'global') || {};
+373:      const tiersList = await db.findMany('pricing_tiers') || [];
+375:      const cardsList = await db.findMany('pricing_cards') || [];
+463:          await db.update('leads', lead_id, { status: 'approved', approved_at: db.serverTimestamp(), breach_details: null });
+473:              created_at: db.serverTimestamp(),
+477:          const approvalRecord = await db.create('approvals', approvalItem);
+478:          await db.update('leads', lead_id, { 
+496:      const allMerchants = await db.findMany('merchants');
+499:      const allLeads = await db.findMany('leads');
+506:      const settings = await db.findOne('app_settings', 'global');
+546:      const approval = await db.findOne('approvals', String(approval_id));
+565:      const lead = await db.findOne('leads', leadId);
+573:      await db.update('approvals', String(approval_id), {
+577:          resolved_at: db.serverTimestamp()
+586:          leadUpdate.approved_at = db.serverTimestamp();
+588:          leadUpdate.rejected_at = db.serverTimestamp();
+591:      await db.update('leads', String(leadId), leadUpdate);
+629:        const data = await db.findMany(colName);
+646:      const data = await db.findOne(colName, req.params.id);
+658:        const result = await db.create(colName, data, data.id);
+661:          const newDoc = await db.findOne(colName, result.id);
+680:      const prevDoc = await db.findOne(colName, id);
+683:        const result = await db.update(colName, id, data);
+686:          const newDoc = await db.findOne(colName, id);
+702:        await db.remove(colName, req.params.id);

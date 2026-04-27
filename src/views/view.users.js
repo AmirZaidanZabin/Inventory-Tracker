@@ -1,6 +1,6 @@
 import { controller } from '../lib/controller.js';
 import { auth } from '../lib/auth.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { createModal } from '../lib/modal.js';
 import { renderTable } from '../lib/table.js';
 
@@ -198,15 +198,15 @@ export function UsersView() {
                     approver_email: fd.get('approver_email'),
                     custom_data: customData,
                     vacation: Array.from(modal.element.querySelectorAll('#vacation-list > div')).map(div => ({
-                        start: div.querySelector('.vac-start').value,
-                        end: div.querySelector('.vac-end').value
+                        start: div.querySelector('.vac-start')?.value,
+                        end: div.querySelector('.vac-end')?.value
                     })).filter(v => v.start && v.end)
                 }
             };
 
             try {
                 if (user) {
-                    await db.update('users', user.user_id, data);
+                    await db.update('users', user.user_id || user.id, data);
                     db.logAction("User Updated", `User ${data.user_name} updated`);
                 } else {
                     const tempId = `manual_${Math.random().toString(36).substr(2, 9)}`;
@@ -325,14 +325,14 @@ export function UsersView() {
                             if (chk.checked) {
                                 const idx = chk.dataset.idx;
                                 newSchedule[idx] = {
-                                    start: modal.element.querySelector(`#start-day-${idx}`).value,
-                                    end: modal.element.querySelector(`#end-day-${idx}`).value
+                                    start: modal.element.querySelector(`#start-day-${idx}`)?.value,
+                                    end: modal.element.querySelector(`#end-day-${idx}`)?.value
                                 };
                             }
                         });
                         
                         try {
-                            await db.update('users', user.user_id, { 
+                            await db.update('users', user.user_id || user.id, { 
                                 updated_at: db.serverTimestamp(),
                                 metadata: {
                                     ...(user.metadata || {}),
@@ -387,7 +387,7 @@ export function UsersView() {
                         const btn = e.target.querySelector('button[type="submit"]');
                         const originalHtml = btn.innerHTML;
                         
-                        const newPassword = modal.element.querySelector('#new-password').value;
+                        const newPassword = modal.element.querySelector('#new-password')?.value;
                         const uid = user.user_id || user.id;
 
                         if (!uid) return alert("Error: User ID not found.");

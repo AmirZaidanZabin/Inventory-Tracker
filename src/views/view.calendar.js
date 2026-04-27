@@ -1,6 +1,6 @@
 import { controller } from '../lib/controller.js';
 import { auth } from '../lib/auth.js';
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { formatServerToLocalTime } from '../lib/timezone.js';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

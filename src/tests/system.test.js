@@ -5,8 +5,9 @@
  */
 
 import { calculateDistance, estimateDuration } from '../lib/travel-logic.js';
-import { firebase } from '../lib/firebase.js';
-import { db } from '../lib/db/index.js';
+import { auth } from '../lib/auth.js';
+const firebase = { ...auth, auth: auth };
+import { apiDb as db } from '../lib/api-client.js';
 
 export async function runSystemTests(t) {
     // --- 1. Unit Tests: travel-logic.js ---

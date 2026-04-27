@@ -1,4 +1,4 @@
-import { db } from '../lib/db/index.js';
+import { apiDb as db } from '../lib/api-client.js';
 import { renderTable } from '../lib/table.js';
 
 export function SettingsView() {
@@ -262,7 +262,7 @@ export function SettingsView() {
                         smtp_url: element.querySelector('#txt-smtp-url').value,
                         updated_at: db.serverTimestamp()
                     };
-                    await db.updateOrCreate('app_settings', 'global', payload);
+                    await db.put('app_settings', 'global', payload);
                     state.data.settings = payload;
                     alert('Global settings saved successfully.');
                 } catch(e) {
